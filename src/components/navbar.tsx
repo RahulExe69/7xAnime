@@ -86,34 +86,39 @@ const NavBar = () => {
           : "",
       ])}
     >
-      <Container className="flex items-center justify-between py-2 gap-20 ">
-        <Link
-          href={ROUTES.HOME}
-          className="flex items-center gap-1 cursor-pointer"
-        >
-          <Image src="/icon.png" alt="logo" width={70} height={70} />
-          <h1
-            className={cn([
-              nightTokyo.className,
-              "text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-gray-200 to-pink-600 tracking-widest",
-            ])}
-          >7xAnime</h1>
-        </Link>
+      <Container className="flex flex-col items-stretch gap-2 py-2 lg:flex-row lg:items-center lg:justify-between lg:gap-8">
+        <div className="flex w-full items-center justify-between lg:w-auto">
+          <Link
+            href={ROUTES.HOME}
+            className="flex min-w-0 items-center gap-2 cursor-pointer"
+          >
+            <Image src="/icon.png" alt="7xAnime logo" width={44} height={44} className="h-11 w-11 rounded-xl object-cover" />
+            <h1
+              className={cn([
+                nightTokyo.className,
+                "text-xl sm:text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-white via-violet-200 to-violet-400 tracking-wide",
+              ])}
+            >7xAnime</h1>
+          </Link>
 
-        <div className="hidden lg:flex items-center gap-10 ml-20">
+          <div className="flex items-center gap-3 lg:hidden">
+            <MobileMenuSheet trigger={<MenuIcon className="h-5 w-5" suppressHydrationWarning />} />
+            {auth.auth ? <NavbarAvatar auth={auth} /> : <LoginPopoverButton />}
+          </div>
+        </div>
+        <div className="hidden lg:flex items-center gap-8">
           {menuItems.map((menu, idx) => (
             <Link href={menu.href || "#"} key={idx}>
               {menu.title}
             </Link>
           ))}
         </div>
-        <div className="w-1/3 hidden lg:flex items-center gap-5">
+        <div className="hidden lg:flex w-full max-w-2xl items-center gap-4">
           <SearchBar />
           {auth.auth ? <NavbarAvatar auth={auth} /> : <LoginPopoverButton />}
         </div>
-        <div className="lg:hidden flex items-center gap-5">
-          <MobileMenuSheet trigger={<MenuIcon suppressHydrationWarning />} />
-          {auth.auth ? <NavbarAvatar auth={auth} /> : <LoginPopoverButton />}
+        <div className="px-0 pb-1 lg:hidden">
+          <SearchBar className="w-full" />
         </div>
       </Container>
     </div>
@@ -146,7 +151,7 @@ const MobileMenuSheet = ({ trigger }: { trigger: ReactNode }) => {
               </Link>
             ))}
             <Separator />
-            <SearchBar onAnimeClick={() => setOpen(false)} />
+            <Link href={ROUTES.SEARCH} onClick={() => setOpen(false)} className="text-sm text-muted-foreground">Browse all anime</Link>
           </div>
         </div>
       </SheetContent>
