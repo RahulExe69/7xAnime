@@ -76,7 +76,7 @@ const AnimeSections = ({
           <Button
             onClick={() => onPageChange(page + 1)}
             disabled={!hasNextPage}
-            className="rounded-full bg-slate-800 border border-slate-700 h-9 w-9 p-0 hover:bg-slate-700 disabled:opacity-40"
+            className="h-9 w-9 rounded-full border border-white/10 bg-white/5 p-0 hover:bg-violet-500/15 disabled:opacity-40"
           >
             <ArrowRight className="h-4 w-4 text-white" />
           </Button>
