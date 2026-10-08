@@ -129,7 +129,7 @@ const Page = () => {
           <AnimeCard
             title={anime.anime.info.name}
             poster={anime.anime.info.poster}
-            href={`${ROUTES.ANIME_DETAILS}/${anime.anime.info.id}`}
+            href={ROUTES.animeDetails(anime.anime.info.id)}
             displayDetails={false}
             variant="lg"
             className="shrink-0"
@@ -237,7 +237,7 @@ const Page = () => {
                       subTitle={relation.title}
                       poster={relation.poster}
                       className="self-center justify-self-center"
-                      href={`${ROUTES.ANIME_DETAILS}/${relation.id}`}
+                      href={ROUTES.animeDetails(relation.id)}
                     />
                   )
                 );
