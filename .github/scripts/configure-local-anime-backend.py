@@ -56,6 +56,46 @@ def insert_before_block_end(text: str, pattern: str, snippet: str, label: str) -
     return text[:close_index] + snippet + text[close_index:]
 
 
+
+def patch_settings_gradle() -> None:
+    """Ensure the Chaquopy plugin can be resolved from Maven Central."""
+    path = ANDROID / "settings.gradle"
+    if not path.is_file():
+        fail("android/settings.gradle does not exist.")
+
+    text = path.read_text(encoding="utf-8")
+    plugin_management = re.search(r"(?m)^\s*pluginManagement\s*\{", text)
+    if not plugin_management:
+        block = (
+            "pluginManagement {\n"
+            "    repositories {\n"
+            "        gradlePluginPortal()\n"
+            "        google()\n"
+            "        mavenCentral()\n"
+            "    }\n"
+            "}\n\n"
+        )
+        text = block + text
+        path.write_text(text, encoding="utf-8")
+        return
+
+    open_index = text.find("{", plugin_management.start())
+    close_index = matching_brace(text, open_index)
+    block = text[open_index:close_index]
+    if "mavenCentral()" in block:
+        return
+
+    repository_match = re.search(r"(?m)^\s*repositories\s*\{", block)
+    if repository_match:
+        repo_open = block.find("{", repository_match.start())
+        repo_close = matching_brace(block, repo_open)
+        block = block[:repo_close] + "\n        mavenCentral()\n    " + block[repo_close:]
+    else:
+        block = block + "\n    repositories {\n        gradlePluginPortal()\n        google()\n        mavenCentral()\n    }\n"
+    text = text[:open_index] + block + text[close_index:]
+    path.write_text(text, encoding="utf-8")
+
+
 def patch_root_gradle() -> None:
     path = ANDROID / "build.gradle"
     if not path.is_file():
@@ -292,6 +332,7 @@ def main() -> None:
         fail("The generated android/ directory is missing; generate Android with Capacitor first.")
 
     copy_python_source()
+    patch_settings_gradle()
     patch_root_gradle()
     patch_app_gradle()
     patch_manifest()
