@@ -58,7 +58,7 @@ if name_count != 1:
     print("ERROR: could not locate the generated Android versionName.", file=sys.stderr)
     raise SystemExit(1)
 
-if "applicationIdSuffix ".debug"" not in text:
+if 'applicationIdSuffix ".debug"' not in text:
     marker = "    buildTypes {"
     debug_block = """    buildTypes {
         debug {
