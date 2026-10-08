@@ -1,10 +1,14 @@
 import withPWA from "next-pwa";
 
+const isStaticExport = process.env.NEXT_STATIC_EXPORT === "1";
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: "standalone",
+  output: isStaticExport ? "export" : "standalone",
+  trailingSlash: isStaticExport,
   reactStrictMode: true,
   images: {
+    unoptimized: isStaticExport,
     remotePatterns: [
       {
         protocol: "https",
@@ -16,7 +20,7 @@ const nextConfig = {
 
 export default withPWA({
   dest: "public",
-  register: true,
-  skipWaiting: true,
-  disable: process.env.NODE_ENV === "development",
+  register: !isStaticExport,
+  skipWaiting: !isStaticExport,
+  disable: isStaticExport || process.env.NODE_ENV === "development",
 })(nextConfig);
