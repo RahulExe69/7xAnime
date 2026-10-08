@@ -299,7 +299,7 @@ const VideoPlayerSection = () => {
               onClick={() => handleCategoryChange("sub")}
               className={`h-8 px-4 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition ${
                 activeCategory === "sub"
-                  ? "bg-[#8b5cf6] text-white hover:bg-[#e9376b]"
+                  ? "bg-[#8b5cf6] text-white hover:bg-[#8b5cf6]"
                   : "bg-slate-800 text-gray-400 hover:bg-slate-700"
               }`}
             >
@@ -378,7 +378,7 @@ const VideoPlayerSection = () => {
                   key={`sub-${pName}`}
                   className={`uppercase font-bold text-xs px-3 transition-all ${
                     isActive
-                      ? "bg-[#e9376b] text-white shadow-md ring-2 ring-[#e9376b]/40 scale-105"
+                      ? "bg-[#8b5cf6] text-white shadow-md ring-2 ring-[#8b5cf6]/40 scale-105"
                       : "bg-white/[0.05] text-zinc-300 hover:bg-white/[0.1] hover:text-white"
                   }`}
                   onClick={() => handleProviderSelect(pName, "sub")}

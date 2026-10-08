@@ -136,7 +136,7 @@ function AnimeSchedule() {
                           <div className="flex flex-col justify-between flex-1 min-w-0 py-0.5">
                             <div className="flex flex-col gap-1">
                               <span className="text-xs text-gray-400 flex items-center gap-1 font-medium">
-                                <Clock className="h-3 w-3 text-[#e9376b]" />
+                                <Clock className="h-3 w-3 text-[#8b5cf6]" />
                                 {timeFormatted}
                               </span>
                               <h3 className="text-sm font-bold text-white line-clamp-2 leading-snug">
@@ -145,13 +145,13 @@ function AnimeSchedule() {
                             </div>
 
                             <div className="flex items-center justify-between gap-2 mt-2">
-                              <Badge className="bg-[#e9376b]/20 text-[#e9376b] border border-[#e9376b]/40 text-[10px] px-2 py-0.5">
+                              <Badge className="bg-[#8b5cf6]/20 text-[#8b5cf6] border border-[#8b5cf6]/40 text-[10px] px-2 py-0.5">
                                 Ep {anime.episode}
                               </Badge>
                               <Link href={ROUTES.animeDetails(anime.id)}>
                                 <Button
                                   size="sm"
-                                  className="h-7 text-xs bg-slate-800 hover:bg-[#e9376b] text-white px-2.5 rounded-lg flex items-center gap-1 transition"
+                                  className="h-7 text-xs bg-slate-800 hover:bg-[#8b5cf6] text-white px-2.5 rounded-lg flex items-center gap-1 transition"
                                 >
                                   <Play className="h-3 w-3 fill-current" /> Details
                                 </Button>

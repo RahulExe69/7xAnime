@@ -105,7 +105,7 @@ const SearchResults = () => {
   return (
     <div className="mx-auto flex min-h-[75vh] w-full max-w-[1600px] flex-col gap-6 px-4 pb-16 pt-28 sm:gap-8 md:px-6 lg:pt-32 lg:px-8">
       <div className="flex flex-col gap-5 rounded-2xl border border-white/[0.07] bg-white/[0.035] p-4 backdrop-blur-sm sm:p-6">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div className="flex items-center gap-2"><Search className="h-5 w-5 text-violet-300" /><p className="text-lg font-semibold">Find your next anime</p></div><span className="text-xs text-zinc-500">Search by title or narrow it down with filters</span></div><SearchBar className="max-w-2xl" /><p className="text-sm font-semibold text-zinc-300">Refine results</p>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div className="flex items-center gap-2"><Search className="h-5 w-5 text-violet-300" /><p className="text-lg font-semibold">Find your next anime</p></div><span className="text-xs text-zinc-500">Search by title or narrow it down with filters</span></div><SearchBar className="max-w-2xl" showFilterButton={false} /><p className="text-sm font-semibold text-zinc-300">Refine results</p>
         <div className="flex flex-wrap gap-3">
           <Select
             options={types}

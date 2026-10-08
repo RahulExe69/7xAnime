@@ -70,9 +70,9 @@ const NavBar = () => {
       className={cn([
         "h-fit w-full",
         "sticky top-0 z-[100] duration-300",
-        isHeaderFixed ? "fixed bg-gradient-to-b from-slate-700" : "",
+        isHeaderFixed ? "fixed border-b border-white/[0.06] bg-[#09090f]/90 backdrop-blur-xl" : "",
         isHeaderSticky
-          ? "bg-clip-padding backdrop-filter backdrop-blur-md bg-opacity-10 bg-slate-900"
+          ? "shadow-lg shadow-black/10"
           : "",
       ])}
     >

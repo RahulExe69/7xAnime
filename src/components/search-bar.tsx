@@ -14,9 +14,11 @@ import Tooltip from "./common/tooltip";
 const SearchBar = ({
   className,
   onAnimeClick,
+  showFilterButton = true,
 }: {
   className?: string;
   onAnimeClick?: () => void;
+  showFilterButton?: boolean;
 }) => {
   const [searchValue, setSearchValue] = useState<string>("");
   const [isFocused, setIsFocused] = useState<boolean>(false);
@@ -62,24 +64,26 @@ const SearchBar = ({
         <SearchIcon suppressHydrationWarning className="absolute inset-y-0 left-3 m-auto h-4 w-4 text-zinc-400" />
       <Input
         className="h-10 w-full rounded-xl border-white/10 bg-white/[0.06] pl-9 pr-11 text-sm text-white placeholder:text-zinc-500 focus-visible:border-violet-400/60 focus-visible:ring-violet-400/20"
-        placeholder="Search anime, genres..."
+        placeholder="Search anime..."
         onChange={(e) => setSearchValue(e.target.value)}
         onFocus={() => setIsFocused(true)}
         onBlur={handleBlur}
         value={searchValue}
         onKeyDown={handleKeyDown}
       />
-      <Button
-        variant="secondary"
-        className="absolute right-1.5 top-1/2 h-8 -translate-y-1/2 rounded-lg text-zinc-300 hover:bg-violet-500/15 hover:text-violet-200"
-        onClick={() => {
-          router.push(ROUTES.SEARCH + '?q=""');
-        }}
-      >
-        <Tooltip side="bottom" content="Filter">
+      {showFilterButton && (
+        <Button
+          variant="secondary"
+          className="absolute right-1.5 top-1/2 h-8 -translate-y-1/2 rounded-lg text-zinc-300 hover:bg-violet-500/15 hover:text-violet-200"
+          onClick={() => {
+            router.push(ROUTES.SEARCH + '?q=""');
+          }}
+        >
+          <Tooltip side="bottom" content="Filter">
             <SlidersHorizontal suppressHydrationWarning className="h-4 w-4" />
-        </Tooltip>
-      </Button>
+          </Tooltip>
+        </Button>
+      )}
       {isFocused && searchValue && (
         <div
           ref={resultsRef}
