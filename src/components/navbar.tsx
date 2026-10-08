@@ -9,7 +9,7 @@ import { Separator } from "./ui/separator";
 
 import { nightTokyo } from "@/utils/fonts";
 import { ROUTES } from "@/constants/routes";
-import React, { ReactNode, useEffect } from "react";
+import React, { ReactNode, useEffect, useState } from "react";
 
 import SearchBar from "./search-bar";
 import { MenuIcon, X } from "lucide-react";
