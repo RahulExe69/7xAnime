@@ -1,5 +1,5 @@
 import { GET_ALL_EPISODES } from "@/constants/query-keys";
-import { api } from "@/lib/api";
+import { api, isLocalBackendEnabled } from "@/lib/api";
 import { Episode, IEpisodes } from "@/types/episodes";
 import { EpisodeResponse } from "@/types/miruro-api";
 import { useQuery } from "react-query";
@@ -45,7 +45,9 @@ const fetchAniListEpisodesFallback = async (
         const epNum = i + 1;
         return {
           title: `Episode ${epNum}`,
-          episodeId: `${epNum}`,
+          episodeId: isLocalBackendEnabled()
+            ? `watch/auto/${animeId}/sub/episode-${epNum}`
+            : `${epNum}`,
           number: epNum,
           isFiller: false,
           hasSub: true,
@@ -63,7 +65,9 @@ const fetchAniListEpisodesFallback = async (
     console.error("AniList fallback error:", err);
     const fallbackEpisodes: Episode[] = Array.from({ length: 12 }, (_, i) => ({
       title: `Episode ${i + 1}`,
-      episodeId: `${i + 1}`,
+      episodeId: isLocalBackendEnabled()
+        ? `watch/auto/${animeId}/sub/episode-${i + 1}`
+        : `${i + 1}`,
       number: i + 1,
       isFiller: false,
       hasSub: true,
