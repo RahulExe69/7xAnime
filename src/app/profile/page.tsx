@@ -1,6 +1,6 @@
 "use client";
 
-import React, { Suspense, useEffect, useRef, useState } from "react";
+import React, { Suspense, useRef } from "react";
 import Container from "@/components/container";
 import Avatar from "@/components/common/avatar";
 import { useAuthStore } from "@/store/auth-store";
