@@ -25,6 +25,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
+    env:
+      NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }}
+      NEXT_PUBLIC_POCKETBASE_URL: ${{ secrets.NEXT_PUBLIC_POCKETBASE_URL }}
+      NEXT_PUBLIC_PROXY_URL: ${{ secrets.NEXT_PUBLIC_PROXY_URL }}
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -60,6 +65,29 @@ jobs:
             VERSION="$(node -p 'require("./package.json").version')"
           fi
           bash .github/scripts/android-version.sh "${VERSION}" >> "${GITHUB_ENV}"
+
+      - name: Validate mobile endpoints
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          for key in NEXT_PUBLIC_API_URL NEXT_PUBLIC_POCKETBASE_URL NEXT_PUBLIC_PROXY_URL; do
+            value="${!key:-}"
+            if [[ -z "${value}" ]]; then
+              echo "::error::Missing required Actions secret: ${key}"
+              exit 1
+            fi
+
+            if [[ ! "${value}" =~ ^https:// ]]; then
+              echo "::error::${key} must use an HTTPS endpoint for the bundled Android app."
+              exit 1
+            fi
+
+            if [[ "${value}" =~ (localhost|127\.0\.0\.1|0\.0\.0\.0) ]]; then
+              echo "::error::${key} points to a local development host and cannot be embedded in the Android app."
+              exit 1
+            fi
+          done
 
       - name: Build static web bundle
         run: npm run build:android-web
