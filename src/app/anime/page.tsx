@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { Suspense, useEffect, useState } from "react";
 import Image from "next/image";
 
 import parse from "html-react-parser";
@@ -25,6 +25,7 @@ import {
   TvMinimalPlay,
 } from "lucide-react";
 import { useGetAnimeDetails } from "@/query/get-anime-details";
+import { useSearchParams } from "next/navigation";
 import Loading from "@/app/loading";
 import { useAuthStore } from "@/store/auth-store";
 import { toast } from "sonner";
@@ -58,13 +59,9 @@ const SelectOptions: ISelectOptions[] = [
   },
 ];
 
-const Page = () => {
-  const [slug, setSlug] = useState("");
-
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    setSlug(params.get("id") || "");
-  }, []);
+const PageContent = () => {
+  const searchParams = useSearchParams();
+  const slug = searchParams.get("id") || "";
 
   const { data: anime, isLoading } = useGetAnimeDetails(slug as string);
   const { auth } = useAuthStore();
@@ -283,5 +280,11 @@ const Page = () => {
   );
   //eslint-disable-next-line
 };
+
+const Page = () => (
+  <Suspense fallback={<Loading />}>
+    <PageContent />
+  </Suspense>
+);
 
 export default Page;
