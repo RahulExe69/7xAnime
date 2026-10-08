@@ -77,12 +77,12 @@ const ContinueWatching = (props: Props) => {
   if ((!anime || !anime.length) && !props.loading) return <></>;
 
   return (
-    <Container className="flex flex-col gap-5 py-10 items-center lg:items-start">
+    <Container className="flex flex-col gap-4 py-7 items-center lg:items-start sm:gap-5 sm:py-9">
       <div className="flex items-center gap-2">
         <History />
         <h5 className="text-2xl font-bold">Continue Watching</h5>
       </div>
-      <div className="grid lg:grid-cols-5 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-7 w-full gap-5 content-center">
+      <div className="grid w-full grid-cols-2 content-start gap-x-3 gap-y-5 sm:grid-cols-3 sm:gap-4 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7">
         {anime?.map(
           (ani, idx) =>
             ani.episode && (
@@ -106,14 +106,14 @@ const ContinueWatching = (props: Props) => {
 
 const LoadingSkeleton = () => {
   return (
-    <Container className="flex flex-col gap-5 py-10 items-center lg:items-start lg:mt-[10.125rem] z-20 ">
+    <Container className="relative z-20 flex flex-col gap-4 py-7 items-center lg:items-start sm:gap-5 sm:py-9">
       <div className="h-10 w-[15.625rem] animate-pulse bg-slate-700"></div>
       <div className="grid lg:grid-cols-5 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-7 w-full gap-5 content-center">
         {[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1].map((_, idx) => {
           return (
             <div
               key={idx}
-              className="rounded-xl h-[15.625rem] min-w-[10.625rem] max-w-[12.625rem] md:h-[18.75rem] md:max-w-[12.5rem] animate-pulse bg-slate-700"
+              className="aspect-[2/3] w-full rounded-2xl animate-pulse bg-white/[0.06]"
             ></div>
           );
         })}
