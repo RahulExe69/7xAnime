@@ -8,6 +8,7 @@ import GoogleIcon from "@/icons/google";
 import { pb } from "@/lib/pocketbase";
 import { toast } from "sonner";
 import { useAuthStore } from "@/store/auth-store";
+import { isLocalBackendEnabled } from "@/lib/api";
 
 type FormData = {
   username: string;
@@ -180,6 +181,22 @@ function LoginPopoverButton() {
       });
     }
   };
+
+  if (isLocalBackendEnabled()) {
+    return (
+      <Button
+        variant="outline"
+        className="border-violet-400/30 bg-violet-500/10 text-violet-100 hover:bg-violet-500/20"
+        onClick={() =>
+          toast.info(
+            "Guest mode is active. Browsing and playback are on-device; accounts, shared comments, and synced lists need a separate server.",
+          )
+        }
+      >
+        Guest mode
+      </Button>
+    );
+  }
 
   return (
     <Popover>
