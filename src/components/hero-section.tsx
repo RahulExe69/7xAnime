@@ -111,7 +111,7 @@ const HeroCarouselItem = ({ anime }: { anime: MediaList }) => {
 
             <div className="flex items-center gap-5 !mt-6">
               <ButtonLink
-                href={`${ROUTES.ANIME_DETAILS}/${anime.id}`}
+                href={ROUTES.animeDetails(anime.id)}
                 className="h-10 text-md bg-[#e9376b] text-white hover:bg-[#e9376b]"
               >
                 Learn More
