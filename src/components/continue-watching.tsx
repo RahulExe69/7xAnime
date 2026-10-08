@@ -10,6 +10,8 @@ import { History } from "lucide-react";
 import SectionHeading from "./section-heading";
 import useBookMarks, { WatchHistory } from "@/hooks/use-get-bookmark";
 import { useAuthStore } from "@/store/auth-store";
+import { isLocalBackendEnabled } from "@/lib/api";
+import { getRecentLocalWatchProgress } from "@/lib/local-watch-progress";
 
 type Props = {
   loading: boolean;
@@ -30,6 +32,30 @@ const ContinueWatching = (props: Props) => {
   });
 
   useEffect(() => {
+    if (isLocalBackendEnabled()) {
+      const localEntries = getRecentLocalWatchProgress(14);
+      const localAnime = localEntries
+        .filter((entry) => !!entry.animeId && !!(entry.poster || entry.animeTitle))
+        .map((entry) => ({
+          id: entry.animeId,
+          name: entry.animeTitle || "Continue Watching",
+          poster: entry.poster || "/icon.png",
+          episode: {
+            id: "local",
+            user: "local",
+            episodeNumber: entry.episodeNumber,
+            current: entry.current,
+            timestamp: entry.duration,
+            created: new Date(entry.updatedAt).toISOString(),
+          } as WatchHistory,
+          updatedAt: entry.updatedAt,
+        }))
+        .sort((a, b) => b.updatedAt - a.updatedAt)
+        .map(({ updatedAt: _updatedAt, ...item }) => item);
+      setAnime(localAnime.length ? (localAnime as WatchedAnime[]) : null);
+      return;
+    }
+
     if (!auth) {
       if (typeof window !== "undefined") {
         const storedData = localStorage.getItem("watched");
