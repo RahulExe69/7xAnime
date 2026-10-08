@@ -2,14 +2,14 @@
 
 Watch your favourite anime anywhere, anytime. No Ads.
 
-Kitsune is a free, open-source anime streaming website. It is built using the [Next Js](https://nextjs.org/) framework, [Shadcn/ui](https://ui.shadcn.com), and [Tailwind CSS](https://tailwindcss.com/).
+7xAnime is a free, open-source anime streaming app and website. It is built using the [Next Js](https://nextjs.org/) framework, [Shadcn/ui](https://ui.shadcn.com), and [Tailwind CSS](https://tailwindcss.com/).
 
 _Kitsune is still under development and may encounter many bugs. Feel free to open any issue regarding bugs or features_
 
 ## Features
 
 - **No Ads** - No ads, no popups, no redirects, no bullshit.
-- **PWA Support** - Kitsune is a PWA, which means you can install it on your phone.
+- **PWA Support** - 7xAnime is a PWA, which means you can install it on your phone.
 
 ## Contributing
 
@@ -45,8 +45,9 @@ You will need discord client secret if you wish to use login from discord featur
 
 ### Frontend
 
-Clone the repo and `cd Kitsune/`.  
-Open `.env` file and change the port. if you are using the above proxy and pocketbase then you are good to go. Then,
+Clone the repo and `cd Kitsune/`.
+
+Open the `.env` file and configure your API, proxy, and PocketBase endpoints. Then:
 
 ```
 npm install
