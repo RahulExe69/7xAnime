@@ -5,6 +5,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import Link from "next/link";
 import { User, LogOut } from "lucide-react";
 import { pb } from "@/lib/pocketbase";
+import { ROUTES } from "@/constants/routes";
 
 type Props = {
   auth: IAuthStore;
