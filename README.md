@@ -39,13 +39,13 @@ Head over to [Proxy-M3U8](https://github.com/Dovakiin0/proxy-m3u8) and follow th
 
 ### Pocketbase
 
-Follow the instruction from the official website. Setup initial superadmin credentials. Once inside dashboard, go to settings > Import Collections and paste the content from [collection-JSON](https://github.com/Dovakiin0/Kitsune/blob/master/docs/pb.json) and click import.
+Follow the instruction from the official website. Setup initial superadmin credentials. Once inside dashboard, go to settings > Import Collections and paste the content from [collection-JSON](https://github.com/RahulExe69/7xAnime/blob/master/docs/pb.json) and click import.
 
 You will need discord client secret if you wish to use login from discord feature.
 
 ### Frontend
 
-Clone the repo and `cd Kitsune/`.
+Clone the repo and `cd 7xAnime/`.
 
 Open the `.env` file and configure your API, proxy, and PocketBase endpoints. Then:
 
