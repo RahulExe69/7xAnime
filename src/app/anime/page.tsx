@@ -251,7 +251,7 @@ const PageContent = () => {
               className="w-full flex flex-col gap-5 "
             >
               <h3 className="text-xl font-semibold">Anime Characters</h3>
-              <div className="grid lg:grid-cols-5 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-7 w-full gap-5 content-center">
+              <div className="grid w-full grid-cols-2 content-start gap-x-3 gap-y-5 sm:grid-cols-3 sm:gap-4 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7">
                 {anime.anime.info.charactersVoiceActors.map(
                   (character, idx) => {
                     return (
