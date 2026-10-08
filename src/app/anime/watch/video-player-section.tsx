@@ -18,6 +18,8 @@ import { useGetAllEpisodes } from "@/query/get-all-episodes";
 
 import useBookMarks from "@/hooks/use-get-bookmark";
 import { useGetSourceAvailable } from "@/query/get-source-available";
+import { isLocalBackendEnabled } from "@/lib/api";
+import { saveLocalWatchProgress } from "@/lib/local-watch-progress";
 
 const VideoPlayerSection = () => {
   const searchParams = useSearchParams();
@@ -163,6 +165,7 @@ const VideoPlayerSection = () => {
     let isMounted = true;
 
     const initBookmark = async () => {
+      if (isLocalBackendEnabled()) return;
       const animeName = anime?.anime?.info?.name || "Anime";
       const poster = anime?.anime?.info?.poster || "";
       const bId = await createOrUpdateBookMark(
@@ -213,7 +216,17 @@ const VideoPlayerSection = () => {
         if (isComplete || Math.abs(now - lastSyncedTimeRef.current) >= 10) {
           lastSyncedTimeRef.current = now;
 
-          if (fallbackBookmarkIdRef.current) {
+          if (isLocalBackendEnabled()) {
+            saveLocalWatchProgress({
+              animeId: animeIdParam || anime?.anime?.info?.id || "0",
+              episodeId: activeEpisodeId,
+              episodeNumber: Number(currentEpNumber) || 1,
+              animeTitle: anime?.anime?.info?.name || "Anime",
+              poster: anime?.anime?.info?.poster || "",
+              current: currentTime,
+              duration: duration,
+            });
+          } else if (fallbackBookmarkIdRef.current) {
             const recordId = await syncWatchProgress(
               fallbackBookmarkIdRef.current,
               fallbackWatchedRecordIdRef.current,
