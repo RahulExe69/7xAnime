@@ -56,8 +56,15 @@ npm run dev
 
 ### Using Docker
 
-There is a `docker-compose.yaml` file which you can use to run the both frontend and server.  
-Simply run `docker compose up -d`.
+For local full-stack development, first copy `.env.backend.example` to `.env.backend` and replace `PB_ADMIN_PASSWORD` with a unique local password. Then run:
+
+```bash
+docker compose up --build
+```
+
+Open `http://localhost:3000`. The stack runs the 7xAnime web app, Miruro API (port 8000), PocketBase (port 8090) and M3U8 proxy (port 4040). Backend ports are bound to localhost for local development only. PocketBase imports the schema from `docs/pb.json` automatically and persists data in the `pb_data` volume.
+
+More details, optional Google OAuth setup, and the Android HTTPS endpoint requirements are in [docs/SELF_HOSTING.md](docs/SELF_HOSTING.md). The bundled Miruro API may be blocked by Cloudflare or the hosting provider's IP range, so verify it from the actual deployment before relying on it.
 
 ## Support
 
