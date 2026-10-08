@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Configure the generated Capacitor project for an on-device Python API."""
+"""Configure the generated Capacitor Android project for a bundled Python API."""
 from __future__ import annotations
 
 import os
@@ -21,6 +21,7 @@ def fail(message: str) -> None:
 
 
 def matching_brace(content: str, open_index: int) -> int:
+    """Find a matching brace while ignoring quoted strings."""
     depth = 0
     quote = None
     escaped = False
@@ -29,7 +30,7 @@ def matching_brace(content: str, open_index: int) -> int:
         if quote:
             if escaped:
                 escaped = False
-            elif char == "\\\\":
+            elif char == "\\":
                 escaped = True
             elif char == quote:
                 quote = None
@@ -46,6 +47,15 @@ def matching_brace(content: str, open_index: int) -> int:
     return -1
 
 
+def insert_before_block_end(text: str, pattern: str, snippet: str, label: str) -> str:
+    match = re.search(pattern, text, flags=re.MULTILINE)
+    if not match:
+        fail(f"Could not locate {label}.")
+    open_index = text.find("{", match.start())
+    close_index = matching_brace(text, open_index)
+    return text[:close_index] + snippet + text[close_index:]
+
+
 def patch_root_gradle() -> None:
     path = ANDROID / "build.gradle"
     if not path.is_file():
@@ -54,23 +64,24 @@ def patch_root_gradle() -> None:
     if "com.chaquo.python" in text:
         return
 
-    plugins_match = re.search(r"(?m)^plugins\\s*\\{", text)
-    if plugins_match:
-        brace = text.find("{", plugins_match.start())
-        close = matching_brace(text, brace)
-        text = text[:close] + (
-            f'    id "com.chaquo.python" version "{CHAQUOPY_VERSION}" apply false\\n'
-        ) + text[close:]
+    plugins_pattern = r"^plugins\s*\{"
+    if re.search(plugins_pattern, text, flags=re.MULTILINE):
+        text = insert_before_block_end(
+            text,
+            plugins_pattern,
+            f'\n    id "com.chaquo.python" version "{CHAQUOPY_VERSION}" apply false\n',
+            "root plugins block",
+        )
     else:
-        deps_match = re.search(r"(?m)^\\s*dependencies\\s*\\{", text)
-        if not deps_match:
-            fail("No buildscript dependencies block found in android/build.gradle.")
-        brace = text.find("{", deps_match.start())
-        close = matching_brace(text, brace)
-        text = text[:close] + (
-            f'    classpath "com.chaquo.python:gradle:{CHAQUOPY_VERSION}"\\n'
-        ) + text[close:]
-
+        # Capacitor templates which use apply-plugin syntax declare classpaths
+        # inside buildscript.dependencies rather than a top-level plugins block.
+        deps_pattern = r"^\s*dependencies\s*\{"
+        text = insert_before_block_end(
+            text,
+            deps_pattern,
+            f'\n        classpath "com.chaquo.python:gradle:{CHAQUOPY_VERSION}"\n',
+            "root buildscript dependencies block",
+        )
     path.write_text(text, encoding="utf-8")
 
 
@@ -81,28 +92,33 @@ def patch_app_gradle() -> None:
     text = path.read_text(encoding="utf-8")
 
     if "com.chaquo.python" not in text:
-        apply_match = re.search(
-            r"(?m)^\\s*apply plugin:\\s*['\"]com\\.android\\.application['\"].*$",
-            text,
-        )
-        if apply_match:
-            insert_at = apply_match.end()
-            text = text[:insert_at] + "\\napply plugin: 'com.chaquo.python'" + text[insert_at:]
+        plugins_pattern = r"^plugins\s*\{"
+        if re.search(plugins_pattern, text, flags=re.MULTILINE):
+            text = insert_before_block_end(
+                text,
+                plugins_pattern,
+                '\n    id "com.chaquo.python"\n',
+                "app plugins block",
+            )
         else:
-            plugins_match = re.search(r"(?m)^plugins\\s*\\{", text)
-            if not plugins_match:
-                fail("Could not locate app-level Gradle plugin declaration.")
-            brace = text.find("{", plugins_match.start())
-            close = matching_brace(text, brace)
-            text = text[:close] + '    id "com.chaquo.python"\\n' + text[close:]
+            android_apply = re.search(
+                r"(?m)^(\s*apply plugin:\s*['\"]com\.android\.application['\"].*)$",
+                text,
+            )
+            if android_apply:
+                position = android_apply.end()
+                text = text[:position] + "\napply plugin: 'com.chaquo.python'" + text[position:]
+            else:
+                fail("Could not locate app-level Android plugin declaration.")
 
+    # Chaquopy 17 requires minSdk 24. Set the shared version when present.
     variables = ANDROID / "variables.gradle"
     patched_min_sdk = False
     if variables.is_file():
         variables_text = variables.read_text(encoding="utf-8")
         variables_text, count = re.subn(
-            r"(?m)^(\\s*minSdkVersion\\s*=\\s*)\\d+",
-            r"\\g<1>24",
+            r"(?m)^(\s*minSdkVersion\s*=\s*)\d+",
+            r"\g<1>24",
             variables_text,
             count=1,
         )
@@ -111,43 +127,42 @@ def patch_app_gradle() -> None:
             patched_min_sdk = True
 
     if not patched_min_sdk:
-        text, count = re.subn(
-            r"(?m)^(\\s*minSdkVersion\\s+)(?:rootProject\\.ext\\.minSdkVersion|\\d+)",
-            r"\\g<1>24",
-            text,
-            count=1,
-        )
-        if count == 0:
-            text, count = re.subn(
-                r"(?m)^(\\s*minSdk\\s*=\\s*)(?:rootProject\\.ext\\.minSdkVersion|\\d+)",
-                r"\\g<1>24",
-                text,
-                count=1,
-            )
-        if count == 0:
-            fail("Could not raise Android minSdk to Chaquopy's required API level 24.")
+        patterns = [
+            r"(?m)^(\s*minSdkVersion\s+)(?:rootProject\.ext\.minSdkVersion|\d+)",
+            r"(?m)^(\s*minSdk\s*=\s*)(?:rootProject\.ext\.minSdkVersion|\d+)",
+        ]
+        for pattern in patterns:
+            text, count = re.subn(pattern, r"\g<1>24", text, count=1)
+            if count:
+                patched_min_sdk = True
+                break
+    if not patched_min_sdk:
+        fail("Could not raise Android minSdk to Chaquopy's required API level 24.")
 
-    default_match = re.search(r"(?m)^\\s*defaultConfig\\s*\\{", text)
+    default_pattern = r"^\s*defaultConfig\s*\{"
+    default_match = re.search(default_pattern, text, flags=re.MULTILINE)
     if not default_match:
         fail("Could not locate app defaultConfig block.")
-    open_index = text.find("{", default_match.start())
-    close_index = matching_brace(text, open_index)
-    default_config = text[open_index:close_index]
+    default_open = text.find("{", default_match.start())
+    default_close = matching_brace(text, default_open)
+    default_config = text[default_open:default_close]
     if "abiFilters" not in default_config:
-        text = text[:close_index] + (
-            '\\n        ndk {\\n            abiFilters "arm64-v8a", "x86_64"\\n        }\\n    '
-        ) + text[close_index:]
+        text = (
+            text[:default_close]
+            + '\n        ndk {\n            abiFilters "arm64-v8a", "x86_64"\n        }\n    '
+            + text[default_close:]
+        )
 
     if "chaquopy {" not in text:
         text += (
-            "\\n\\nchaquopy {\\n"
-            "    defaultConfig {\\n"
-            f'        version = "{PYTHON_VERSION}"\\n'
-            "        pip {\\n"
-            '            install("-r", "src/main/python/requirements.txt")\\n'
-            "        }\\n"
-            "    }\\n"
-            "}\\n"
+            "\n\nchaquopy {\n"
+            "    defaultConfig {\n"
+            f'        version = "{PYTHON_VERSION}"\n'
+            "        pip {\n"
+            '            install("-r", "src/main/python/requirements.txt")\n'
+            "        }\n"
+            "    }\n"
+            "}\n"
         )
 
     path.write_text(text, encoding="utf-8")
@@ -158,26 +173,42 @@ def patch_manifest() -> None:
     if not path.is_file():
         fail("AndroidManifest.xml does not exist.")
     text = path.read_text(encoding="utf-8")
+    if "xmlns:android=" not in text:
+        text = re.sub(
+            r"<manifest\b",
+            '<manifest xmlns:android="http://schemas.android.com/apk/res/android"',
+            text,
+            count=1,
+        )
     if "android.permission.INTERNET" not in text:
-        if 'xmlns:android="http://schemas.android.com/apk/res/android"' not in text:
-            text = text.replace(
-                "<manifest",
-                '<manifest\\n    xmlns:android="http://schemas.android.com/apk/res/android"',
-                1,
-            )
-        text = text.replace(
-            "<application",
-            '    <uses-permission android:name="android.permission.INTERNET" />\\n\\n    <application',
-            1,
+        text = re.sub(
+            r"<application\b",
+            '    <uses-permission android:name="android.permission.INTERNET" />\n\n    <application',
+            text,
+            count=1,
         )
     if "android:usesCleartextTraffic=" not in text:
         text = re.sub(
-            r"<application\\b",
+            r"<application\b",
             '<application android:usesCleartextTraffic="true"',
             text,
             count=1,
         )
+    if "android.permission.INTERNET" not in text:
+        fail("Could not add Android INTERNET permission.")
+    if "android:usesCleartextTraffic=" not in text:
+        fail("Could not enable loopback HTTP for the local API.")
     path.write_text(text, encoding="utf-8")
+
+
+def add_import(text: str, import_statement: str) -> str:
+    if import_statement in text:
+        return text
+    package_match = re.search(r"(?m)^package [^;]+;", text)
+    if not package_match:
+        fail("Could not find MainActivity package declaration.")
+    position = package_match.end()
+    return text[:position] + "\n\n" + import_statement + text[position:]
 
 
 def register_plugin(main_activity: Path) -> None:
@@ -185,44 +216,50 @@ def register_plugin(main_activity: Path) -> None:
     if "registerPlugin(LocalAnimeBackendPlugin.class)" in text:
         return
 
-    if "import android.os.Bundle;" not in text:
-        text = re.sub(r"(?m)^(package [^;]+;\\s*)", r"\\1\\nimport android.os.Bundle;", text, count=1)
-    if "import com.sevenx.anime.LocalAnimeBackendPlugin;" not in text:
-        text = re.sub(
-            r"(?m)^(package [^;]+;\\s*)",
-            r"\\1\\nimport com.sevenx.anime.LocalAnimeBackendPlugin;",
-            text,
-            count=1,
-        )
+    text = add_import(text, "import com.sevenx.anime.LocalAnimeBackendPlugin;")
     if "import com.getcapacitor.BridgeActivity;" not in text:
-        text = text.replace(
-            "import com.sevenx.anime.LocalAnimeBackendPlugin;",
-            "import com.sevenx.anime.LocalAnimeBackendPlugin;\\nimport com.getcapacitor.BridgeActivity;",
-            1,
-        )
+        text = add_import(text, "import com.getcapacitor.BridgeActivity;")
 
-    on_create = re.search(r"(?s)void\\s+onCreate\\s*\\([^)]*\\)\\s*\\{", text)
+    on_create = re.search(
+        r"(?s)void\s+onCreate\s*\([^)]*\)\s*\{",
+        text,
+    )
     if on_create:
         remaining = text[on_create.end():]
-        super_call = re.search(r"super\\.onCreate\\s*\\(\\s*savedInstanceState\\s*\\)\\s*;", remaining)
+        super_call = re.search(
+            r"super\.onCreate\s*\(\s*savedInstanceState\s*\)\s*;",
+            remaining,
+        )
         if super_call:
             position = on_create.end() + super_call.start()
-            text = text[:position] + "registerPlugin(LocalAnimeBackendPlugin.class);\\n        " + text[position:]
+            text = (
+                text[:position]
+                + "registerPlugin(LocalAnimeBackendPlugin.class);\n        "
+                + text[position:]
+            )
         else:
             fail("MainActivity has an onCreate method without the expected super call.")
     else:
-        class_match = re.search(r"class\\s+MainActivity\\s+extends\\s+BridgeActivity\\s*\\{", text)
+        class_match = re.search(
+            r"class\s+MainActivity\s+extends\s+BridgeActivity\s*\{",
+            text,
+        )
         if not class_match:
             fail("Could not locate MainActivity class declaration.")
+        text = add_import(text, "import android.os.Bundle;")
+        class_match = re.search(
+            r"class\s+MainActivity\s+extends\s+BridgeActivity\s*\{",
+            text,
+        )
         close = text.rfind("}")
         if close < class_match.end():
             fail("Could not locate MainActivity class terminator.")
         method = (
-            "\\n    @Override\\n"
-            "    public void onCreate(Bundle savedInstanceState) {\\n"
-            "        registerPlugin(LocalAnimeBackendPlugin.class);\\n"
-            "        super.onCreate(savedInstanceState);\\n"
-            "    }\\n"
+            "\n    @Override\n"
+            "    public void onCreate(Bundle savedInstanceState) {\n"
+            "        registerPlugin(LocalAnimeBackendPlugin.class);\n"
+            "        super.onCreate(savedInstanceState);\n"
+            "    }\n"
         )
         text = text[:close] + method + text[close:]
     main_activity.write_text(text, encoding="utf-8")
@@ -252,7 +289,7 @@ def copy_python_source() -> None:
 
 def main() -> None:
     if not ANDROID.is_dir():
-        fail("The generated android/ directory is missing. Run the Capacitor Android generation step first.")
+        fail("The generated android/ directory is missing; generate Android with Capacitor first.")
 
     copy_python_source()
     patch_root_gradle()
