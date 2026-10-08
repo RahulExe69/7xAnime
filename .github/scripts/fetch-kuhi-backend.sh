@@ -19,6 +19,10 @@ test -f "${SOURCE_DIR}/src/endpoints.py" || {
   echo "::error::Pinned Kuhi snapshot is missing src/endpoints.py."
   exit 1
 }
+test -f "${SOURCE_DIR}/LICENSE" || {
+  echo "::error::Pinned Kuhi snapshot is missing its required LICENSE notice."
+  exit 1
+}
 
 if [[ -n "${GITHUB_ENV:-}" ]]; then
   echo "KUHI_SOURCE_DIR=${SOURCE_DIR}" >> "${GITHUB_ENV}"
