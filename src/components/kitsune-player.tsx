@@ -99,6 +99,8 @@ function KitsunePlayer({
         animeId: animeInfo.id,
         episodeId: serversData.episodeId,
         episodeNumber,
+        animeTitle: animeInfo.title,
+        poster: animeInfo.image,
         current,
         duration,
       });
