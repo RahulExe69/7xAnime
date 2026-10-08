@@ -66,6 +66,24 @@ Open `http://localhost:3000`. The stack runs the 7xAnime web app, Miruro API (po
 
 More details, optional Google OAuth setup, and the Android HTTPS endpoint requirements are in [docs/SELF_HOSTING.md](docs/SELF_HOSTING.md). The bundled Miruro API may be blocked by Cloudflare or the hosting provider's IP range, so verify it from the actual deployment before relying on it.
 
+## Android APK with an on-device API
+
+The Android debug build now has an experimental **local-backend** path: the APK bundles
+a Python runtime and a pinned Kuhi API snapshot, starts the API on `127.0.0.1:8000`,
+and routes catalog, episode extraction, and HLS proxy requests through that loopback
+service. This path does **not** require the three hosted API/proxy/PocketBase Actions
+secrets or a server we own.
+
+The app still uses the internet to reach AniList, providers, and stream CDNs. The
+standalone build runs in guest mode: watch progress is local to the device, while
+accounts, shared comments, and synced watch lists still require a shared PocketBase
+server. The Kuhi MIT license notice is bundled at [public/licenses/Kuhi-MIT-LICENSE.txt](public/licenses/Kuhi-MIT-LICENSE.txt).
+
+Pushes to the PR now trigger both static validation and an Android debug build. The
+APK artifact is a development build until search, episode lists, extraction, subtitles,
+HLS playback, and watch-progress restore are tested on a real Android device; a green
+build proves packaging, not upstream stream availability.
+
 ## Support
 
 Join the Discord server: <https://discord.gg/6yAJ3XDHTt>
