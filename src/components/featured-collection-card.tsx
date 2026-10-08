@@ -32,7 +32,7 @@ const FeaturedCollectionCard = (props: Props) => {
               score={item.averageScore}
               className={classNames[index]}
               poster={poster}
-              href={`${ROUTES.ANIME_DETAILS}/${item.id}`}
+              href={ROUTES.animeDetails(item.id)}
             />
           );
         })}
