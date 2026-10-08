@@ -57,7 +57,7 @@ const AnimeCarousel = (props: Props) => {
                   key={idx}
                   title={ani.name}
                   format={ani.type}
-                  href={`${ROUTES.ANIME_DETAILS}/${ani.id}`}
+                  href={ROUTES.animeDetails(ani.id)}
                   poster={ani.poster}
                   className="self-center justify-self-center min-w-[12rem]"
                 />
