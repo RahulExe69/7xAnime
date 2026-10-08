@@ -2,6 +2,8 @@ export type LocalWatchProgress = {
   animeId: string;
   episodeId: string;
   episodeNumber: number;
+  animeTitle?: string;
+  poster?: string;
   current: number;
   duration: number;
   updatedAt: number;
@@ -44,6 +46,20 @@ export const getLocalWatchProgress = (
     null
   );
 };
+
+export const getLocalWatchProgressForAnime = (
+  animeId: string,
+): LocalWatchProgress[] =>
+  readAll()
+    .filter((entry) => entry.animeId === animeId)
+    .sort((a, b) => b.updatedAt - a.updatedAt);
+
+export const getRecentLocalWatchProgress = (
+  limit = 14,
+): LocalWatchProgress[] =>
+  readAll()
+    .sort((a, b) => b.updatedAt - a.updatedAt)
+    .slice(0, Math.max(0, limit));
 
 export const saveLocalWatchProgress = (
   progress: Omit<LocalWatchProgress, "updatedAt">,
