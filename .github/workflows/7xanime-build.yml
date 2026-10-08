@@ -56,12 +56,16 @@ jobs:
           python -m pip install --disable-pip-version-check -r android-local-backend/requirements-android.txt
           PYTHONPATH="android-local-backend:$KUHI_SOURCE_DIR" python - <<'PY'
           import local_api
+          from fastapi.testclient import TestClient
           from src.providers import _race
 
           providers = _race.providers()
           if not providers:
               raise SystemExit("Kuhi loaded no native providers")
           print("Local API import OK; providers:", ", ".join(name for name, _ in providers))
+
+          assert local_api._episode_number_from_slug("anineko-12") == 12
+          assert local_api._episode_number_from_slug("episode-3") == 3
           assert local_api._validated_remote_url("https://example.com/master.m3u8").startswith("https://")
           try:
               local_api._validated_remote_url("http://127.0.0.1/private")
@@ -69,6 +73,24 @@ jobs:
               pass
           else:
               raise SystemExit("Loopback URL validation did not reject a private target")
+
+          # Smoke-test loopback auth and the Capacitor WebView's CORS preflight without network access.
+          with TestClient(local_api.app) as client:
+              health = client.get("/api/health")
+              assert health.status_code == 200 and health.json()["status"] == "ok"
+              unauthorized = client.get("/spotlight")
+              assert unauthorized.status_code == 403
+              preflight = client.options(
+                  "/spotlight",
+                  headers={
+                      "Origin": "https://localhost",
+                      "Access-Control-Request-Method": "GET",
+                      "Access-Control-Request-Headers": "x-7xanime-token",
+                  },
+              )
+              assert preflight.status_code == 200
+              assert preflight.headers.get("access-control-allow-origin") == "https://localhost"
+          print("Local API health, auth guard, slug parsing, and CORS checks passed.")
           PY
 
       - name: Setup Java 21
