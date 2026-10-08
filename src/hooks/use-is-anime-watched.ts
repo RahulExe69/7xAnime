@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { IWatchedAnime } from "@/types/watched-anime";
 import { WatchHistory } from "./use-get-bookmark";
+import { isLocalBackendEnabled } from "@/lib/api";
+import { getLocalWatchProgressForAnime } from "@/lib/local-watch-progress";
 
 export const useHasAnimeWatched = (
   animeId: string,
@@ -11,6 +13,15 @@ export const useHasAnimeWatched = (
   const [hasWatchedEpisode, setHasWatchedEpisode] = useState(false);
 
   useEffect(() => {
+    if (isLocalBackendEnabled()) {
+      const entries = getLocalWatchProgressForAnime(animeId);
+      setHasWatchedAnime(entries.length > 0);
+      setHasWatchedEpisode(
+        !!episodeId && entries.some((entry) => entry.episodeId === episodeId),
+      );
+      return;
+    }
+
     const watchedDetails: Array<IWatchedAnime> =
       JSON.parse(localStorage.getItem("watched") as string) || [];
 
