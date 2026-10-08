@@ -4,6 +4,7 @@ import localFont from "next/font/local";
 
 import NavBar from "@/components/navbar";
 import Footer from "@/components/footer";
+import BottomNav from "@/components/bottom-nav";
 import Script from "next/script";
 import QueryProvider from "@/providers/query-provider";
 import { ThemeProvider } from "@/components/theme-provider";
@@ -74,7 +75,7 @@ export default function RootLayout({
         <link rel="icon" href="/icon.png" type="image/png" sizes="192x192" />
       </head>
       <body
-        className={`${geistSans.className} antialiased max-w-[100vw] overflow-x-hidden`}
+        className={`${geistSans.className} antialiased max-w-[100vw] overflow-x-hidden pb-24 lg:pb-0`}
       >
         <ThemeProvider
           attribute="class"
@@ -86,6 +87,7 @@ export default function RootLayout({
             <NavBar />
             {children}
             <Footer />
+            <BottomNav />
           </QueryProvider>
         </ThemeProvider>
         <Toaster />
