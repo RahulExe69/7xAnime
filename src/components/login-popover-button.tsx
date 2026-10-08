@@ -4,6 +4,7 @@ import Button from "./common/custom-button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import { Input } from "./ui/input";
 import DiscordIcon from "@/icons/discord";
+import GoogleIcon from "@/icons/google";
 import { pb } from "@/lib/pocketbase";
 import { toast } from "sonner";
 import { useAuthStore } from "@/store/auth-store";
@@ -136,6 +137,50 @@ function LoginPopoverButton() {
     }
   };
 
+  const loginWithGoogle = async () => {
+    try {
+      const result = await pb.collection("users").authWithOAuth2({
+        provider: "google",
+      });
+      const record = pb.authStore.record;
+
+      if (pb.authStore.isValid && record) {
+        let username = record.username;
+
+        if (!username) {
+          const updated = await pb.collection("users").update(record.id, {
+            username:
+              result.meta?.username ||
+              result.meta?.name ||
+              record.email?.split("@")[0] ||
+              "7xAnimeUser",
+          });
+          username = updated.username;
+        }
+
+        toast.success("Google sign-in successful", {
+          style: { background: "green" },
+        });
+        auth.setAuth({
+          id: record.id,
+          email: record.email,
+          username,
+          avatar: record.avatar,
+          collectionId: record.collectionId,
+          collectionName: record.collectionName,
+          autoSkip: record.autoSkip,
+          created: record.created,
+        });
+        clearForm();
+      }
+    } catch (error) {
+      console.error("Google sign-in error:", error);
+      toast.error("Google sign-in is not configured on the PocketBase server yet.", {
+        style: { background: "red" },
+      });
+    }
+  };
+
   return (
     <Popover>
       <PopoverTrigger asChild>
@@ -200,12 +245,21 @@ function LoginPopoverButton() {
             <hr className="text-white text-xs text-center" />
             <Button
               variant="default"
-              className="bg-blue-600 hover:bg-blue-800 text-white w-full text-xs"
+              className="w-full bg-blue-600 text-xs text-white hover:bg-blue-700"
               size="sm"
               onClick={loginWithDiscord}
             >
-              <DiscordIcon className="mr-2" />
+              <DiscordIcon className="mr-2 h-4 w-4" />
               Login with Discord
+            </Button>
+            <Button
+              variant="default"
+              className="w-full bg-white text-xs text-black hover:bg-gray-100"
+              size="sm"
+              onClick={loginWithGoogle}
+            >
+              <GoogleIcon className="mr-2 h-4 w-4" />
+              Login with Google
             </Button>
           </TabsContent>
           <TabsContent value="signup" className="flex flex-col gap-2">
@@ -265,12 +319,21 @@ function LoginPopoverButton() {
             <hr className="text-white text-xs text-center" />
             <Button
               variant="default"
-              className="bg-blue-600 hover:bg-blue-800 text-white w-full text-xs"
+              className="w-full bg-blue-600 text-xs text-white hover:bg-blue-700"
               size="sm"
               onClick={loginWithDiscord}
             >
-              <DiscordIcon className="mr-2" />
+              <DiscordIcon className="mr-2 h-4 w-4" />
               Signup with Discord
+            </Button>
+            <Button
+              variant="default"
+              className="w-full bg-white text-xs text-black hover:bg-gray-100"
+              size="sm"
+              onClick={loginWithGoogle}
+            >
+              <GoogleIcon className="mr-2 h-4 w-4" />
+              Continue with Google
             </Button>
           </TabsContent>
         </Tabs>
