@@ -1,6 +1,8 @@
 "use client";
 
 import React from "react";
+import SearchBar from "@/components/search-bar";
+import { Search } from "lucide-react";
 import { ROUTES } from "@/constants/routes";
 import AnimeCard from "@/components/anime-card";
 
@@ -101,9 +103,9 @@ const SearchResults = () => {
   };
 
   return (
-    <div className="flex flex-col gap-10 mt-28 lg:mt-36 pb-20 min-h-[75vh]">
-      <div className="bg-slate-800 bg-opacity-50 backdrop-blur-sm rounded-lg p-5 flex flex-col gap-5">
-        <p className="text-lg font-semibold">Filters</p>
+    <div className="mx-auto flex min-h-[75vh] w-full max-w-[1600px] flex-col gap-6 px-4 pb-16 pt-28 sm:gap-8 md:px-6 lg:pt-32 lg:px-8">
+      <div className="flex flex-col gap-5 rounded-2xl border border-white/[0.07] bg-white/[0.035] p-4 backdrop-blur-sm sm:p-6">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div className="flex items-center gap-2"><Search className="h-5 w-5 text-violet-300" /><p className="text-lg font-semibold">Find your next anime</p></div><span className="text-xs text-zinc-500">Search by title or narrow it down with filters</span></div><SearchBar className="max-w-2xl" /><p className="text-sm font-semibold text-zinc-300">Refine results</p>
         <div className="flex flex-wrap gap-3">
           <Select
             options={types}
@@ -158,10 +160,10 @@ const SearchResults = () => {
                 key={genre.value}
                 size="sm"
                 className={cn(
-                  "border border-slate-700 hover:border-[#e9376b] hover:text-[#e9376b] hover:bg-transparent",
-                  "data-[state=on]:border-[#e9376b] data-[state=on]:text-white data-[state=on]:bg-[#e9376b]",
+                  "rounded-full border border-white/10 bg-white/[0.03] hover:border-violet-400/60 hover:text-violet-200 hover:bg-violet-500/10",
+                  "data-[state=on]:border-violet-400/60 data-[state=on]:text-white data-[state=on]:bg-violet-500/30",
                   filters.genres?.split(",").includes(genre.value)
-                    ? "bg-[#e9376b] text-white"
+                    ? "bg-violet-500/30 text-white"
                     : "text-slate-300",
                 )}
               >
@@ -173,7 +175,7 @@ const SearchResults = () => {
         <div className="flex items-center gap-2 mt-4">
           <Button
             size="sm"
-            className="w-[6.25rem] hover:bg-[#e9376b] bg-[#e9376b] text-white"
+            className="w-[6.25rem] rounded-xl bg-violet-500 text-white hover:bg-violet-400"
             onClick={applyFilters}
           >
             Filter
@@ -188,7 +190,7 @@ const SearchResults = () => {
           </Button>
         </div>
       </div>
-      <div className="text-2xl font-semibold">
+      <div className="text-xl font-semibold tracking-tight sm:text-2xl">
         {displayPhrase === "" ? (
           "Filter Results"
         ) : (
@@ -199,12 +201,12 @@ const SearchResults = () => {
         )}
       </div>
       {isLoading && (
-        <div className="grid lg:grid-cols-5 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-7 w-full gap-5 content-center">
+        <div className="grid w-full grid-cols-2 content-start gap-x-3 gap-y-5 sm:grid-cols-3 sm:gap-4 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7">
           {[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1].map((_, idx) => {
             return (
               <div
                 key={idx}
-                className="rounded-xl h-[15.625rem] min-w-[10.625rem] max-w-[12.625rem] md:h-[18.75rem] md:max-w-[12.5rem] animate-pulse bg-slate-700"
+                className="aspect-[2/3] w-full rounded-2xl animate-pulse bg-white/[0.06]"
               ></div>
             );
           })}
