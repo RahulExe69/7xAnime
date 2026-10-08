@@ -108,7 +108,7 @@ const LoadingSkeleton = () => {
   return (
     <Container className="relative z-20 flex flex-col gap-4 py-7 items-center lg:items-start sm:gap-5 sm:py-9">
       <div className="h-10 w-[15.625rem] animate-pulse bg-slate-700"></div>
-      <div className="grid lg:grid-cols-5 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-7 w-full gap-5 content-center">
+      <div className="grid w-full grid-cols-2 content-start gap-x-3 gap-y-5 sm:grid-cols-3 sm:gap-4 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7">
         {[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1].map((_, idx) => {
           return (
             <div
