@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
 import { IWatchedAnime } from "@/types/watched-anime";
+import { isLocalBackendEnabled } from "@/lib/api";
+import { getLocalWatchProgressForAnime } from "@/lib/local-watch-progress";
 
 export const useGetLastEpisodeWatched = (animeId: string) => {
   const [lastEpisodeWatched, setLastEpisodeWatched] = useState<string | null>(
@@ -7,6 +9,12 @@ export const useGetLastEpisodeWatched = (animeId: string) => {
   );
 
   useEffect(() => {
+    if (isLocalBackendEnabled()) {
+      const latest = getLocalWatchProgressForAnime(animeId)[0];
+      setLastEpisodeWatched(latest?.episodeId || null);
+      return;
+    }
+
     const watchedDetails: Array<IWatchedAnime> =
       JSON.parse(localStorage.getItem("watched") as string) || [];
 
