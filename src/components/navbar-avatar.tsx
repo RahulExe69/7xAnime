@@ -32,7 +32,7 @@ function NavbarAvatar({ auth }: Props) {
           </div>
           <div className="border-b border-gray-600 pb-2">
             <Link
-              href={`/profile/${auth.auth.username}`}
+              href={ROUTES.profile(auth.auth.username)}
               className="flex flex-row space-x-2 items-center"
               onClick={() => setOpen(false)}
             >
