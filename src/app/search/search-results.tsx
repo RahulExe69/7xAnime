@@ -217,7 +217,7 @@ const SearchResults = () => {
               title={anime.name}
               format={anime.type}
               poster={anime.poster}
-              href={`${ROUTES.ANIME_DETAILS}/${anime.id}`}
+              href={ROUTES.animeDetails(anime.id)}
               className="self-center justify-self-center"
               showGenre={false}
             />
