@@ -2,8 +2,21 @@
 @tailwind components;
 @tailwind utilities;
 
+html {
+  color-scheme: dark;
+  scroll-behavior: smooth;
+}
+
 body {
   font-family: Arial, Helvetica, sans-serif;
+  background: #09090f;
+  color: #f4f4f5;
+  -webkit-tap-highlight-color: transparent;
+}
+
+::selection {
+  background: rgb(139 92 246 / 35%);
+  color: #fff;
 }
 
 @layer utilities {
@@ -42,25 +55,25 @@ body {
   }
 
   .dark {
-    --background: 240 10% 3.9%;
+    --background: 240 25% 4%;
     --foreground: 0 0% 98%;
-    --card: 240 10% 3.9%;
+    --card: 240 18% 7%;
     --card-foreground: 0 0% 98%;
-    --popover: 240 10% 3.9%;
+    --popover: 240 18% 7%;
     --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
-    --primary-foreground: 240 5.9% 10%;
-    --secondary: 240 3.7% 15.9%;
+    --primary: 263 70% 65%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 240 12% 12%;
     --secondary-foreground: 0 0% 98%;
-    --muted: 240 3.7% 15.9%;
+    --muted: 240 12% 12%;
     --muted-foreground: 240 5% 64.9%;
-    --accent: 240 3.7% 15.9%;
+    --accent: 263 35% 18%;
     --accent-foreground: 0 0% 98%;
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 0 0% 98%;
-    --border: 240 3.7% 15.9%;
-    --input: 240 3.7% 15.9%;
-    --ring: 240 4.9% 83.9%;
+    --border: 240 10% 16%;
+    --input: 240 10% 16%;
+    --ring: 263 70% 65%;
     --chart-1: 220 70% 50%;
     --chart-2: 160 60% 45%;
     --chart-3: 30 80% 55%;
@@ -85,12 +98,13 @@ body {
 
 /* Track */
 ::-webkit-scrollbar-track {
-  background: #000;
+  background: #09090f;
 }
 
 /* Handle */
 ::-webkit-scrollbar-thumb {
-  background: #505250;
+  background: #393344;
+  border-radius: 999px;
 }
 
 /* Handle on hover */
