@@ -99,7 +99,7 @@ const SearchBar = ({
               })}
 
             {searchResults?.map((anime) => (
-              <a key={anime.id} href={ROUTES.ANIME_DETAILS + "/" + anime.id}>
+              <a key={anime.id} href={ROUTES.animeDetails(anime.id)}>
                 <div
                   className="flex items-start gap-4 hover:bg-[#121212] rounded-md p-2 cursor-pointer"
                   onClick={handleAnimeClick} // Clear search value on click
@@ -158,7 +158,7 @@ const SearchBar = ({
               })}
 
             {searchResults?.slice(0, 5).map((anime) => (
-              <Link key={anime.id} href={ROUTES.ANIME_DETAILS + "/" + anime.id}>
+              <Link key={anime.id} href={ROUTES.animeDetails(anime.id)}>
                 <div
                   className="flex items-center gap-2 hover:bg-[#121212] rounded-md p-1 cursor-pointer"
                   onClick={handleAnimeClick} // Clear search value on click
