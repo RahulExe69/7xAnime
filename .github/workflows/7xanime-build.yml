@@ -54,7 +54,7 @@ jobs:
       - name: Smoke test pinned Python API
         run: |
           python -m pip install --disable-pip-version-check -r android-local-backend/requirements-android.txt
-          PYTHONPATH="$KUHI_SOURCE_DIR" python - <<'PY'
+          PYTHONPATH="android-local-backend:$KUHI_SOURCE_DIR" python - <<'PY'
           import local_api
           from src.providers import _race
 
