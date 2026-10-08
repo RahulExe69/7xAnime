@@ -97,9 +97,7 @@ const NavBar = () => {
               nightTokyo.className,
               "text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-gray-200 to-pink-600 tracking-widest",
             ])}
-          >
-            Kitsunee
-          </h1>
+          >7xAnime</h1>
         </Link>
 
         <div className="hidden lg:flex items-center gap-10 ml-20">
