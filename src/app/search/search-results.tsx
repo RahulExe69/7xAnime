@@ -212,7 +212,7 @@ const SearchResults = () => {
           })}
         </div>
       )}
-      <div className="grid lg:grid-cols-5 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-7 w-full gap-5 content-center">
+      <div className="grid w-full grid-cols-2 content-start gap-x-3 gap-y-5 sm:grid-cols-3 sm:gap-4 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7">
         {searchResults?.animes.map((anime, idx) => (
           <BlurFade key={idx} delay={idx * 0.05} inView>
             <AnimeCard
