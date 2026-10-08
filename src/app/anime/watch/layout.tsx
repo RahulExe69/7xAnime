@@ -189,7 +189,7 @@ const LayoutContent = (props: Props) => {
             subTitle={anime?.anime.moreInfo.aired}
             displayDetails={false}
             className="!h-full !rounded-sm"
-            href={ROUTES.ANIME_DETAILS + "/" + anime?.anime.info.id}
+            href={ROUTES.animeDetails(anime?.anime.info.id || "")}
           />
           <div className="flex flex-col gap-2">
             <Select
@@ -224,4 +224,5 @@ const LayoutContent = (props: Props) => {
     )
   );
 };
+
 export default Layout;
