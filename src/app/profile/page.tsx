@@ -1,11 +1,12 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { Suspense, useEffect, useRef, useState } from "react";
 import Container from "@/components/container";
 import Avatar from "@/components/common/avatar";
 import { useAuthStore } from "@/store/auth-store";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { pb } from "@/lib/pocketbase";
+import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import Image from "next/image";
 import CoverImage from "@/assets/cover.png";
@@ -25,14 +26,9 @@ export type TargetProfileUser = {
   created: string;
 };
 
-function ProfilePage() {
-  const [username, setUsername] = useState("");
-
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const value = params.get("username") || "";
-    setUsername(value ? decodeURIComponent(value) : "");
-  }, []);
+function ProfilePageContent() {
+  const searchParams = useSearchParams();
+  const username = searchParams.get("username") || "";
 
   const { auth, setAuth } = useAuthStore();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -214,6 +210,14 @@ function ProfilePage() {
         </div>
       </Container>
     </>
+  );
+}
+
+function ProfilePage() {
+  return (
+    <Suspense fallback={<Loading />}>
+      <ProfilePageContent />
+    </Suspense>
   );
 }
 
