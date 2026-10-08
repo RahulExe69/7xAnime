@@ -4,6 +4,14 @@ set -eu
 PB_DIR=/pb_data
 : "${PB_ADMIN_EMAIL:?Set PB_ADMIN_EMAIL in .env.backend}"
 : "${PB_ADMIN_PASSWORD:?Set PB_ADMIN_PASSWORD in .env.backend}"
+if [ "$PB_ADMIN_PASSWORD" = "REPLACE_WITH_A_UNIQUE_LOCAL_PASSWORD_32_CHARS_MINIMUM" ]; then
+  echo "[pocketbase] Replace the example admin password in .env.backend first." >&2
+  exit 1
+fi
+if [ "${#PB_ADMIN_PASSWORD}" -lt 24 ]; then
+  echo "[pocketbase] Use a unique local admin password of at least 24 characters." >&2
+  exit 1
+fi
 
 mkdir -p "$PB_DIR"
 
