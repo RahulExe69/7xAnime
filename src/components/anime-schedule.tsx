@@ -46,9 +46,9 @@ function AnimeSchedule() {
   }
 
   return (
-    <Container className="flex flex-col gap-6 py-10 items-start">
+    <Container className="flex flex-col items-start gap-5 py-7 sm:gap-6 sm:py-9">
       <div className="flex flex-col gap-1">
-        <h5 className="text-2xl md:text-3xl font-bold text-white">Estimated Schedule</h5>
+        <h5 className="text-xl font-bold tracking-tight text-white sm:text-2xl md:text-3xl">Estimated Schedule</h5>
         <p className="text-sm text-gray-400">Track upcoming episode releases for this week</p>
       </div>
 
@@ -60,7 +60,7 @@ function AnimeSchedule() {
         className="w-full flex flex-col md:flex-row gap-6"
       >
         {/* Vertical Tabs List */}
-        <TabsList className="flex flex-row md:flex-col justify-start items-stretch gap-2 w-full md:w-56 shrink-0 h-auto md:h-fit border-none overflow-x-auto no-scrollbar bg-secondary/30 p-2 rounded-xl border border-slate-800/80">
+        <TabsList className="flex h-auto w-full shrink-0 flex-row items-stretch justify-start gap-2 overflow-x-auto rounded-xl border border-white/[0.07] bg-white/[0.025] p-2 md:h-fit md:w-56 md:flex-col">
           {daysOfWeek.map((day) => {
             const dateObj = getDateForWeekday(day);
             const isToday = day === currentDay;
@@ -69,7 +69,7 @@ function AnimeSchedule() {
               <TabsTrigger
                 key={day}
                 value={day}
-                className="shrink-0 flex items-center justify-between px-4 py-3 rounded-lg text-left transition-all data-[state=active]:bg-[#e9376b] data-[state=active]:text-white hover:bg-slate-800/60"
+                className="shrink-0 flex items-center justify-between px-4 py-3 rounded-lg text-left transition-all data-[state=active]:bg-[#8b5cf6] data-[state=active]:text-white hover:bg-slate-800/60"
               >
                 <div className="flex flex-col items-start">
                   <span className="font-bold text-sm uppercase tracking-wider">

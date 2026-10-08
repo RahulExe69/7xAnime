@@ -267,7 +267,7 @@ const VideoPlayerSection = () => {
 
   if (!activeEpisodeId || isLoadingData) {
     return (
-      <div className="h-auto aspect-video lg:max-h-[calc(100vh-150px)] min-h-[20vh] sm:min-h-[30vh] md:min-h-[40vh] lg:min-h-[60vh] w-full animate-pulse bg-slate-800 rounded-xl"></div>
+      <div className="aspect-video w-full animate-pulse rounded-2xl bg-white/[0.06]"></div>
     );
   }
 
@@ -279,7 +279,7 @@ const VideoPlayerSection = () => {
 
     return (
       <div className="flex flex-col gap-4 w-full">
-        <div className="relative w-full h-auto aspect-video min-h-[20vh] sm:min-h-[30vh] md:min-h-[40vh] lg:min-h-[60vh] max-h-[500px] lg:max-h-[calc(100vh-150px)] bg-black overflow-hidden rounded-xl border border-slate-800">
+        <div className="relative aspect-video w-full overflow-hidden rounded-2xl border border-white/10 bg-black shadow-2xl shadow-black/40">
           <iframe
             key={`${fallbackAnimeId}-${fallbackEpId}-${activeCategory}`}
             src={fallbackSrc}
@@ -289,7 +289,7 @@ const VideoPlayerSection = () => {
             className="w-full h-full border-0"
           ></iframe>
         </div>
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-[#0f172a] rounded-xl border border-slate-800">
+        <div className="flex flex-col justify-between gap-3 rounded-2xl border border-white/[0.07] bg-white/[0.035] p-3 sm:flex-row sm:items-center sm:p-4">
           <div className="flex flex-wrap items-center gap-3">
             <span className="text-xs font-bold text-gray-400 tracking-wider">CATEGORY:</span>
             <Button
@@ -299,7 +299,7 @@ const VideoPlayerSection = () => {
               onClick={() => handleCategoryChange("sub")}
               className={`h-8 px-4 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition ${
                 activeCategory === "sub"
-                  ? "bg-[#e9376b] text-white hover:bg-[#e9376b]"
+                  ? "bg-[#8b5cf6] text-white hover:bg-[#e9376b]"
                   : "bg-slate-800 text-gray-400 hover:bg-slate-700"
               }`}
             >
@@ -323,7 +323,7 @@ const VideoPlayerSection = () => {
             size="sm"
             variant="outline"
             onClick={() => setUseFallback(false)}
-            className="h-8 px-3 text-xs border-slate-700 bg-slate-800/80 hover:bg-slate-700 text-gray-200 flex items-center gap-1.5 shrink-0 self-start sm:self-auto"
+            className="flex h-8 shrink-0 items-center gap-1.5 self-start border-white/10 bg-white/[0.04] px-3 text-xs text-zinc-200 hover:bg-white/[0.08] sm:self-auto"
           >
             <Tv className="h-3.5 w-3.5 text-blue-400" /> Try Primary Player
           </Button>
@@ -360,11 +360,11 @@ const VideoPlayerSection = () => {
         autoSkip={autoSkip}
         onError={() => setUseFallback(true)}
       />
-      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 w-full p-5 bg-[#0f172a] border-t border-slate-800">
-        <div className="flex flex-col gap-3 w-full md:w-auto">
+      <div className="flex w-full flex-col items-start justify-between gap-4 rounded-2xl border border-white/[0.07] bg-white/[0.035] p-3 sm:p-4 md:flex-row md:items-center">
+        <div className="flex w-full flex-col gap-3 md:w-auto">
           <div className="flex flex-wrap items-center gap-3">
             <Captions className="text-red-400 h-4 w-4 shrink-0" />
-            <p className="font-bold text-xs text-gray-300 tracking-wider">SERVERS (SUB):</p>
+            <p className="text-xs font-semibold tracking-wider text-zinc-400">SERVERS (SUB):</p>
             {providerNames.map((pName) => {
               const hasSub = (rawProviders[pName]?.episodes?.sub || []).length > 0;
               if (!hasSub) return null;
@@ -379,7 +379,7 @@ const VideoPlayerSection = () => {
                   className={`uppercase font-bold text-xs px-3 transition-all ${
                     isActive
                       ? "bg-[#e9376b] text-white shadow-md ring-2 ring-[#e9376b]/40 scale-105"
-                      : "bg-slate-800/80 text-gray-300 hover:bg-slate-700 hover:text-white"
+                      : "bg-white/[0.05] text-zinc-300 hover:bg-white/[0.1] hover:text-white"
                   }`}
                   onClick={() => handleProviderSelect(pName, "sub")}
                 >

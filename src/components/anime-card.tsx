@@ -47,7 +47,7 @@ const AnimeCard = ({
         className={cn([
           "group relative w-full overflow-hidden rounded-2xl border border-white/[0.06] bg-zinc-900 shadow-sm transition duration-200 ease-out hover:-translate-y-1 hover:border-violet-400/30 hover:shadow-xl hover:shadow-violet-950/20",
           variant === "sm" && "aspect-[2/3] min-w-0 max-w-[11.5rem]",
-          variant === "lg" && "aspect-auto h-auto w-full max-w-[12.625rem] shrink-0 md:h-[22rem] md:max-w-[15rem] lg:w-[15rem]",
+          variant === "lg" && "aspect-[2/3] h-auto w-full max-w-[9rem] shrink-0 sm:max-w-[11rem] md:aspect-auto md:h-[22rem] md:max-w-[15rem] lg:w-[15rem]",
           props.className,
         ])}
       >

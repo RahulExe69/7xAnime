@@ -22,19 +22,9 @@ import NavbarAvatar from "./navbar-avatar";
 import { toast } from "sonner";
 
 const menuItems: Array<{ title: string; href?: string }> = [
-  // {
-  //   title: "Home",
-  //   href: ROUTES.HOME,
-  // },
-  // {
-  //   title: "Catalog",
-  // },
-  // {
-  //   title: "News",
-  // },
-  // {
-  //   title: "Collection",
-  // },
+  { title: "Home", href: ROUTES.HOME },
+  { title: "Browse", href: ROUTES.SEARCH },
+
 ];
 
 const NavBar = () => {
@@ -151,7 +141,7 @@ const MobileMenuSheet = ({ trigger }: { trigger: ReactNode }) => {
               </Link>
             ))}
             <Separator />
-            <Link href={ROUTES.SEARCH} onClick={() => setOpen(false)} className="text-sm text-muted-foreground">Browse all anime</Link>
+            <p className="text-xs text-muted-foreground">Find your next favourite anime.</p>
           </div>
         </div>
       </SheetContent>
