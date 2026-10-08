@@ -56,10 +56,15 @@ export const getLocalWatchProgressForAnime = (
 
 export const getRecentLocalWatchProgress = (
   limit = 14,
-): LocalWatchProgress[] =>
-  readAll()
-    .sort((a, b) => b.updatedAt - a.updatedAt)
-    .slice(0, Math.max(0, limit));
+): LocalWatchProgress[] => {
+  const latestByAnime = new Map<string, LocalWatchProgress>();
+  for (const entry of readAll().sort((a, b) => b.updatedAt - a.updatedAt)) {
+    if (!latestByAnime.has(entry.animeId)) {
+      latestByAnime.set(entry.animeId, entry);
+    }
+  }
+  return Array.from(latestByAnime.values()).slice(0, Math.max(0, limit));
+};
 
 export const saveLocalWatchProgress = (
   progress: Omit<LocalWatchProgress, "updatedAt">,
