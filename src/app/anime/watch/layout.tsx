@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useGetAnimeDetails } from "@/query/get-anime-details";
-import React, { ReactNode, useEffect, useMemo, useState } from "react";
+import React, { ReactNode, Suspense, useEffect, useMemo, useState } from "react";
 import AnimeCarousel from "@/components/anime-carousel";
 import { IAnime } from "@/types/anime";
 import useBookMarks from "@/hooks/use-get-bookmark";
@@ -31,7 +31,13 @@ type Props = {
   children: ReactNode;
 };
 
-const Layout = (props: Props) => {
+const Layout = (props: Props) => (
+  <Suspense fallback={<Loading />}>
+    <LayoutContent {...props} />
+  </Suspense>
+);
+
+const LayoutContent = (props: Props) => {
   const searchParams = useSearchParams();
   const { setAnime, setSelectedEpisode } = useAnimeStore();
   const router = useRouter();
