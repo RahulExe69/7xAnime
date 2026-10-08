@@ -10,6 +10,7 @@ import { ROUTES } from "@/constants/routes";
 
 import Button from "./common/custom-button";
 import { ArrowLeft, ArrowRight } from "lucide-react";
+import SectionHeading from "./section-heading";
 
 type Props = {
   animeList: MediaList[];
@@ -32,7 +33,7 @@ const AnimeSections = ({
   if (!animeList?.length) {
     return (
       <Container className="flex flex-col gap-4 py-7 sm:py-9">
-        <h5 className="text-xl font-bold tracking-tight text-white sm:text-2xl">{sectionTitle}</h5>
+        <SectionHeading eyebrow="Explore the archive" title={sectionTitle} />
         <div className="w-full rounded-2xl border border-white/[0.07] bg-white/[0.025] px-4 py-8 text-center text-sm text-zinc-400">
           No anime to display right now. Try again in a little while.
         </div>
@@ -41,7 +42,7 @@ const AnimeSections = ({
   }
   return (
     <Container className="flex flex-col gap-4 py-7 items-center lg:items-start sm:gap-5 sm:py-9">
-      <h5 className="text-2xl font-bold text-white">{sectionTitle}</h5>
+      <SectionHeading eyebrow="Explore the archive" title={sectionTitle} />
       <div className="grid w-full grid-cols-2 content-start gap-x-3 gap-y-5 sm:grid-cols-3 sm:gap-4 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7">
         {animeList.map((anime, idx) => {
           const title =
@@ -68,16 +69,16 @@ const AnimeSections = ({
           <Button
             onClick={() => onPageChange(Math.max(page - 1, 1))}
             disabled={page <= 1}
-            className="rounded-full bg-slate-800 border border-slate-700 h-9 w-9 p-0 hover:bg-slate-700 disabled:opacity-40"
+            className="h-9 w-9 rounded-full border border-white/10 bg-white/5 p-0 hover:bg-violet-500/15 disabled:opacity-40"
           >
-            <ArrowLeft className="text-white h-4 w-4" />
+            <ArrowLeft className="h-4 w-4 text-white" />
           </Button>
           <Button
             onClick={() => onPageChange(page + 1)}
             disabled={!hasNextPage}
             className="rounded-full bg-slate-800 border border-slate-700 h-9 w-9 p-0 hover:bg-slate-700 disabled:opacity-40"
           >
-            <ArrowRight className="text-white h-4 w-4" />
+            <ArrowRight className="h-4 w-4 text-white" />
           </Button>
         </div>
       )}
