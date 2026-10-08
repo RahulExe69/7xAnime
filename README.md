@@ -4,7 +4,7 @@ Watch your favourite anime anywhere, anytime. No Ads.
 
 7xAnime is a free, open-source anime streaming app and website. It is built using the [Next Js](https://nextjs.org/) framework, [Shadcn/ui](https://ui.shadcn.com), and [Tailwind CSS](https://tailwindcss.com/).
 
-_Kitsune is still under development and may encounter many bugs. Feel free to open any issue regarding bugs or features_
+_7xAnime is still under development and may encounter many bugs. Feel free to open any issue regarding bugs or features_
 
 ## Features
 
