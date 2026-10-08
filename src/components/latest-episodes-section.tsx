@@ -8,6 +8,7 @@ import BlurFade from "./ui/blur-fade";
 import { useGetRecentAnime } from "@/query/get-recent-anime";
 import Button from "./common/custom-button";
 import { ArrowLeft, ArrowRight } from "lucide-react";
+import SectionHeading from "./section-heading";
 
 type Props = {
   loading?: boolean;
@@ -36,7 +37,7 @@ const LatestEpisodesAnime = ({ loading: initialLoading }: Props) => {
 
   return (
     <Container className="relative z-20 flex flex-col gap-4 py-7 items-center lg:items-start lg:mt-[-7rem] sm:gap-5 sm:py-9">
-      <h5 className="text-2xl font-bold text-white">Recent Releases</h5>
+      <SectionHeading eyebrow="Just Added" title="Recent Releases" />
       <div className="grid w-full grid-cols-2 content-start gap-x-3 gap-y-5 sm:grid-cols-3 sm:gap-4 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7">
         {episodesList.map((anime, idx) => {
           const title =
