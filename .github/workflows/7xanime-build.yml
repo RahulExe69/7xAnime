@@ -1,0 +1,123 @@
+name: 7xAnime Android Debug
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_name:
+        description: MAJOR.MINOR.PATCH
+        required: true
+        type: string
+        default: "1.0.0"
+  pull_request:
+    branches:
+      - master
+
+permissions:
+  contents: read
+
+concurrency:
+  group: 7xanime-android-debug-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  debug-apk:
+    name: Build Debug APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Setup Java 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Install dependencies
+        run: npm ci --prefer-offline --no-audit || npm install --no-audit --package-lock=false
+
+      - name: Resolve Android version
+        shell: bash
+        env:
+          INPUT_VERSION: ${{ inputs.version_name }}
+        run: |
+          set -euo pipefail
+          VERSION="${INPUT_VERSION:-}"
+          if [[ -z "${VERSION}" ]]; then
+            VERSION="$(node -p 'require("./package.json").version')"
+          fi
+          bash .github/scripts/android-version.sh "${VERSION}" >> "${GITHUB_ENV}"
+
+      - name: Build static web bundle
+        run: npm run build:android-web
+
+      - name: Add Capacitor Android
+        run: npx cap add android
+
+      - name: Sync Capacitor Android
+        run: npx cap sync android
+
+      - name: Configure Android debug build
+        run: python3 .github/scripts/configure-capacitor-android.py
+
+      - name: Build Debug APK
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug             --no-daemon             --parallel             --build-cache             --stacktrace
+
+      - name: Verify and package APK
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          APK="android/app/build/outputs/apk/debug/app-debug.apk"
+          if [[ ! -f "${APK}" ]]; then
+            echo "::error::Debug APK was not generated at ${APK}"
+            exit 1
+          fi
+
+          mkdir -p artifacts
+          OUTPUT="artifacts/7xAnime-v${VERSION_NAME}-debug.apk"
+          cp "${APK}" "${OUTPUT}"
+          sha256sum "${OUTPUT}" > "${OUTPUT}.sha256"
+
+          {
+            echo "## 7xAnime debug build"
+            echo
+            echo "- Version: ${VERSION_NAME}"
+            echo "- Android versionCode: ${VERSION_CODE}"
+            echo "- Package: `com.sevenx.anime.debug`"
+            echo "- APK: `$(basename "${OUTPUT}")`"
+            echo "- SHA-256: `$(cut -d' ' -f1 "${OUTPUT}.sha256")`"
+            echo "- Release signing: not used"
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: 7xAnime-v${{ env.VERSION_NAME }}-debug-apk
+          path: artifacts/7xAnime-v${{ env.VERSION_NAME }}-debug.apk
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload debug checksum
+        uses: actions/upload-artifact@v4
+        with:
+          name: 7xAnime-v${{ env.VERSION_NAME }}-debug-checksum
+          path: artifacts/7xAnime-v${{ env.VERSION_NAME }}-debug.apk.sha256
+          if-no-files-found: error
+          retention-days: 30
