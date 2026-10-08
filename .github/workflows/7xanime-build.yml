@@ -1,6 +1,9 @@
 name: 7xAnime Android Debug
 
 on:
+  pull_request:
+    branches:
+      - master
   workflow_dispatch:
     inputs:
       version_name:
@@ -20,12 +23,13 @@ jobs:
   debug-apk:
     name: Build Debug APK
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
 
     env:
-      NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }}
-      NEXT_PUBLIC_POCKETBASE_URL: ${{ secrets.NEXT_PUBLIC_POCKETBASE_URL }}
-      NEXT_PUBLIC_PROXY_URL: ${{ secrets.NEXT_PUBLIC_PROXY_URL }}
+      NEXT_PUBLIC_LOCAL_BACKEND: "1"
+      NEXT_PUBLIC_API_URL: "http://127.0.0.1:8000"
+      NEXT_PUBLIC_POCKETBASE_URL: "http://127.0.0.1:8090"
+      NEXT_PUBLIC_PROXY_URL: ""
 
     steps:
       - name: Checkout
@@ -33,11 +37,19 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Fetch pinned Kuhi backend source
+        run: bash .github/scripts/fetch-kuhi-backend.sh
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
 
       - name: Setup Java 21
         uses: actions/setup-java@v5
@@ -65,29 +77,6 @@ jobs:
           fi
           bash .github/scripts/android-version.sh "${VERSION}" >> "${GITHUB_ENV}"
 
-      - name: Validate mobile endpoints
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          for key in NEXT_PUBLIC_API_URL NEXT_PUBLIC_POCKETBASE_URL NEXT_PUBLIC_PROXY_URL; do
-            value="${!key:-}"
-            if [[ -z "${value}" ]]; then
-              echo "::error::Missing required Actions secret: ${key}"
-              exit 1
-            fi
-
-            if [[ ! "${value}" =~ ^https:// ]]; then
-              echo "::error::${key} must use an HTTPS endpoint for the bundled Android app."
-              exit 1
-            fi
-
-            if [[ "${value}" =~ (localhost|127\.0\.0\.1|0\.0\.0\.0) ]]; then
-              echo "::error::${key} points to a local development host and cannot be embedded in the Android app."
-              exit 1
-            fi
-          done
-
       - name: Build static web bundle
         run: npm run build:android-web
 
@@ -98,7 +87,9 @@ jobs:
         run: npx cap sync android
 
       - name: Configure Android debug build
-        run: python3 .github/scripts/configure-capacitor-android.py
+        run: |
+          python3 .github/scripts/configure-capacitor-android.py
+          python3 .github/scripts/configure-local-anime-backend.py
 
       - name: Build Debug APK
         working-directory: android
