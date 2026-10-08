@@ -127,7 +127,7 @@ const HeroCarouselItem = ({ anime }: { anime: MediaList }) => {
 const LoadingSkeleton = () => {
   return (
     <div className="relative h-[64svh] min-h-[430px] max-h-[700px] w-full md:h-[78vh] md:min-h-[560px]">
-      <div className="w-full h-[calc(100%-5.25rem)] mt-[5.25rem] relative z-20">
+      <div className="relative z-20 h-full w-full">
         <Container className="flex h-full w-full flex-col justify-end pb-12 pt-24 md:justify-center md:pb-10 md:pt-20">
           <div className="space-y-2 lg:w-[40vw]">
             <div className="h-16 animate-pulse bg-slate-700 w-[75%]"></div>
