@@ -20,6 +20,7 @@ import { useAuthStore } from "@/store/auth-store";
 import { pb } from "@/lib/pocketbase";
 import NavbarAvatar from "./navbar-avatar";
 import { toast } from "sonner";
+import { isLocalBackendEnabled } from "@/lib/api";
 
 const menuItems: Array<{ title: string; href?: string }> = [
   { title: "Home", href: ROUTES.HOME },
@@ -34,6 +35,13 @@ const NavBar = () => {
   const isHeaderSticky = y > 0;
   useEffect(() => {
     const refreshAuth = async () => {
+      if (isLocalBackendEnabled()) {
+        auth.clearAuth();
+        pb.authStore.clear();
+        localStorage.removeItem("pocketbase_auth");
+        return;
+      }
+
       const auth_token = JSON.parse(
         localStorage.getItem("pocketbase_auth") as string,
       );
