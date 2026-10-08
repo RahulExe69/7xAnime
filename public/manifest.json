@@ -4,9 +4,9 @@
   "display": "standalone",
   "scope": "/",
   "start_url": "/",
-  "name": "Kitsune",
-  "short_name": "Kitsune",
-  "description": "Watch anime with ease and no ads",
+  "name": "7xAnime",
+  "short_name": "7xAnime",
+  "description": "Watch anime with ease and no ads.",
   "orientation": "portrait-primary",
   "icons": [
     {
