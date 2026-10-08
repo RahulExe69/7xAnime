@@ -49,7 +49,7 @@ const RecentCommentsSection = () => {
             return (
               <div
                 key={comment.id}
-                className="flex flex-col justify-between group flex flex-col justify-between rounded-2xl border border-white/5 bg-[#141414] p-4 shadow-sm transition hover:border-violet-500/30"
+                className="group flex flex-col justify-between rounded-2xl border border-white/5 bg-[#141414] p-4 shadow-sm transition hover:border-violet-500/30"
               >
                 <div className="flex flex-col gap-2.5">
                   {/* Header: User Info */}
