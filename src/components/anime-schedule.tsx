@@ -8,6 +8,7 @@ import Image from "next/image";
 import { ROUTES } from "@/constants/routes";
 import { Badge } from "./ui/badge";
 import { Clock, Play } from "lucide-react";
+import SectionHeading from "./section-heading";
 
 function AnimeSchedule() {
   const currentDate = new Date();
@@ -47,9 +48,9 @@ function AnimeSchedule() {
 
   return (
     <Container id="schedule" className="scroll-mt-24 flex flex-col items-start gap-5 py-7 sm:gap-6 sm:py-9">
-      <div className="flex flex-col gap-1">
-        <h5 className="text-xl font-bold tracking-tight text-white sm:text-2xl md:text-3xl">Estimated Schedule</h5>
-        <p className="text-sm text-gray-400">Track upcoming episode releases for this week</p>
+      <div className="flex flex-col gap-2">
+        <SectionHeading eyebrow="On the air" title="Estimated Schedule" />
+        <p className="text-sm text-zinc-400">Track upcoming episode releases for this week.</p>
       </div>
 
       <Tabs
