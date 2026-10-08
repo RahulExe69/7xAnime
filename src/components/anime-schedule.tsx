@@ -148,7 +148,7 @@ function AnimeSchedule() {
                               <Badge className="bg-[#e9376b]/20 text-[#e9376b] border border-[#e9376b]/40 text-[10px] px-2 py-0.5">
                                 Ep {anime.episode}
                               </Badge>
-                              <Link href={`${ROUTES.ANIME_DETAILS}/${anime.id}`}>
+                              <Link href={ROUTES.animeDetails(anime.id)}>
                                 <Button
                                   size="sm"
                                   className="h-7 text-xs bg-slate-800 hover:bg-[#e9376b] text-white px-2.5 rounded-lg flex items-center gap-1 transition"
