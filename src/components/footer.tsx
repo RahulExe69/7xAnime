@@ -4,7 +4,7 @@ import Image from "next/image";
 
 const Footer = () => {
   return (
-    <footer className="mt-10 flex w-full flex-col items-center space-y-5 border-t border-white/5 bg-[#09090f] p-6 pb-28 text-center lg:pb-6">
+    <footer className="mt-10 flex w-full flex-col items-center space-y-5 border-t border-white/5 bg-[#09090f] p-6 text-center">
       <Image src="/icon.png" alt="logo" width="100" height="100" suppressHydrationWarning />
       <div className="flex space-x-5 items-center">
         <a href="https://github.com/RahulExe69/7xAnime" target="_blank">
