@@ -34,6 +34,14 @@ jobs:
           node-version: 22
           cache: npm
 
+      - name: Validate backend bootstrap scripts
+        run: python3 -m py_compile pocketbase/init-collections.py .github/scripts/configure-capacitor-android.py
+
+      - name: Validate local Docker Compose
+        run: |
+          cp .env.backend.example .env.backend
+          docker compose config --quiet
+
       - name: Install dependencies
         run: |
           npm install --package-lock-only --ignore-scripts --no-audit --no-fund
