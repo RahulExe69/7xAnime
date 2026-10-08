@@ -7,6 +7,7 @@ import { ROUTES } from "@/constants/routes";
 import BlurFade from "./ui/blur-fade";
 import { IAnime } from "@/types/anime";
 import { History } from "lucide-react";
+import SectionHeading from "./section-heading";
 import useBookMarks, { WatchHistory } from "@/hooks/use-get-bookmark";
 import { useAuthStore } from "@/store/auth-store";
 
@@ -78,10 +79,7 @@ const ContinueWatching = (props: Props) => {
 
   return (
     <Container className="flex flex-col gap-4 py-7 items-center lg:items-start sm:gap-5 sm:py-9">
-      <div className="flex items-center gap-2">
-        <History />
-        <h5 className="text-2xl font-bold">Continue Watching</h5>
-      </div>
+      <SectionHeading eyebrow="Pick up where you left off" title="Continue Watching" icon={<History className="h-5 w-5 text-violet-400" />} />
       <div className="grid w-full grid-cols-2 content-start gap-x-3 gap-y-5 sm:grid-cols-3 sm:gap-4 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7">
         {anime?.map(
           (ani, idx) =>
@@ -107,7 +105,7 @@ const ContinueWatching = (props: Props) => {
 const LoadingSkeleton = () => {
   return (
     <Container className="relative z-20 flex flex-col gap-4 py-7 items-center lg:items-start sm:gap-5 sm:py-9">
-      <div className="h-10 w-[15.625rem] animate-pulse bg-slate-700"></div>
+      <div className="h-10 w-[15.625rem] animate-pulse bg-white/[0.06]"></div>
       <div className="grid w-full grid-cols-2 content-start gap-x-3 gap-y-5 sm:grid-cols-3 sm:gap-4 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7">
         {[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1].map((_, idx) => {
           return (
