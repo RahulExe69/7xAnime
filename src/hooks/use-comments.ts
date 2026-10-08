@@ -121,7 +121,7 @@ export const useGetInfiniteComments = ({
       }
       return undefined;
     },
-    enabled: !!animeId,
+    enabled: !isLocalBackendEnabled() && !!animeId,
     staleTime: 0,
     refetchOnWindowFocus: true,
   });
