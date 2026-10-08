@@ -63,7 +63,7 @@ const SearchBar = ({
     <div className={cn([" relative w-full min-h-fit", className])}>
         <SearchIcon suppressHydrationWarning className="absolute inset-y-0 left-3 m-auto h-4 w-4 text-zinc-400" />
       <Input
-        className="h-10 w-full rounded-xl border-white/10 bg-white/[0.06] pl-9 pr-11 text-sm text-white placeholder:text-zinc-500 focus-visible:border-violet-400/60 focus-visible:ring-violet-400/20"
+        className={cn(["h-10 w-full rounded-xl border-white/10 bg-white/[0.06] pl-9 text-sm text-white placeholder:text-zinc-500 focus-visible:border-violet-400/60 focus-visible:ring-violet-400/20", showFilterButton ? "pr-11" : "pr-3"])}
         placeholder="Search anime..."
         onChange={(e) => setSearchValue(e.target.value)}
         onFocus={() => setIsFocused(true)}

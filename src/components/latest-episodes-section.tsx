@@ -20,8 +20,18 @@ const LatestEpisodesAnime = ({ loading: initialLoading }: Props) => {
   const episodesList = data?.results || [];
   const hasNextPage = data?.hasNextPage ?? false;
 
-  if (isLoading || isFetching || initialLoading || !episodesList.length) {
+  if (isLoading || isFetching || initialLoading) {
     return <LoadingSkeleton />;
+  }
+
+  if (!episodesList.length) {
+    return (
+      <Container className="py-7 sm:py-9">
+        <div className="rounded-2xl border border-white/[0.07] bg-white/[0.025] px-4 py-8 text-center text-sm text-zinc-400">
+          No recent releases are available right now.
+        </div>
+      </Container>
+    );
   }
 
   return (

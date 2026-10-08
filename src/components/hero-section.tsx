@@ -114,7 +114,7 @@ const HeroCarouselItem = ({ anime }: { anime: MediaList }) => {
                 href={ROUTES.animeDetails(anime.id)}
                 className="h-10 rounded-xl bg-violet-500 px-5 text-sm font-semibold text-white shadow-lg shadow-violet-950/30 transition-colors hover:bg-violet-400"
               >
-                Learn More
+                View Details
               </ButtonLink>
             </div>
           </div>
