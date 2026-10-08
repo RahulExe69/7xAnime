@@ -8,6 +8,7 @@ import Avatar from "@/components/common/avatar";
 import { formatDistanceToNow } from "date-fns";
 import Container from "@/components/container";
 import SectionHeading from "./section-heading";
+import { isLocalBackendEnabled } from "@/lib/api";
 
 const RecentCommentsSection = () => {
   const { data: comments, isLoading } = useGetRecentComments(8);
@@ -16,6 +17,8 @@ const RecentCommentsSection = () => {
   const toggleReveal = (id: string) => {
     setRevealed((prev) => ({ ...prev, [id]: !prev[id] }));
   };
+
+  if (isLocalBackendEnabled()) return null;
 
   if (!isLoading && (!comments || comments.length === 0)) {
     return null;
