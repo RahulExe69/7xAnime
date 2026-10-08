@@ -5,7 +5,7 @@ export const ROUTES = {
   WATCH: "/anime/watch",
   SEARCH: "/search",
 
-  animeDetails: (id: string) => `/anime?id=${encodeURIComponent(id)}`,
+  animeDetails: (id: string | number) => `/anime?id=${encodeURIComponent(id)}`,
   profile: (username: string) =>
     `/profile?username=${encodeURIComponent(username)}`,
 };
