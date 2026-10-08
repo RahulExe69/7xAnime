@@ -20,7 +20,7 @@ const SearchBar = ({
 }) => {
   const [searchValue, setSearchValue] = useState<string>("");
   const [isFocused, setIsFocused] = useState<boolean>(false);
-  const debouncedValue = useDebounce(searchValue, 1000);
+  const debouncedValue = useDebounce(searchValue, 350);
   const resultsRef = useRef<HTMLDivElement | null>(null);
   const router = useRouter();
 
@@ -59,10 +59,10 @@ const SearchBar = ({
 
   return (
     <div className={cn([" relative w-full min-h-fit", className])}>
-        <SearchIcon suppressHydrationWarning className="absolute inset-y-0 left-2 m-auto h-4 w-4" />
+        <SearchIcon suppressHydrationWarning className="absolute inset-y-0 left-3 m-auto h-4 w-4 text-zinc-400" />
       <Input
-        className="w-full h-10 pl-8 text-white border-white"
-        placeholder="Enter your keywords to search..."
+        className="h-10 w-full rounded-xl border-white/10 bg-white/[0.06] pl-9 pr-11 text-sm text-white placeholder:text-zinc-500 focus-visible:border-violet-400/60 focus-visible:ring-violet-400/20"
+        placeholder="Search anime, genres..."
         onChange={(e) => setSearchValue(e.target.value)}
         onFocus={() => setIsFocused(true)}
         onBlur={handleBlur}
@@ -71,7 +71,7 @@ const SearchBar = ({
       />
       <Button
         variant="secondary"
-        className="absolute  text-white right-2 top-1/2 -translate-y-1/2 h-2/3"
+        className="absolute right-1.5 top-1/2 h-8 -translate-y-1/2 rounded-lg text-zinc-300 hover:bg-violet-500/15 hover:text-violet-200"
         onClick={() => {
           router.push(ROUTES.SEARCH + '?q=""');
         }}
