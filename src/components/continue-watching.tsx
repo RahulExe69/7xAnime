@@ -48,10 +48,7 @@ const ContinueWatching = (props: Props) => {
             timestamp: entry.duration,
             created: new Date(entry.updatedAt).toISOString(),
           } as WatchHistory,
-          updatedAt: entry.updatedAt,
-        }))
-        .sort((a, b) => b.updatedAt - a.updatedAt)
-        .map(({ updatedAt: _updatedAt, ...item }) => item);
+        }));
       setAnime(localAnime.length ? (localAnime as WatchedAnime[]) : null);
       return;
     }
