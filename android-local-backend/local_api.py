@@ -51,11 +51,17 @@ async def local_health():
     return {"status": "ok", "service": "7xanime-local-api"}
 
 
+def _episode_number_from_slug(episode_slug: str) -> int:
+    # Kuhi emits ids such as "watch/anineko/12345/sub/anineko-12".
+    # Extract the final number regardless of the provider-specific slug prefix.
+    match = re.search(r"(\d+)\s*$", episode_slug)
+    return int(match.group(1)) if match else 1
+
+
 @app.get("/watch/{provider}/{anilist_id}/{audio}/{episode_slug:path}")
 async def legacy_watch_route(provider: str, anilist_id: int, audio: str, episode_slug: str):
-    """Translate the legacy Miruro episode URL to Kuhi's native extraction route."""
-    match = re.search(r"(?:episode|ep|e)?[-_ ]*(\d+)\s*$", episode_slug, re.IGNORECASE)
-    episode_number = int(match.group(1)) if match else 1
+    """Translate Kuhi's episode IDs to its native extraction route."""
+    episode_number = _episode_number_from_slug(episode_slug)
     audio = (audio or "sub").lower()
     if audio not in {"sub", "dub"}:
         audio = "sub"
