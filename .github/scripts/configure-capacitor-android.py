@@ -64,7 +64,6 @@ if 'applicationIdSuffix ".debug"' not in text:
         debug {
             applicationIdSuffix ".debug"
             debuggable true
-            resValue "string", "app_name", "7xAnime Debug"
         }
 """
     if marker not in text:
@@ -82,4 +81,46 @@ if not namespace_match or namespace_match.group(1) != "com.sevenx.anime":
     raise SystemExit(1)
 
 app_gradle.write_text(text, encoding="utf-8")
+
+strings = Path("android/app/src/main/res/values/strings.xml")
+if strings.is_file():
+    source_strings = strings.read_text(encoding="utf-8")
+    source_strings, _ = re.subn(
+        r'(<string name="app_name">).*?(</string>)',
+        r'\g<1>7xAnime\g<2>',
+        source_strings,
+        count=1,
+    )
+    source_strings, _ = re.subn(
+        r'(<string name="title_activity_main">).*?(</string>)',
+        r'\g<1>7xAnime\g<2>',
+        source_strings,
+        count=1,
+    )
+    source_strings, _ = re.subn(
+        r'(<string name="package_name">).*?(</string>)',
+        r'\g<1>com.sevenx.anime\g<2>',
+        source_strings,
+        count=1,
+    )
+    source_strings, _ = re.subn(
+        r'(<string name="custom_url_scheme">).*?(</string>)',
+        r'\g<1>com.sevenx.anime\g<2>',
+        source_strings,
+        count=1,
+    )
+    strings.write_text(source_strings, encoding="utf-8")
+
+debug_strings = Path("android/app/src/debug/res/values/strings.xml")
+debug_strings.parent.mkdir(parents=True, exist_ok=True)
+debug_strings.write_text(
+    '''<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">7xAnime Debug</string>
+    <string name="title_activity_main">7xAnime Debug</string>
+</resources>
+''',
+    encoding="utf-8",
+)
+
 print(f"Configured com.sevenx.anime version {version_name} ({version_code}) with a separate debug id com.sevenx.anime.debug.")
