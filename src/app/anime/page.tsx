@@ -103,8 +103,8 @@ const PageContent = () => {
   return isLoading || !anime ? (
     <Loading />
   ) : (
-    <div className="w-full z-50">
-      <div className="h-[30vh] md:h-[40vh] w-full relative ">
+    <div className="relative z-10 w-full pb-8">
+      <div className="relative h-[26vh] min-h-[190px] w-full overflow-hidden md:h-[34vh] md:min-h-[280px]">
         <Image
           src={
             anime.anime.info.bannerImage || anime.anime.info.poster
@@ -112,17 +112,17 @@ const PageContent = () => {
           alt={anime.anime.info.name}
           height={100}
           width={100}
-          className="h-full w-full object-cover"
+          className="h-full w-full object-cover opacity-80"
           unoptimized
         />
 
         <WatchTrailer
           videoHref={anime.anime.info.promotionalVideos[0]?.source}
         />
-        <div className="absolute h-full w-full inset-0 m-auto bg-gradient-to-r from-slate-900 to-transparent"></div>
+        <div className="absolute inset-0 m-auto h-full w-full bg-gradient-to-r from-[#09090f]/95 via-[#09090f]/45 to-transparent"></div>
       </div>
-      <Container className="z-50 md:space-y-10 pb-20">
-        <div className="flex md:mt-[-9.375rem] mt-[-6.25rem] md:flex-row flex-col md:items-end md:gap-20 gap-10 ">
+      <Container className="relative z-10 -mt-16 space-y-7 pb-16 md:-mt-24 md:space-y-8">
+        <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:gap-6 md:gap-8">
           <AnimeCard
             title={anime.anime.info.name}
             poster={anime.anime.info.poster}
@@ -131,11 +131,11 @@ const PageContent = () => {
             variant="lg"
             className="shrink-0"
           />
-          <div className="flex flex-col md:gap-5 gap-2 pb-16">
-            <h1 className="md:text-5xl text-2xl md:font-black font-extrabold z-[9]">
+          <div className="flex min-w-0 flex-col gap-3 pb-2 sm:pb-4">
+            <h1 className="z-[9] text-2xl font-extrabold leading-tight tracking-tight sm:text-3xl md:text-4xl">
               {anime.anime.info.name}
             </h1>
-            <div className="flex items-center gap-5">
+            <div className="flex flex-wrap items-center gap-3">
               <WatchButton />
               {auth && (
                 <Select
@@ -150,10 +150,10 @@ const PageContent = () => {
           </div>
         </div>
         <Tabs defaultValue="overview" className="w-full">
-          <TabsList className="flex items-center justify-start w-fit text-2xl h-fit">
+          <TabsList className="flex h-fit w-full items-center justify-start gap-1 overflow-x-auto rounded-xl border border-white/[0.06] bg-white/[0.025] p-1 text-base">
             <TabsTrigger
               value="overview"
-              className="md:text-2xl text-lg font-semibold"
+              className="rounded-lg px-3 py-2 text-sm font-semibold sm:text-base"
             >
               Overview
             </TabsTrigger>
@@ -184,11 +184,11 @@ const PageContent = () => {
 
           <TabsContent
             value="overview"
-            className="w-full grid md:grid-cols-5 grid-cols-1 gap-x-20 gap-y-5 mt-10"
+            className="mt-6 grid w-full grid-cols-1 gap-x-10 gap-y-7 md:grid-cols-5 md:gap-y-5"
           >
-            <div className="col-span-1 flex flex-col gap-5 w-full">
+            <div className="col-span-1 flex w-full flex-col gap-4">
               <h3 className="text-xl font-semibold">Details</h3>
-              <div className="grid grid-cols-2 w-full md:text-base text-xs gap-y-2 gap-x-20 md:gap-x-0">
+              <div className="grid w-full grid-cols-[90px_minmax(0,1fr)] gap-x-3 gap-y-2 text-xs sm:text-sm md:grid-cols-2 md:gap-x-2">
                 <h3>Aired</h3>
                 <span>{anime.anime.moreInfo.aired}</span>
 
@@ -211,9 +211,9 @@ const PageContent = () => {
                 <span>{anime.anime.moreInfo.studios}</span>
               </div>
             </div>
-            <div className="col-span-4 flex flex-col gap-5">
+            <div className="col-span-4 flex flex-col gap-3">
               <h3 className="text-xl font-semibold">Description</h3>
-              <div className="md:text-base text-xs leading-6 text-gray-300">
+              <div className="text-sm leading-7 text-zinc-300">
                 {parse(anime.anime.info.description || "")}
               </div>
             </div>
@@ -221,10 +221,10 @@ const PageContent = () => {
 
           <TabsContent
             value="relations"
-            className="w-full flex flex-col gap-5 "
+            className="flex w-full flex-col gap-4"
           >
             <h3 className="text-xl font-semibold">Relations</h3>
-            <div className="grid lg:grid-cols-5 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-7 w-full gap-5 content-center">
+            <div className="grid w-full grid-cols-2 content-start gap-x-3 gap-y-5 sm:grid-cols-3 sm:gap-4 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7">
               {anime.seasons.map((relation, idx) => {
                 return (
                   !relation.isCurrent && (
