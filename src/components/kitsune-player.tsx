@@ -21,6 +21,7 @@ import { useAuthStore } from "@/store/auth-store";
 import useBookMarks from "@/hooks/use-get-bookmark";
 import { pb } from "@/lib/pocketbase";
 import Image from "next/image";
+import { getProxyUrl } from "@/lib/proxy";
 
 const WATCH_PROGRESS_UPDATE_INTERVAL = 10000; // Update every 10 seconds
 const WATCH_PROGRESS_MIN_WATCH_TIME = 10; // Min seconds watched to create record
@@ -95,9 +96,7 @@ function KitsunePlayer({
     const firstSourceUrl = episodeInfo?.sources?.[0]?.url;
     if (!firstSourceUrl) return null;
     const referer = episodeInfo?.headers?.Referer;
-    const encodedUrl = encodeURIComponent(firstSourceUrl);
-    const refererParam = referer ? `&referer=${encodeURIComponent(referer)}` : "";
-    return `/api/proxy?url=${encodedUrl}${refererParam}`;
+    return getProxyUrl(firstSourceUrl, referer);
   }, [episodeInfo]);
 
   const skipTimesRef = useRef<{
@@ -251,7 +250,7 @@ function KitsunePlayer({
       )?.url || episodeInfo?.subtitles?.[0]?.url;
 
     const defaultTrackProxyUrl = defaultTrack
-      ? `/api/proxy?url=${encodeURIComponent(defaultTrack)}`
+      ? getProxyUrl(defaultTrack)
       : undefined;
 
     // Direct Subtitle Option based on subOrDub
@@ -426,7 +425,7 @@ function KitsunePlayer({
           ],
           onSelect: function(item: any) {
             if (item.url && typeof item.url === "string") {
-              const proxiedUrl = `/api/proxy?url=${encodeURIComponent(item.url)}`;
+              const proxiedUrl = getProxyUrl(item.url);
               art.subtitle.switch(proxiedUrl, {
                 name: item.html,
               });
