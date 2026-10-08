@@ -42,14 +42,12 @@ const AnimeCard = ({
   const percentage = safeTotal > 0 ? (clampedCurrent / safeTotal) * 100 : 0;
 
   return (
-    <Link href={props.href as string}>
+    <Link href={props.href as string} className="block w-full">
       <div
         className={cn([
-          "rounded-xl overflow-hidden relative cursor-pointer hover:scale-105 duration-300",
-          variant === "sm" &&
-            "h-[12rem] min-[320px]:h-[16.625rem] sm:h-[18rem] max-w-[12.625rem] md:min-w-[12rem]",
-          variant === "lg" &&
-            "max-w-[12.625rem] md:max-w-[18.75rem] h-auto md:h-[25rem] shrink-0 lg:w-[18.75rem]",
+          "group relative w-full overflow-hidden rounded-2xl border border-white/[0.06] bg-zinc-900 shadow-sm transition duration-200 ease-out hover:-translate-y-1 hover:border-violet-400/30 hover:shadow-xl hover:shadow-violet-950/20",
+          variant === "sm" && "aspect-[2/3] min-w-0 max-w-[11.5rem]",
+          variant === "lg" && "aspect-auto h-auto w-full max-w-[12.625rem] shrink-0 md:h-[22rem] md:max-w-[15rem] lg:w-[15rem]",
           props.className,
         ])}
       >
@@ -58,14 +56,14 @@ const AnimeCard = ({
           alt={props.title}
           height={100}
           width={100}
-          className="w-full h-full object-cover"
+          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
           unoptimized
         />
         {displayDetails && (
           <>
-            <div className="absolute inset-0 m-auto h-full w-full bg-gradient-to-t from-accent to-transparent"></div>
-            <div className="absolute bottom-0 flex flex-col gap-1 px-4 pb-3 w-full">
-              <h5 className="line-clamp-1 font-bold text-sm text-white">{props.title}</h5>
+            <div className="absolute inset-0 m-auto h-full w-full bg-gradient-to-t from-black/95 via-black/20 to-transparent"></div>
+            <div className="absolute bottom-0 flex w-full flex-col gap-1 px-2.5 pb-2.5 sm:px-3 sm:pb-3">
+              <h5 className="line-clamp-2 text-xs font-semibold leading-snug text-white sm:text-sm">{props.title}</h5>
               {props.watchDetail && (
                 <>
                   <p className="text-xs text-gray-400">
@@ -78,12 +76,12 @@ const AnimeCard = ({
               )}
               <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
                 {props.episodeCard && !!props.episodes && (
-                  <Badge className="bg-[#e9376b] text-white text-[10px] px-1.5 py-0.5">
+                  <Badge className="border-0 bg-violet-500/90 px-1.5 py-0.5 text-[10px] text-white">
                     Ep {props.episodes}
                   </Badge>
                 )}
                 {props.format && (
-                  <Badge variant="outline" className="text-gray-300 border-gray-600 text-[10px] px-1.5 py-0.5">
+                  <Badge variant="outline" className="border-white/20 bg-black/35 px-1.5 py-0.5 text-[10px] text-zinc-200">
                     {props.format}
                   </Badge>
                 )}
