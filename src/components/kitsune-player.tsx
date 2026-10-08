@@ -22,6 +22,8 @@ import useBookMarks from "@/hooks/use-get-bookmark";
 import { pb } from "@/lib/pocketbase";
 import Image from "next/image";
 import { getProxyUrl } from "@/lib/proxy";
+import { isLocalBackendEnabled } from "@/lib/api";
+import { getLocalWatchProgress, saveLocalWatchProgress } from "@/lib/local-watch-progress";
 
 const WATCH_PROGRESS_UPDATE_INTERVAL = 10000; // Update every 10 seconds
 const WATCH_PROGRESS_MIN_WATCH_TIME = 10; // Min seconds watched to create record
@@ -87,6 +89,30 @@ function KitsunePlayer({
     populate: false,
   });
 
+  const persistWatchProgress = (
+    current: number,
+    duration: number,
+  ): Promise<string | null> => {
+    const episodeNumber = parseInt(serversData.episodeNo, 10) || 1;
+    if (isLocalBackendEnabled()) {
+      saveLocalWatchProgress({
+        animeId: animeInfo.id,
+        episodeId: serversData.episodeId,
+        episodeNumber,
+        current,
+        duration,
+      });
+      return Promise.resolve(null);
+    }
+
+    return syncWatchProgress(bookmarkIdRef.current, watchedRecordIdRef.current, {
+      episodeId: serversData.episodeId,
+      episodeNumber,
+      current,
+      duration,
+    });
+  };
+
   useEffect(() => {
     setIsAutoSkipEnabled(autoSkip);
   }, [autoSkip]);
@@ -109,6 +135,23 @@ function KitsunePlayer({
   }>({ validIntro: false, validOutro: false });
 
   useEffect(() => {
+    if (isLocalBackendEnabled()) {
+      bookmarkIdRef.current = null;
+      watchedRecordIdRef.current = null;
+      watchHistoryIdsRef.current = [];
+      const localProgress =
+        animeInfo.id && serversData.episodeId
+          ? getLocalWatchProgress(
+              animeInfo.id,
+              serversData.episodeId,
+              parseInt(serversData.episodeNo, 10) || 1,
+            )
+          : null;
+      initialSeekTimeRef.current = localProgress?.current ?? null;
+      hasMetMinWatchTimeRef.current = !!localProgress;
+      return;
+    }
+
     if (!auth || !animeInfo.id || !serversData.episodeId) {
       // Reset refs if critical info is missing
       bookmarkIdRef.current = null;
@@ -199,6 +242,7 @@ function KitsunePlayer({
     animeInfo.title,
     animeInfo.image,
     serversData.episodeId,
+    serversData.episodeNo,
     createOrUpdateBookMark,
   ]);
 
@@ -566,16 +610,7 @@ function KitsunePlayer({
         // Immediately sync progress if min time just met and no record exists
         if (!watchedRecordIdRef.current) {
           console.log("Triggering initial sync after min watch time.");
-          syncWatchProgress(
-            bookmarkIdRef.current,
-            null, // Force creation attempt
-            {
-              episodeId: serversData.episodeId,
-              episodeNumber: parseInt(serversData.episodeNo),
-              current: currentTime,
-              duration: duration,
-            },
-          ).then((newId) => {
+          persistWatchProgress(currentTime, duration).then((newId) => {
             if (newId) {
               watchedRecordIdRef.current = newId;
               watchHistoryIdsRef.current.push(newId);
@@ -592,12 +627,7 @@ function KitsunePlayer({
       ) {
         // Call sync directly now, timer approach less reliable with state/refs
         // console.log("Updating progress via interval check")
-        syncWatchProgress(bookmarkIdRef.current, watchedRecordIdRef.current, {
-          episodeId: serversData.episodeId,
-          episodeNumber: parseInt(serversData.episodeNo),
-          current: currentTime,
-          duration: duration,
-        }).then((id) => {
+        persistWatchProgress(currentTime, duration).then((id) => {
           if (id) watchedRecordIdRef.current = id; // Update ref just in case
         });
         lastUpdateTimeRef.current = Date.now(); // Reset timer
@@ -668,12 +698,7 @@ function KitsunePlayer({
         console.log("Syncing progress on pause/seek.");
         // Clear any pending throttled update
         if (updateTimerRef.current) clearTimeout(updateTimerRef.current);
-        syncWatchProgress(bookmarkIdRef.current, watchedRecordIdRef.current, {
-          episodeId: serversData.episodeId,
-          episodeNumber: parseInt(serversData.episodeNo),
-          current: art.currentTime,
-          duration: art.duration,
-        }).then((id) => {
+        persistWatchProgress(art.currentTime, art.duration).then((id) => {
           if (id) watchedRecordIdRef.current = id;
         });
         lastUpdateTimeRef.current = Date.now();
@@ -715,12 +740,7 @@ function KitsunePlayer({
       ) {
         console.log("Syncing final progress on unmount.");
         // Use current values directly
-        syncWatchProgress(bookmarkIdRef.current, watchedRecordIdRef.current, {
-          episodeId: serversData.episodeId,
-          episodeNumber: parseInt(serversData.episodeNo),
-          current: art.currentTime,
-          duration: art.duration,
-        }); // Don't need to wait for promise here
+        persistWatchProgress(art.currentTime, art.duration); // Saves locally or syncs to PocketBase.
       }
 
       // Clear throttle timer
