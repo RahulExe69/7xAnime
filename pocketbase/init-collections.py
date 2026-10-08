@@ -80,8 +80,8 @@ def main():
             pass
         time.sleep(1)
     else:
-        print("[init] PocketBase not ready, skipping")
-        sys.exit(0)
+        print("[init] PocketBase not ready after 30 seconds", file=sys.stderr)
+        sys.exit(1)
 
     # Authenticate using environment-provided local admin credentials.
     if not PB_EMAIL or not PB_PASSWORD:
@@ -91,18 +91,20 @@ def main():
     status, data = api("POST", "/api/collections/_superusers/auth-with-password",
                        data={"identity": PB_EMAIL, "password": PB_PASSWORD})
     if status != 200 or "token" not in data:
-        print(f"[init] Auth failed: {status} {data}")
-        sys.exit(0)
+        print(f"[init] Auth failed: {status} {data}", file=sys.stderr)
+        sys.exit(1)
     token = data["token"]
 
     # Get existing collections (name -> {id, fields})
     status, data = api("GET", "/api/collections?perPage=200", token=token)
+    if status != 200:
+        print(f"[init] Could not load collections: {status} {data}", file=sys.stderr)
+        sys.exit(1)
+
     existing = {}
-    items = []
-    if status == 200:
-        items = data.get("items", data.get("collections", []))
-        if isinstance(data, list):
-            items = data
+    items = data.get("items", data.get("collections", []))
+    if isinstance(data, list):
+        items = data
     for c in items:
         if isinstance(c, dict):
             existing[c["name"]] = c
@@ -129,6 +131,8 @@ def main():
     id_map = {}
     for name, info in existing.items():
         id_map[info.get("id", "")] = info.get("id", "")
+
+    had_errors = False
 
     for col in ordered:
         name = col.get("name", "")
@@ -171,7 +175,8 @@ def main():
                 if status == 200:
                     print(f"[init] Updated collection: {name} (added {len(new_fields)} fields)")
                 else:
-                    print(f"[init] Update {name} failed: {status} {json.dumps(resp)[:200]}")
+                    print(f"[init] Update {name} failed: {status} {json.dumps(resp)[:200]}", file=sys.stderr)
+                    had_errors = True
             else:
                 print(f"[init] Exists, no changes: {name}")
         else:
@@ -183,7 +188,12 @@ def main():
             elif status == 400 and "exists" in json.dumps(resp).lower():
                 print(f"[init] Exists: {name}")
             else:
-                print(f"[init] Failed {name}: {status} {json.dumps(resp)[:200]}")
+                print(f"[init] Failed {name}: {status} {json.dumps(resp)[:200]}", file=sys.stderr)
+                had_errors = True
+
+    if had_errors:
+        print("[init] One or more collections could not be initialized", file=sys.stderr)
+        sys.exit(1)
 
     configure_google_oauth(token)
 
