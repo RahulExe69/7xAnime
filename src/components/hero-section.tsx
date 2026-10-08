@@ -45,15 +45,15 @@ const HeroSection = (props: IHeroSectionProps) => {
           onClick={() => {
             api?.scrollPrev();
           }}
-          className="rounded-full bg-transparent border border-white h-10 w-10 hover:bg-slate-500"
+          className="h-10 w-10 rounded-full border border-white/20 bg-black/40 text-white backdrop-blur hover:bg-violet-600"
         >
-          <ArrowLeft className="text-white shrink-0" />
+          <ArrowLeft className="shrink-0" />
         </Button>
         <Button
           onClick={() => api?.scrollNext()}
           className="rounded-full bg-transparent border border-white h-10 w-10 hover:bg-slate-500"
         >
-          <ArrowRight className="text-white shrink-0" />
+          <ArrowRight className="shrink-0" />
         </Button>
       </div>
     </div>
