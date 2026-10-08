@@ -5,7 +5,6 @@ native Capacitor bridge protects requests from unrelated apps/web pages.
 """
 from __future__ import annotations
 
-import asyncio
 import ipaddress
 import re
 import secrets
@@ -102,11 +101,10 @@ def _validated_remote_url(value: str) -> str:
         raise ValueError("Local network targets are not allowed")
     try:
         address = ipaddress.ip_address(host)
-        if not address.is_global:
-            raise ValueError("Local or private IP targets are not allowed")
-    except ValueError as error:
-        if "does not appear to be an IPv4 or IPv6 address" not in str(error):
-            raise
+    except ValueError:
+        address = None  # Domain name rather than a literal IP address.
+    if address is not None and not address.is_global:
+        raise ValueError("Local or private IP targets are not allowed")
     return value
 
 
@@ -134,7 +132,7 @@ async def local_media_proxy(url: str, referer: str = ""):
         is_manifest = (
             ".m3u8" in urlsplit(target).path.lower()
             or "mpegurl" in content_type.lower()
-            or upstream.text[:128].lstrip().startswith("#EXTM3U")
+            or upstream.content[:128].lstrip().startswith(b"#EXTM3U")
         )
         if not upstream.is_success:
             return Response(
