@@ -14,7 +14,7 @@ export default function BottomNav() {
   const auth = useAuthStore();
 
   // Keep navigation off the dedicated video player surface on small screens.
-  if (pathname === ROUTES.WATCH) return null;
+  if (pathname?.replace(/\/$/, "") === ROUTES.WATCH) return null;
 
   const items = [
     {
