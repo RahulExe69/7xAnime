@@ -28,7 +28,17 @@ const AnimeSections = ({
   hasNextPage = false,
   onPageChange,
 }: Props) => {
-  if (loading || !animeList?.length) return <LoadingSkeleton />;
+  if (loading) return <LoadingSkeleton />;
+  if (!animeList?.length) {
+    return (
+      <Container className="flex flex-col gap-4 py-7 sm:py-9">
+        <h5 className="text-xl font-bold tracking-tight text-white sm:text-2xl">{sectionTitle}</h5>
+        <div className="w-full rounded-2xl border border-white/[0.07] bg-white/[0.025] px-4 py-8 text-center text-sm text-zinc-400">
+          No anime to display right now. Try again in a little while.
+        </div>
+      </Container>
+    );
+  }
   return (
     <Container className="flex flex-col gap-4 py-7 items-center lg:items-start sm:gap-5 sm:py-9">
       <h5 className="text-2xl font-bold text-white">{sectionTitle}</h5>

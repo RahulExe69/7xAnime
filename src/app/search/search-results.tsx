@@ -2,7 +2,7 @@
 
 import React from "react";
 import SearchBar from "@/components/search-bar";
-import { Search } from "lucide-react";
+import { Search, SearchX } from "lucide-react";
 import { ROUTES } from "@/constants/routes";
 import AnimeCard from "@/components/anime-card";
 
@@ -210,6 +210,13 @@ const SearchResults = () => {
               ></div>
             );
           })}
+        </div>
+      )}
+      {!isLoading && searchResults?.animes?.length === 0 && (
+        <div className="flex flex-col items-center justify-center rounded-2xl border border-white/[0.07] bg-white/[0.025] px-5 py-12 text-center">
+          <SearchX className="mb-3 h-8 w-8 text-violet-300" />
+          <h3 className="text-base font-semibold text-zinc-100">No anime found</h3>
+          <p className="mt-1 max-w-sm text-sm text-zinc-400">Try a different title or loosen a few filters.</p>
         </div>
       )}
       <div className="grid w-full grid-cols-2 content-start gap-x-3 gap-y-5 sm:grid-cols-3 sm:gap-4 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7">
