@@ -55,7 +55,7 @@ export default function Home() {
   );
 
   return (
-    <div className="flex flex-col bg-[#121212]">
+    <div className="flex min-h-screen flex-col overflow-hidden bg-[#09090f] text-zinc-100">
       <HeroSection
         spotlightAnime={spotlightList}
         isDataLoading={isLoadingSpotlight}
