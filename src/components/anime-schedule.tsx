@@ -46,7 +46,7 @@ function AnimeSchedule() {
   }
 
   return (
-    <Container className="flex flex-col items-start gap-5 py-7 sm:gap-6 sm:py-9">
+    <Container id="schedule" className="scroll-mt-24 flex flex-col items-start gap-5 py-7 sm:gap-6 sm:py-9">
       <div className="flex flex-col gap-1">
         <h5 className="text-xl font-bold tracking-tight text-white sm:text-2xl md:text-3xl">Estimated Schedule</h5>
         <p className="text-sm text-gray-400">Track upcoming episode releases for this week</p>
