@@ -5,6 +5,7 @@ import React, {
   useRef,
   useMemo,
   HTMLAttributes,
+  useState,
 } from "react";
 import Artplayer from "artplayer";
 import type { Option } from "artplayer";
@@ -88,6 +89,8 @@ function VideoPlayer({
   const lastUpdateTimeRef = useRef<number>(0);
   const hasMetMinWatchTimeRef = useRef<boolean>(false); // Track if min time met for this episode
   const initialSeekTimeRef = useRef<number | null>(null);
+  const seekFeedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [seekFeedback, setSeekFeedback] = useState<"backward" | "forward" | null>(null);
 
   const { auth } = useAuthStore();
   const { createOrUpdateBookMark, syncWatchProgress } = useBookMarks({
@@ -536,8 +539,11 @@ function VideoPlayer({
       flip: false,
       playbackRate: true,
       aspectRatio: true,
-      fullscreen: true,
-      fullscreenWeb: true,
+      // The outer PlayerViewport owns fullscreen/rotation so the same controls
+      // work for direct media and third-party iframes. Double-tap is repurposed
+      // for +/-10s seeking below instead of ArtPlayer's fullscreen action.
+      fullscreen: false,
+      fullscreenWeb: false,
       subtitleOffset: true,
       miniProgressBar: false,
       mutex: true,
@@ -566,6 +572,75 @@ function VideoPlayer({
       return;
     }
     artInstanceRef.current = art;
+
+    // YouTube-style double tap: left half seeks back 10s, right half forward
+    // 10s. Single taps still play/pause, but are delayed briefly so a second
+    // tap can cancel the single-tap action. Controls/buttons remain untouched.
+    const interactionContainer = artContainerRef.current;
+    let lastVideoTapAt = 0;
+    let videoTapTimer: ReturnType<typeof setTimeout> | null = null;
+    const isVideoSurfaceTarget = (target: EventTarget | null): target is HTMLElement => {
+      if (!(target instanceof HTMLElement)) return false;
+      if (target.closest("button, a, input, select, textarea, .art-controls, .art-control, .art-setting, .art-contextmenu")) {
+        return false;
+      }
+      return target === art.video
+        || target.classList.contains("art-video")
+        || !!target.closest(".art-video");
+    };
+    const handleVideoClickCapture = (event: MouseEvent) => {
+      if (!isVideoSurfaceTarget(event.target)) return;
+      const videoRect = (art.video || interactionContainer)?.getBoundingClientRect();
+      if (!videoRect || videoRect.width <= 0) return;
+
+      // Intercept the player surface click so ArtPlayer doesn't treat a
+      // double-tap as fullscreen or toggle twice.
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+      const now = Date.now();
+      if (lastVideoTapAt > 0 && now - lastVideoTapAt <= 360) {
+        lastVideoTapAt = 0;
+        if (videoTapTimer) {
+          window.clearTimeout(videoTapTimer);
+          videoTapTimer = null;
+        }
+        const forward = event.clientX >= videoRect.left + videoRect.width / 2;
+        const current = Math.max(0, Number(art.currentTime) || 0);
+        const duration = Number(art.duration);
+        const proposed = current + (forward ? 10 : -10);
+        const targetTime = Math.max(
+          0,
+          Number.isFinite(duration) && duration > 0 ? Math.min(duration, proposed) : proposed,
+        );
+        art.seek = targetTime;
+        setSeekFeedback(forward ? "forward" : "backward");
+        if (seekFeedbackTimerRef.current) window.clearTimeout(seekFeedbackTimerRef.current);
+        seekFeedbackTimerRef.current = window.setTimeout(() => {
+          setSeekFeedback(null);
+          seekFeedbackTimerRef.current = null;
+        }, 700);
+        return;
+      }
+
+      lastVideoTapAt = now;
+      if (videoTapTimer) window.clearTimeout(videoTapTimer);
+      videoTapTimer = window.setTimeout(() => {
+        lastVideoTapAt = 0;
+        videoTapTimer = null;
+        if (artInstanceRef.current !== art) return;
+        if (art.playing) art.pause();
+        else void art.play();
+      }, 360);
+    };
+    const suppressVideoDoubleClick = (event: MouseEvent) => {
+      if (!isVideoSurfaceTarget(event.target)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+    };
+    interactionContainer?.addEventListener("click", handleVideoClickCapture, true);
+    interactionContainer?.addEventListener("dblclick", suppressVideoDoubleClick, true);
 
     // --- Skip Logic Handler ---
     const handleTimeUpdate = () => {
@@ -765,6 +840,18 @@ function VideoPlayer({
 
     // --- Cleanup Function ---
     return () => {
+      if (videoTapTimer) {
+        window.clearTimeout(videoTapTimer);
+        videoTapTimer = null;
+      }
+      interactionContainer?.removeEventListener("click", handleVideoClickCapture, true);
+      interactionContainer?.removeEventListener("dblclick", suppressVideoDoubleClick, true);
+      if (seekFeedbackTimerRef.current) {
+        window.clearTimeout(seekFeedbackTimerRef.current);
+        seekFeedbackTimerRef.current = null;
+      }
+      setSeekFeedback(null);
+
       console.log(
         "Running cleanup for ArtPlayer instance:",
         artInstanceRef.current?.id,
@@ -852,14 +939,14 @@ function VideoPlayer({
   return (
     <div
       className={cn(
-        "relative w-full h-auto aspect-video  min-h-[20vh] sm:min-h-[30vh] md:min-h-[40vh] lg:min-h-[60vh] max-h-[500px] lg:max-h-[calc(100vh-150px)] bg-black overflow-hidden", // Added relative and overflow-hidden
+        "relative w-full h-auto aspect-video min-h-[20vh] sm:min-h-[30vh] md:min-h-[40vh] lg:min-h-[60vh] max-h-[500px] lg:max-h-[calc(100vh-150px)] bg-black overflow-hidden",
         rest.className ?? "",
       )}
     >
-      <div ref={artContainerRef} className="w-full h-full">
+      <div ref={artContainerRef} className="h-full w-full">
         {!uri && (
           <div
-            className="w-full h-full flex items-center justify-center bg-cover bg-center"
+            className="flex h-full w-full items-center justify-center bg-cover bg-center"
             style={{ backgroundImage: `url(${animeInfo.image})` }}
           >
             <Image
@@ -871,6 +958,17 @@ function VideoPlayer({
           </div>
         )}
       </div>
+      {seekFeedback && (
+        <div
+          aria-live="polite"
+          className={`pointer-events-none absolute inset-y-0 z-40 flex w-1/3 items-center justify-center ${seekFeedback === "backward" ? "left-0" : "right-0"}`}
+        >
+          <div className="flex flex-col items-center gap-2 rounded-2xl bg-black/60 px-5 py-4 text-white shadow-lg backdrop-blur-sm">
+            <span className="text-3xl font-black leading-none">{seekFeedback === "backward" ? "↶" : "↷"}</span>
+            <span className="text-sm font-extrabold">{seekFeedback === "backward" ? "−10s" : "+10s"}</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
