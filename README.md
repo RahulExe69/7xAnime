@@ -72,6 +72,12 @@ The Android local backend exposes manual server choices for AniXo, Megavid, Anim
 
 Megavid can occasionally display a deceptive “Click Allow” prompt, and NontonGo warns about pop-up ads. Do not grant notification permissions or install anything from those embeds; use MegaPlay or AniXo if suspicious prompts appear. The parent app cannot safely remove content rendered inside a cross-origin iframe. The player now offers Retry or Server 1 after 15 seconds of unresolved stream loading, and an explicitly selected MegaPlay fallback renders without waiting for the background request.
 
+## Player experience marathon
+
+The Android player work also includes a best-effort ad/redirect filter, blocked pop-up and remote JavaScript prompt dialogs, a native landscape fullscreen bridge with swipe/Back support, and double-tap ±10-second seeking in the app-owned ArtPlayer player. See [the player marathon notes](docs/PLAYER-MARATHON.md) for exact coverage and cross-origin iframe limitations. Known ad-domain filtering can never remove every in-page ad, especially content served by the player itself.
+
+When playback is detected as failed, 7xAnime keeps the server button visible and tries the next configured server before returning to MegaPlay at the end. Failed servers remain available to retry. A visual ad overlay inside a cross-origin iframe is not reliably detectable by the parent app, so this automatic switching cannot trigger on every in-page ad.
+
 ## Android APK with an on-device API
 
 The Android debug build has an experimental **local-backend** path: the APK bundles
