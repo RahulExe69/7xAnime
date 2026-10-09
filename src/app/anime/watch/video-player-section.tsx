@@ -662,6 +662,10 @@ const VideoPlayerSection = () => {
       anixo: "anixo.buzz",
       megavid: "megavid.buzz",
       cosmic: "cosmic-api-azure.vercel.app",
+      megaflix: "www.megaflix.buzz",
+      tryembed: "tryembed.us.cc",
+      cinexstream: "cinextream.cc",
+      nontongo: "nontongo.win",
     };
     const expectedHost = expectedHosts[observedEmbedProvider];
     if (!expectedHost) return;
@@ -1034,12 +1038,15 @@ const VideoPlayerSection = () => {
             ? "Cosmic Player wraps MegaPlay-backed streams. Use this server to compare the player interface; it is not an independent upstream source."
             : `Embedded source: ${getProviderDisplayName(embedProvider)}. External top-level navigation is blocked by Android.`}
         </p>
-        {embedProvider === "megavid" && (
+        {(embedProvider === "megavid" || embedProvider === "nontongo") && (
           <Alert className="rounded-2xl border-amber-300/15 bg-amber-300/[0.04] text-zinc-200">
             <AlertCircle className="h-4 w-4 text-amber-300" />
-            <AlertTitle className="font-bold">Megavid safety note</AlertTitle>
+            <AlertTitle className="font-bold">{embedProvider === "megavid" ? "Megavid safety note" : "NontonGo safety note"}</AlertTitle>
             <AlertDescription className="mt-1 flex flex-col gap-3 text-sm text-zinc-400">
-              Megavid may occasionally show a deceptive “Click Allow” / robot-check overlay inside its own player. Do not tap Allow, grant notification permissions, or install anything. Because this content is inside a third-party iframe, 7xAnime cannot safely remove the overlay from the parent page.
+              {embedProvider === "megavid"
+                ? "Megavid may occasionally show a deceptive “Click Allow” / robot-check overlay inside its own player. Do not tap Allow, grant notification permissions, or install anything."
+                : "NontonGo warns that its site can show pop-up ads. If a new page or a fake Allow/notification prompt appears, don't grant permissions or install anything."}
+              Because this is a third-party player, 7xAnime cannot safely remove its internal overlay or control every redirect from the parent page.
               <div className="flex flex-wrap gap-2">
                 <Button size="sm" variant="secondary" onClick={() => selectFallbackServer()}>Switch to MegaPlay</Button>
                 <Button size="sm" variant="outline" onClick={() => handleProviderSelect("anixo", activeCategory)}>Try AniXo</Button>
