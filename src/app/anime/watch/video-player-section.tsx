@@ -662,7 +662,7 @@ const VideoPlayerSection = () => {
       anixo: "anixo.buzz",
       megavid: "megavid.buzz",
       cosmic: "cosmic-api-azure.vercel.app",
-      megaflix: "www.megaflix.buzz",
+      megaflix: "megaflix.buzz",
       tryembed: "tryembed.us.cc",
       cinexstream: "cinextream.cc",
       nontongo: "nontongo.win",
