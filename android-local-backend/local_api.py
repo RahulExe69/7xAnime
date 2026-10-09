@@ -21,6 +21,7 @@ from fastapi.responses import JSONResponse, Response
 from src.config import HEADERS
 from src.endpoints import extract_simple, router
 from src.main import app
+from src.providers import _race as provider_race
 
 HOST = "127.0.0.1"
 PORT = 8000
