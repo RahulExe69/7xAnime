@@ -447,7 +447,14 @@ const VideoPlayerSection = () => {
   const availableProviderNames = providerNames.filter(
     (providerName) => (rawProviders[providerName]?.episodes?.[activeCategory] || []).length > 0,
   );
-  const selectedProviderIndex = availableProviderNames.indexOf(currentProviderName);
+  // For Android, show every provider module that actually imports successfully,
+  // not only the providers whose episode catalogue happened to return a list.
+  // Each button uses a strict per-provider request; unavailable sources show an
+  // honest error instead of silently swapping to another server.
+  const serverProviderNames = isLocalBackendEnabled()
+    ? (localProviderStatus?.providers.filter((item) => item.moduleLoaded).map((item) => item.id) || availableProviderNames)
+    : availableProviderNames;
+  const selectedProviderIndex = serverProviderNames.indexOf(currentProviderName);
   const fallbackServerNumber = 1;
   const activeServerNumber = isHindiMode
     ? selectedHindiServer + 1
@@ -538,8 +545,8 @@ const VideoPlayerSection = () => {
             <Button size="sm" title="Server 1 — MegaPlay" aria-label="Server 1 — MegaPlay" onClick={() => selectFallbackServer()} className={`h-10 min-w-12 rounded-xl px-2.5 text-xs font-extrabold transition ${activeServerNumber === 1 && (useFallback || isFallbackActive) ? "bg-[#ff2f9d] text-white" : "border border-white/[0.08] bg-white/[0.035] text-zinc-300 hover:border-[#ff2f9d]/30 hover:bg-[#ff2f9d]/10"}`}>
               <span className="flex flex-col items-center gap-0.5 leading-none"><span>1</span><span className="text-[8px] font-semibold opacity-80">MegaPlay</span></span>
             </Button>
-            {availableProviderNames.map((providerName, index) => (
-              <Button key={`${activeCategory}-${providerName}`} size="sm" title={getServerProviderTitle(availableProviderNames, providerName)} aria-label={getServerProviderTitle(availableProviderNames, providerName)} onClick={() => handleProviderSelect(providerName, activeCategory)} className={`h-10 min-w-12 rounded-xl px-2.5 text-xs font-extrabold transition ${currentProviderName === providerName && !useFallback && !isHindiMode ? "bg-[#ff2f9d] text-white" : "border border-white/[0.08] bg-white/[0.035] text-zinc-300 hover:border-[#ff2f9d]/30 hover:bg-[#ff2f9d]/10"}`}>
+            {serverProviderNames.map((providerName, index) => (
+              <Button key={`${activeCategory}-${providerName}`} size="sm" title={getServerProviderTitle(serverProviderNames, providerName)} aria-label={getServerProviderTitle(serverProviderNames, providerName)} onClick={() => handleProviderSelect(providerName, activeCategory)} className={`h-10 min-w-12 rounded-xl px-2.5 text-xs font-extrabold transition ${currentProviderName === providerName && !useFallback && !isHindiMode ? "bg-[#ff2f9d] text-white" : "border border-white/[0.08] bg-white/[0.035] text-zinc-300 hover:border-[#ff2f9d]/30 hover:bg-[#ff2f9d]/10"}`}>
                 <span className="flex flex-col items-center gap-0.5 leading-none"><span>{index + 2}</span><span className="text-[8px] font-semibold opacity-80">{getProviderDisplayName(providerName)}</span></span>
               </Button>
             ))}
