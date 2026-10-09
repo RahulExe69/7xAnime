@@ -10,7 +10,7 @@ from unittest.mock import AsyncMock, patch
 from fastapi.testclient import TestClient
 
 import local_api
-from src.providers import animenosub
+from src.providers import animenosub, anixo, megavid
 
 
 class LocalAnimeApiTests(unittest.TestCase):
@@ -415,6 +415,64 @@ class LocalAnimeApiTests(unittest.TestCase):
             self.assertEqual(streams[0]["type"], "embed")
             self.assertEqual(streams[0]["url"], "https://vidmoly.to/embed/abc123")
             self.assertEqual(streams[0]["referer"], "https://vidmoly.to/")
+
+        asyncio.run(exercise())
+
+
+    def test_anixo_and_megavid_build_documented_embed_routes_without_network(self) -> None:
+        context = {
+            "media": {"id": 21, "episodes": 12, "title": {"english": "Test Series"}},
+            "anizip": None,
+        }
+
+        async def exercise() -> None:
+            anixo_result = await anixo.watch(21, "sub", 3, context)
+            megavid_result = await megavid.watch(21, "dub", 7, context)
+
+            self.assertEqual(anixo_result[0]["type"], "embed")
+            self.assertEqual(
+                anixo_result[0]["url"],
+                "https://anixo.buzz/embed/ani/21/3?track=sub",
+            )
+            self.assertEqual(anixo_result[0]["upstream"], "anixo")
+            self.assertEqual(
+                megavid_result[0]["url"],
+                "https://megavid.buzz/ani/21/7/dub",
+            )
+            self.assertEqual(megavid_result[0]["type"], "embed")
+            self.assertEqual(megavid_result[0]["upstream"], "megavid")
+
+            anixo_episodes = await anixo.get_episodes(21, context)
+            megavid_episodes = await megavid.get_episodes(21, context)
+            self.assertEqual(len(anixo_episodes["episodes"]["sub"]), 12)
+            self.assertEqual(len(anixo_episodes["episodes"]["dub"]), 12)
+            self.assertEqual(len(megavid_episodes["episodes"]["sub"]), 12)
+            self.assertEqual(anixo_episodes["episodes"]["sub"][2]["id"], "watch/anixo/21/sub/anixo-3")
+
+        asyncio.run(exercise())
+
+    def test_auto_race_excludes_manual_only_embed_route_builders(self) -> None:
+        attempted = []
+
+        async def fake_watch_one(mod, name, anilist_id, episode, audio, ctx):
+            attempted.append(name)
+            return name, [{"url": f"https://cdn.example/{name}.m3u8", "type": "hls"}], 0.1, True
+
+        async def exercise() -> None:
+            with (
+                patch.object(local_api.provider_race, "providers", return_value=[
+                    ("anineko", object()), ("anixo", anixo), ("megavid", megavid),
+                ]),
+                patch.object(local_api.provider_race, "build_ctx", new=AsyncMock(return_value={
+                    "media": {"id": 21, "title": {"english": "Test"}}, "anizip": None,
+                })),
+                patch.object(local_api, "_watch_one_for_player", new=AsyncMock(side_effect=fake_watch_one)),
+                patch.object(local_api.provider_race, "record_latency"),
+            ):
+                result = await local_api._race_watch_for_player(21, 1, "sub")
+
+            self.assertEqual(result["provider"], "anineko")
+            self.assertEqual(attempted, ["anineko"])
 
         asyncio.run(exercise())
 
