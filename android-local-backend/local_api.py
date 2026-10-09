@@ -43,14 +43,14 @@ LOCAL_CONTEXT_CACHE_TTL = 600.0
 LOCAL_WATCH_TIMEOUT = 45.0
 LOCAL_WATCH_CACHE_TTL = 35.0
 LOCAL_ROUTE_TIMEOUT = 80.0
-# These providers construct documented third-party iframe routes rather than
-# resolving a media stream. Keep them available for manual selection, but out of
-# Auto's extraction race: returning a URL is not proof that playback works.
-# Only providers observed working on the user's device remain active. Kuhi's
-# adapters and all other researched candidates are parked: do not invoke their
-# episode scrapers or watch extractors until explicitly re-enabled.
-ACTIVE_PROVIDER_ALLOWLIST = {"anixo", "megavid"}
-MANUAL_EMBED_ONLY_PROVIDERS = {"anixo", "megavid"}
+# Active provider order drives deterministic server numbering and diagnostics.
+# Newly added sources remain manual-only until real-device playback is verified.
+# Cosmic is a player wrapper backed by MegaPlay, not a separate upstream source.
+# Keep unapproved Kuhi adapters parked to avoid unnecessary third-party requests.
+ACTIVE_PROVIDER_ORDER = ("anixo", "megavid", "animeparadise", "cosmic")
+ACTIVE_PROVIDER_ALLOWLIST = set(ACTIVE_PROVIDER_ORDER)
+MANUAL_EMBED_ONLY_PROVIDERS = {"anixo", "megavid", "cosmic"}
+MANUAL_SELECTION_ONLY_PROVIDERS = {"animeparadise"}
 _LOCAL_CONTEXT_CACHE: dict[int, tuple[float, dict]] = {}
 # Asyncio primitives are event-loop-bound. Keep in-flight work and locks scoped
 # to the current loop so isolated test loops cannot reuse a task from another loop.
@@ -174,7 +174,7 @@ async def _start_episode_provider_discovery(anilist_id: int, state: dict) -> Non
         mods = [
             (name, mod)
             for name, mod in provider_race.providers()
-            if name in ACTIVE_PROVIDER_ALLOWLIST
+            if name in ACTIVE_PROVIDER_ALLOWLIST and name != "animeparadise"
         ]
         state["provider_names"] = [name for name, _ in mods]
         if not mods:
@@ -282,7 +282,7 @@ async def local_provider_status():
     available = set(snapshot.get("available") or []) & ACTIVE_PROVIDER_ALLOWLIST
     latency = snapshot.get("latency") or {}
     providers = []
-    for name in ACTIVE_PROVIDER_ALLOWLIST:
+    for name in ACTIVE_PROVIDER_ORDER:
         metrics = latency.get(name) or {}
         attempt = _LOCAL_PROVIDER_DIAGNOSTICS.get(name) or {}
         loaded = name in available
@@ -417,7 +417,9 @@ async def _race_watch_for_player(anilist_id: int, episode: int, audio: str) -> d
     mods = [
         (name, mod)
         for name, mod in provider_race.providers()
-        if name in ACTIVE_PROVIDER_ALLOWLIST and name not in MANUAL_EMBED_ONLY_PROVIDERS
+        if name in ACTIVE_PROVIDER_ALLOWLIST
+        and name not in MANUAL_EMBED_ONLY_PROVIDERS
+        and name not in MANUAL_SELECTION_ONLY_PROVIDERS
     ]
     if not mods:
         return None
