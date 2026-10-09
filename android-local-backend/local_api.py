@@ -160,6 +160,44 @@ async def local_health():
     return {"status": "ok", "service": "7xanime-local-api"}
 
 
+@app.get("/providers/status")
+async def local_provider_status():
+    """Expose embedded provider import and recent attempt diagnostics to the app."""
+    snapshot = provider_race.providers_status()
+    available = set(snapshot.get("available") or [])
+    latency = snapshot.get("latency") or {}
+    providers = []
+    for name in snapshot.get("ranking") or []:
+        metrics = latency.get(name) or {}
+        loaded = name in available
+        avg_seconds = metrics.get("avg_seconds")
+        failures = int(metrics.get("failures") or 0)
+        if not loaded:
+            status = "module_unavailable"
+        elif avg_seconds is None and failures == 0:
+            status = "not_tested_yet"
+        elif failures:
+            status = "recent_attempts_failed"
+        else:
+            status = "recent_attempt_succeeded"
+        providers.append({
+            "id": name,
+            "moduleLoaded": loaded,
+            "status": status,
+            "averageSeconds": avg_seconds,
+            "episodesSeconds": metrics.get("episodes_seconds"),
+            "failuresSinceLastSuccess": failures,
+        })
+    return {
+        "mode": "embedded",
+        "defaultProvider": snapshot.get("defaultProvider"),
+        "loadedCount": len(available),
+        "providerCount": len(snapshot.get("ranking") or []),
+        "providers": providers,
+        "note": "Module-loaded status is not a live guarantee for every anime or episode. Attempt metrics are collected as you select or play providers.",
+    }
+
+
 def _episode_number_from_slug(episode_slug: str) -> int:
     # Kuhi emits ids such as "watch/anineko/12345/sub/anineko-12".
     # Extract the final number regardless of the provider-specific slug prefix.
