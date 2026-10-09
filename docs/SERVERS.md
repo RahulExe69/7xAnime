@@ -1,6 +1,6 @@
 # 7xAnime playback server guide
 
-**Server1 is always the MegaPlay fallback player.** It is the first option on the watch screen and remains available when the primary provider list is empty or a stream fails.
+**Server 1 is always the MegaPlay fallback player.** It is the first option on the watch screen and remains available when the primary provider list is empty or a stream fails.
 
 ## Numbered server labels
 
@@ -19,19 +19,19 @@ The bundled Kuhi API uses these provider keys and ranking order:
 | 9 | `mkissa` | MKissa | https://mkissa.to |
 | 10 | `animeonsen` | AnimeOnsen | https://www.animeonsen.xyz |
 
-For Sub/Dub, providers are returned in this ranking order, but providers with no matching episodes for that anime are omitted. The visible labels start at **Server2** because Server1 is reserved for the fallback. The same number can refer to a different upstream provider on a different series. Focus or long-press the numbered provider button to reveal its current provider name and site.
+For Sub/Dub, providers are returned in this ranking order, but providers with no matching episodes for that anime are omitted. The visible labels start at **Server 2** because Server 1 is reserved for the fallback. The same number can refer to a different upstream provider on a different series. Focus or long-press the numbered provider button to reveal its current provider name and site.
 
 ## Hindi dub catalogue
 
 The Hindi button uses the community project [ZeroTwo-Py/anime-api](https://github.com/ZeroTwo-Py/anime-api), which documents search at `/api/search?s={title}&page=1` and embedded stream results at `/api/stream?id={slug}&season={season}&ep={episode}`. The APK calls the catalogue through fixed, token-protected local routes; the web build calls its public API endpoint directly. Stream results are third-party embeds, not a direct stream guaranteed to work on every device.
 
-While Hindi mode is active, its first available embed is **Server2**, followed by additional embeds as Server3, Server4, etc. This numbering is for the selected Hindi mode; it does not assert that Server2 is the same provider as Server2 in the Sub/Dub list.
+While Hindi mode is active, its first available Hindi embed is **Server 1**, followed by Server 2, Server 3, etc. Hindi mode has its own server list, so these numbers refer only to the Hindi embeds. When you return to SUB/ENGLISH, Server 1 is MegaPlay again and the upstream providers start at Server 2.
 
-Hindi titles and episodes are not available in that catalogue for every series. A missing title/episode, blocked embed, or provider outage is reported in the player; regular Sub/Dub and Server1 remain available. No reliable Urdu-specific episode/stream endpoint was verified during this research, so the app does not label any source as Urdu.
+Hindi titles and episodes are not available in that catalogue for every series. A missing title/episode, blocked embed, or provider outage is reported in the player; regular Sub/Dub and Server 1 remain available. No reliable Urdu-specific episode/stream endpoint was verified during this research, so the app does not label any source as Urdu.
 
 ## Fallback URL
 
-Server1 currently opens:
+Server 1 currently opens:
 
 `https://megaplay.buzz/stream/ani/{anilistId}/{episodeNumber}/{sub-or-dub}`
 
