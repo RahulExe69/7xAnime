@@ -166,7 +166,7 @@ jobs:
               path.is_file() and "https://jitpack.io" in path.read_text(encoding="utf-8")
               for path in gradle_repository_files
           )
-          if "com.github.Edsuns.AdblockAndroid:ad-filter:a585487eb1" not in app_gradle:
+          if "com.github.Edsuns.AdblockAndroid:ad-filter:v0.9.1" not in app_gradle:
               raise SystemExit("Android filter-engine dependency is missing")
           if not has_jitpack_repository:
               raise SystemExit("JitPack repository is missing from Android dependency repositories")
