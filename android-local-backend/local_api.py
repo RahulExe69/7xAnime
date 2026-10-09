@@ -95,6 +95,40 @@ async def legacy_watch_route(provider: str, anilist_id: int, audio: str, episode
     return data
 
 
+HINDI_API_BASE = "https://anime-api-ashen-chi.vercel.app/api"
+
+
+async def _fetch_hindi_api(path: str, params: dict):
+    """Proxy a fixed set of endpoints from the community Hindi anime catalog."""
+    try:
+        async with httpx.AsyncClient(timeout=12.0, follow_redirects=True) as client:
+            upstream = await client.get(f"{HINDI_API_BASE}/{path}", params=params)
+        if not upstream.is_success:
+            return JSONResponse(
+                {"success": False, "detail": f"Hindi catalogue returned HTTP {upstream.status_code}"},
+                status_code=502,
+            )
+        try:
+            return upstream.json()
+        except ValueError:
+            return JSONResponse({"success": False, "detail": "Hindi catalogue returned invalid JSON"}, status_code=502)
+    except Exception:
+        return JSONResponse({"success": False, "detail": "Hindi catalogue is temporarily unavailable"}, status_code=502)
+
+
+@app.get("/hindi/search")
+async def hindi_catalogue_search(s: str, page: int = 1):
+    return await _fetch_hindi_api("search", {"s": s, "page": max(1, page)})
+
+
+@app.get("/hindi/stream")
+async def hindi_catalogue_stream(id: str, season: int = 1, ep: int = 1):
+    return await _fetch_hindi_api(
+        "stream",
+        {"id": id, "season": max(1, season), "ep": max(1, ep)},
+    )
+
+
 def _validated_remote_url(value: str) -> str:
     value = (value or "").strip()
     if value.startswith("//"):

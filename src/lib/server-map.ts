@@ -26,7 +26,8 @@ export const getServerLabel = (providerNames: string[], providerName: string): s
   const index = providerNames.indexOf(providerName);
   // If the episode list came from the API metadata fallback, the "auto" route
   // tries the provider race; it is the only visible route until provider data resolves.
-  return `Server${index >= 0 ? index + 1 : 1}`;
+  if (index >= 0) return `Server${index + 2}`;
+  return providerName.toLowerCase() === "auto" ? "Server2" : "Server1";
 };
 
 export const getServerProviderTitle = (providerNames: string[], providerName: string): string => {
