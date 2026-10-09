@@ -74,7 +74,7 @@ const AnimeCard = ({ displayDetails = true, variant = "sm", ...props }: Props) =
       variant === "lg" && "max-w-[15rem]",
       props.className,
     )}>
-      <div className="relative aspect-[2/3] w-full shrink-0 overflow-hidden bg-[#ebe9f4]">
+      <div className="relative aspect-[2/3] w-full shrink-0 overflow-hidden bg-[#ebe9f4] dark:bg-[#242132]">
         <Image
           src={props.poster || "/brand/7xanime-mark.svg"}
           alt={props.title}
