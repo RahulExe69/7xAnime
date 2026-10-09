@@ -43,11 +43,11 @@ const HeroSection = (props: IHeroSectionProps) => {
     return <LoadingSkeleton />;
 
   return (
-    <div className="relative h-[68svh] min-h-[500px] max-h-[700px] w-full md:h-[78vh] md:min-h-[600px] md:max-h-[780px]">
-      <Carousel className="w-full" setApi={setApi} opts={{ loop: true }}>
-        <CarouselContent>
+    <div className="relative h-[62svh] min-h-[420px] max-h-[600px] w-full overflow-hidden md:h-[76vh] md:min-h-[540px] md:max-h-[720px]">
+      <Carousel className="h-full w-full" setApi={setApi} opts={{ loop: true }}>
+        <CarouselContent className="h-full">
           {props.spotlightAnime.map((anime, index) => (
-            <CarouselItem key={anime.id || index}>
+            <CarouselItem key={anime.id || index} className="h-full">
               <HeroCarouselItem anime={anime} />
             </CarouselItem>
           ))}
@@ -89,7 +89,7 @@ const HeroCarouselItem = ({ anime }: { anime: MediaList }) => {
 
   return (
     <div
-      className="relative h-[68svh] min-h-[500px] max-h-[700px] w-full bg-cover bg-center bg-no-repeat md:h-[78vh] md:min-h-[600px] md:max-h-[780px]"
+      className="relative h-[62svh] min-h-[420px] max-h-[600px] w-full bg-cover bg-center bg-no-repeat md:h-[76vh] md:min-h-[540px] md:max-h-[720px]"
       style={{ backgroundImage: `url(${bgImage})` }}
     >
       {/* Gradient Overlay */}
@@ -151,21 +151,21 @@ const HeroCarouselItem = ({ anime }: { anime: MediaList }) => {
 
 const LoadingSkeleton = () => {
   return (
-    <div className="relative h-[68svh] min-h-[500px] max-h-[700px] w-full md:h-[78vh] md:min-h-[600px] md:max-h-[780px]">
+    <div className="relative h-[62svh] min-h-[420px] max-h-[600px] w-full overflow-hidden md:h-[76vh] md:min-h-[540px] md:max-h-[720px]">
       <div className="relative z-20 h-full w-full">
         <Container className="flex h-full w-full flex-col justify-end pb-12 pt-24 md:justify-center md:pb-10 md:pt-20">
           <div className="space-y-2 lg:w-[40vw]">
-            <div className="h-16 animate-pulse bg-slate-700 w-[75%]"></div>
-            <div className="h-40 animate-pulse w-full bg-slate-700"></div>
+            <div className="h-16 w-[75%] animate-pulse rounded-2xl bg-white/[0.08]"></div>
+            <div className="h-24 w-full animate-pulse rounded-xl bg-white/[0.06]"></div>
             <div className="flex items-center gap-5">
-              <span className="h-10 w-[7.5rem] animate-pulse bg-slate-700"></span>
+              <span className="h-10 w-[7.5rem] animate-pulse rounded-xl bg-white/[0.08]"></span>
               <span className="h-10 w-[7.5rem] animate-pulse bg-slate-700"></span>
             </div>
           </div>
         </Container>
       </div>
       <div className="absolute hidden md:flex items-center gap-5 right-10 bottom-32 z-50 isolate">
-        <span className="h-10 w-10 rounded-full animate-pulse bg-slate-700"></span>
+        <span className="h-10 w-10 animate-pulse rounded-full bg-white/[0.08]"></span>
         <span className="h-10 w-10 rounded-full animate-pulse bg-slate-700"></span>
       </div>
     </div>
