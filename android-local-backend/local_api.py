@@ -190,7 +190,7 @@ async def legacy_watch_route(provider: str, anilist_id: int, audio: str, episode
                 audio,
                 preferred=preferred,
             ),
-            timeout=14.0,
+            timeout=10.0,
         )
         streams = (raced or {}).get("streams") or []
         data = {
