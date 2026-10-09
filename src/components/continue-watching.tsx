@@ -85,7 +85,20 @@ export default function ContinueWatching({ loading = false }: { loading: boolean
       <div ref={scrollRef} className="anime-shelf-scroll flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-1 sm:gap-4 sm:px-6 lg:px-8">
         {anime.map((item, index) => {
           const episode = item.episode;
-          const episodeNumber = typeof episode === "string" ? Number(episode) || 1 : episode.episodeNumber;
+          const episodeNumber = typeof episode === "string"
+            ? (() => {
+                const raw = episode.split("?")[0].split("#")[0];
+                const lastPart = raw.split("/").filter(Boolean).pop() || raw;
+                const direct = Number(lastPart);
+                if (Number.isFinite(direct) && direct > 0) return direct;
+                let end = lastPart.length - 1;
+                while (end >= 0 && (lastPart.charCodeAt(end) < 48 || lastPart.charCodeAt(end) > 57)) end -= 1;
+                let start = end;
+                while (start >= 0 && lastPart.charCodeAt(start) >= 48 && lastPart.charCodeAt(start) <= 57) start -= 1;
+                const suffix = end >= start + 1 ? Number(lastPart.slice(start + 1, end + 1)) : 0;
+                return Number.isFinite(suffix) && suffix > 0 ? suffix : 1;
+              })()
+            : episode.episodeNumber;
           const current = typeof episode === "string" ? 0 : episode.current || 0;
           const total = typeof episode === "string" ? 0 : episode.timestamp || 0;
           const percent = total > 0 ? Math.min(100, (current / total) * 100) : 0;

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import React, { useEffect, useState } from "react";
-import { Bell, Search, Shuffle } from "lucide-react";
+import { Search, Shuffle } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { toast } from "sonner";
 
@@ -92,7 +92,6 @@ export default function NavBar() {
             <a href="https://discord.gg/6yAJ3XDHTt" target="_blank" rel="noreferrer" aria-label="Join 7xAnime Discord" title="Discord" className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#5865f2] text-white shadow-sm transition hover:bg-[#4752d8]">
               <svg viewBox="0 0 24 24" className="h-5 w-5 fill-current" aria-hidden="true"><path d="M19.7 5.4a18.5 18.5 0 0 0-4.6-1.4l-.6 1.2a17 17 0 0 0-5 0L8.9 4a18.5 18.5 0 0 0-4.6 1.4C1.4 9.7.6 13.9 1 18a18.7 18.7 0 0 0 5.6 2.8l1.2-2a11.8 11.8 0 0 1-1.9-.9l.5-.4a13.3 13.3 0 0 0 11.2 0l.5.4a11.8 11.8 0 0 1-1.9.9l1.2 2A18.7 18.7 0 0 0 23 18c.5-4.8-.8-8.9-3.3-12.6ZM8.8 15.3c-1.1 0-2-1-2-2.2s.9-2.2 2-2.2 2 1 2 2.2-.9 2.2-2 2.2Zm6.4 0c-1.1 0-2-1-2-2.2s.9-2.2 2-2.2 2 1 2 2.2-.9 2.2-2 2.2Z"/></svg>
             </a>
-            <button type="button" onClick={() => toast("You're all caught up.", { duration: 1600 })} aria-label="Notifications" title="Notifications" className="grid h-9 w-9 shrink-0 place-items-center rounded-xl transition hover:bg-[#efedf7] hover:text-[#604bd3] dark:hover:bg-white/5 dark:hover:text-[#b7aaff]"><Bell className="h-[21px] w-[21px]" /></button>
             <button type="button" onClick={openRandomAnime} disabled={randomLoading} aria-label="Surprise me with a random anime" title="Random anime" className="grid h-9 w-9 shrink-0 place-items-center rounded-xl transition hover:bg-[#efedf7] hover:text-[#604bd3] disabled:opacity-50 dark:hover:bg-white/5 dark:hover:text-[#b7aaff]"><Shuffle className={`h-[21px] w-[21px] ${randomLoading ? "animate-pulse" : ""}`} /></button>
             <button type="button" onClick={() => setSearchOpen(true)} aria-label="Search anime" title="Search anime" className="grid h-9 w-9 shrink-0 place-items-center rounded-xl transition hover:bg-[#efedf7] hover:text-[#604bd3] dark:hover:bg-white/5 dark:hover:text-[#b7aaff]"><Search className="h-[22px] w-[22px]" /></button>
           </div>
