@@ -28,7 +28,7 @@ const WATCH_PROGRESS_UPDATE_INTERVAL = 10000; // Update every 10 seconds
 const WATCH_PROGRESS_MIN_WATCH_TIME = 10; // Min seconds watched to create record
 
 // --- Define Props for the Combined Player ---
-interface ArtPlayerProps extends HTMLAttributes<HTMLDivElement> {
+type ArtPlayerProps = Omit<HTMLAttributes<HTMLDivElement>, "onError"> & {
   episodeInfo: IEpisodeSource; // Source info including URLs, tracks, intro/outro
   animeInfo: { title: string; image: string; id: string }; // Basic anime info for poster etc.
   subOrDub: "sub" | "dub"; // Use literal type for clarity
@@ -38,7 +38,7 @@ interface ArtPlayerProps extends HTMLAttributes<HTMLDivElement> {
   serversData: IEpisodeServers;
   onError?: (detail?: string) => void;
   onPlaybackReady?: () => void;
-}
+};
 
 // --- Helper to generate highlights ---
 interface HighlightPoint {
