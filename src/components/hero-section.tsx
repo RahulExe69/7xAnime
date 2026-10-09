@@ -131,13 +131,13 @@ const HeroCarouselItem = ({ anime }: { anime: MediaList }) => {
               <ButtonLink
                 href={ROUTES.watchAnime(anime.id)}
                 LeftIcon={Play}
-                className="h-11 rounded-xl bg-[#604bd3] px-5 text-sm font-bold text-white shadow-lg shadow-[#604bd3]/25 transition hover:bg-[#513cc4]"
+                className="h-12 rounded-xl bg-[#604bd3] px-5 text-sm font-bold text-white shadow-lg shadow-[#604bd3]/25 transition hover:bg-[#513cc4]"
               >
                 Watch Now
               </ButtonLink>
               <ButtonLink
                 href={ROUTES.animeDetails(anime.id)}
-                className="h-11 rounded-xl border border-white/30 bg-black/20 px-5 text-sm font-semibold text-white backdrop-blur transition hover:bg-black/35"
+                className="h-12 rounded-xl border border-white/30 bg-black/20 px-5 text-sm font-semibold text-white backdrop-blur transition hover:bg-black/35"
               >
                 View Details
               </ButtonLink>
