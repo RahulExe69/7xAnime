@@ -16,6 +16,7 @@ import { getProviderDisplayName, getServerProviderTitle, isProviderSelectable } 
 import { Switch } from "@/components/ui/switch";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { PlayerViewport } from "@/components/player-viewport";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 import { useGetAllEpisodes } from "@/query/get-all-episodes";
@@ -894,7 +895,7 @@ const VideoPlayerSection = () => {
       <div className="flex w-full flex-col gap-3">
         {playerHeader}
         {selectedHindi ? (
-          <div className="relative aspect-video w-full overflow-hidden rounded-2xl border border-white/10 bg-black shadow-2xl shadow-black/40">
+          <PlayerViewport title="Hindi video player">
             <iframe
               key={selectedHindi.embed}
               src={selectedHindi.embed}
@@ -907,7 +908,7 @@ const VideoPlayerSection = () => {
               referrerPolicy="strict-origin-when-cross-origin"
               className="absolute inset-0 h-full w-full border-0"
             />
-          </div>
+          </PlayerViewport>
         ) : (
           <Alert className="rounded-2xl border-white/[0.08] bg-[#101018] text-zinc-200">
             <AlertCircle className="h-4 w-4 text-[#ff70bd]" />
@@ -991,7 +992,7 @@ const VideoPlayerSection = () => {
     return (
       <div className="flex w-full flex-col gap-3">
         {playerHeader}
-        <div className="relative aspect-video w-full overflow-hidden rounded-2xl border border-white/10 bg-black shadow-2xl shadow-black/40">
+        <PlayerViewport title="MegaPlay video player">
           <iframe
             key={`${fallbackAnimeId}-${fallbackEpId}-${activeCategory}`}
             src={fallbackSrc}
@@ -1005,7 +1006,7 @@ const VideoPlayerSection = () => {
             onError={() => handlePlayerError("MegaPlay embedded player failed to load.")}
             className="absolute inset-0 h-full w-full border-0"
           />
-        </div>
+        </PlayerViewport>
         {playerControls}
       </div>
     );
@@ -1017,7 +1018,7 @@ const VideoPlayerSection = () => {
     return (
       <div className="flex w-full flex-col gap-3">
         {playerHeader}
-        <div className="relative aspect-video w-full overflow-hidden rounded-2xl border border-white/10 bg-black shadow-2xl shadow-black/40">
+        <PlayerViewport title={`${getProviderDisplayName(embedProvider)} video player`}>
           <iframe
             ref={externalEmbedFrameRef}
             key={firstResolvedSource.url}
@@ -1032,7 +1033,7 @@ const VideoPlayerSection = () => {
             onError={() => handlePlayerError("Embedded provider player failed to load.")}
             className="absolute inset-0 h-full w-full border-0"
           />
-        </div>
+        </PlayerViewport>
         <p className="text-xs text-zinc-500">
           {embedProvider === "cosmic"
             ? "Cosmic Player wraps MegaPlay-backed streams. Use this server to compare the player interface; it is not an independent upstream source."
@@ -1096,22 +1097,25 @@ const VideoPlayerSection = () => {
   return (
     <div className="space-y-3">
       {playerHeader}
-      <VideoPlayer
-        key={selectedPlaybackSource.url}
-        episodeInfo={{ ...episodeData, sources: [selectedPlaybackSource] }}
-        serversData={{
-          episodeId: activeEpisodeId,
-          episodeNo: String(currentEpNumber),
-          sub: availableProviderNames.map((providerName, index) => ({ serverId: index + 2, serverName: `Server ${index + 2}` })),
-          dub: [],
-          raw: [],
-        }}
-        animeInfo={playerAnimeInfo}
-        subOrDub={activeCategory}
-        autoSkip={autoSkip}
-        onError={handlePlayerError}
-        onPlaybackReady={handlePlayerPlaybackReady}
-      />
+      <PlayerViewport title="7xAnime video player">
+        <VideoPlayer
+          key={selectedPlaybackSource.url}
+          className="!h-full !min-h-0 !max-h-none !aspect-auto"
+          episodeInfo={{ ...episodeData, sources: [selectedPlaybackSource] }}
+          serversData={{
+            episodeId: activeEpisodeId,
+            episodeNo: String(currentEpNumber),
+            sub: availableProviderNames.map((providerName, index) => ({ serverId: index + 2, serverName: `Server ${index + 2}` })),
+            dub: [],
+            raw: [],
+          }}
+          animeInfo={playerAnimeInfo}
+          subOrDub={activeCategory}
+          autoSkip={autoSkip}
+          onError={handlePlayerError}
+          onPlaybackReady={handlePlayerPlaybackReady}
+        />
+      </PlayerViewport>
       {playerControls}
     </div>
   );
