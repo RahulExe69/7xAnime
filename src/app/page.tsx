@@ -27,11 +27,11 @@ export default function Home() {
   const { data: completedRes, isLoading: loadingCompleted } = useGetFilteredAnime("FINISHED", "SCORE_DESC", 18);
 
   return (
-    <main className="min-h-screen overflow-hidden bg-[#f6f5fc] pb-10 text-[#1a1830] dark:bg-[#111019] dark:text-white">
-      <HeroSection spotlightAnime={spotlightList} isDataLoading={loadingSpotlight} />
+    <main className="min-h-screen overflow-hidden bg-[#0b0a10] pb-10 text-zinc-100">
       <div id="continue-watching" className="scroll-mt-20">
         <ContinueWatching loading={false} />
       </div>
+      <HeroSection spotlightAnime={spotlightList} isDataLoading={loadingSpotlight} />
       <AnimeShelf title="New Today" eyebrow="Freshly updated" mode="new" viewAllHref="/search?collection=new" items={recentRes?.results || []} loading={loadingRecent} />
       <AnimeShelf title="Currently Airing" eyebrow="On the air" icon={<Flame className="h-5 w-5 fill-current text-orange-500" />} viewAllHref="/search?collection=currently-airing" items={airingRes?.results || []} loading={loadingAiring} />
       <AnimeShelf title="Trending Now" eyebrow="Popular this week" icon={<span className="text-[#604bd3]">↗</span>} viewAllHref="/search?collection=trending" items={trendingRes?.results || []} loading={loadingTrending} />
