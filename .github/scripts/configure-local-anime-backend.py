@@ -97,28 +97,59 @@ def patch_settings_gradle() -> None:
 
 
 def patch_dependency_repositories() -> None:
-    """Add JitPack for the Android-native EasyList-compatible filter dependency."""
-    path = ANDROID / "settings.gradle"
-    text = path.read_text(encoding="utf-8")
+    """Add JitPack to the active Android dependency repositories."""
+    # Capacitor versions have put repositories either in settings.gradle or an
+    # applied capacitor.settings.gradle script. Prefer centralized management
+    # when present, and fall back to the generated root allprojects repositories.
+    candidates = [ANDROID / "settings.gradle", ANDROID / "capacitor.settings.gradle"]
+    for path in candidates:
+        if not path.is_file():
+            continue
+        text = path.read_text(encoding="utf-8")
+        if "https://jitpack.io" in text:
+            return
+
+        management = re.search(r"(?m)^\s*dependencyResolutionManagement\s*\{", text)
+        if not management:
+            continue
+
+        open_index = text.find("{", management.start())
+        close_index = matching_brace(text, open_index)
+        block = text[open_index:close_index]
+        repositories = re.search(r"(?m)^\s*repositories\s*\{", block)
+        if not repositories:
+            fail(f"Could not locate dependency repositories in {path}.")
+        repo_open = block.find("{", repositories.start())
+        repo_close = matching_brace(block, repo_open)
+        block = block[:repo_close] + '\n        maven { url = uri("https://jitpack.io") }\n    ' + block[repo_close:]
+        text = text[:open_index] + block + text[close_index:]
+        path.write_text(text, encoding="utf-8")
+        return
+
+    root_gradle = ANDROID / "build.gradle"
+    if not root_gradle.is_file():
+        fail("Could not locate Android Gradle files for adding JitPack.")
+    text = root_gradle.read_text(encoding="utf-8")
     if "https://jitpack.io" in text:
         return
 
-    management = re.search(r"(?m)^\s*dependencyResolutionManagement\s*\{", text)
-    if not management:
-        fail("Could not locate dependencyResolutionManagement in generated settings.gradle.")
-
-    open_index = text.find("{", management.start())
-    close_index = matching_brace(text, open_index)
-    block = text[open_index:close_index]
-    repositories = re.search(r"(?m)^\s*repositories\s*\{", block)
-    if not repositories:
-        fail("Could not locate dependency repositories in generated settings.gradle.")
-
-    repo_open = block.find("{", repositories.start())
-    repo_close = matching_brace(block, repo_open)
-    block = block[:repo_close] + '\n        maven { url = uri("https://jitpack.io") }\n    ' + block[repo_close:]
-    text = text[:open_index] + block + text[close_index:]
-    path.write_text(text, encoding="utf-8")
+    all_projects = re.search(r"(?m)^\s*allprojects\s*\{", text)
+    if all_projects:
+        project_open = text.find("{", all_projects.start())
+        project_close = matching_brace(text, project_open)
+        project_block = text[project_open:project_close]
+        repositories = re.search(r"(?m)^\s*repositories\s*\{", project_block)
+        if repositories:
+            repo_open = project_block.find("{", repositories.start())
+            repo_close = matching_brace(project_block, repo_open)
+            project_block = project_block[:repo_close] + '\n        maven { url "https://jitpack.io" }\n    ' + project_block[repo_close:]
+            text = text[:project_open] + project_block + text[project_close:]
+        else:
+            project_block += '\n    repositories { maven { url "https://jitpack.io" } }\n'
+            text = text[:project_open] + project_block + text[project_close:]
+    else:
+        text += '\n\nallprojects {\n    repositories {\n        maven { url "https://jitpack.io" }\n    }\n}\n'
+    root_gradle.write_text(text, encoding="utf-8")
 
 
 def patch_root_gradle() -> None:
