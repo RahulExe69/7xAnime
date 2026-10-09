@@ -544,7 +544,14 @@ async def legacy_watch_route(provider: str, anilist_id: int, audio: str, episode
                 "subtitles": [],
             }
 
-        ctx = await _get_local_provider_context(anilist_id)
+        # Embed-route adapters only construct their documented iframe URL;
+        # they do not need AniList/AniZip metadata setup before the player opens.
+        # Skip the shared metadata request for them to avoid a false loading delay.
+        ctx = (
+            {}
+            if preferred in MANUAL_EMBED_ONLY_PROVIDERS
+            else await _get_local_provider_context(anilist_id)
+        )
         actual_name, streams, seconds, ok = await _watch_one_for_player(
             module, preferred, anilist_id, episode_number, audio, ctx
         )
