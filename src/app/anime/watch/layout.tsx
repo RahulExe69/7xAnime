@@ -156,7 +156,7 @@ const LayoutContent = (props: Props) => {
 
   return (
     anime?.anime.info && (
-      <Container className="mt-28 space-y-7 pb-16 md:mt-32 md:space-y-9">
+      <Container className="mt-3 space-y-5 pb-12 sm:mt-5 md:mt-6 md:space-y-7">
         <div className="grid w-full grid-cols-1 gap-4 lg:grid-cols-4 lg:gap-5">
           <div className="lg:col-span-3 col-span-1 lg:mb-0">
             {props.children}
@@ -176,7 +176,7 @@ const LayoutContent = (props: Props) => {
             />
           )}
         </div>
-        <div className="flex flex-col gap-4 rounded-2xl border border-white/[0.07] bg-white/[0.025] p-4 sm:flex-row sm:items-start sm:gap-5">
+        <div className="flex flex-col gap-3 rounded-2xl border border-white/[0.07] bg-[#101018] p-3 sm:flex-row sm:items-start sm:gap-4">
           <AnimeCard
             title={anime?.anime.info.name}
             poster={anime?.anime.info.poster}
@@ -195,7 +195,7 @@ const LayoutContent = (props: Props) => {
             <h1 className="z-[100] text-xl font-bold tracking-tight sm:text-2xl">
               {anime?.anime.info.name}
             </h1>
-            <p className="text-sm leading-7 text-zinc-300">{parse(anime?.anime.info.description as string)}</p>
+            <p className="line-clamp-3 text-sm leading-6 text-zinc-300">{parse(anime?.anime.info.description as string)}</p>
           </div>
         </div>
 

@@ -8,7 +8,10 @@ const VideoPlayer = dynamic(() => import("@/components/video-player"), {
   ssr: false,
 });
 import { useGetEpisodeData } from "@/query/get-episode-data";
-import { Captions, Mic, AlertCircle, Tv } from "lucide-react";
+import { ArrowLeft, Captions, Mic, AlertCircle, Tv } from "lucide-react";
+import Link from "next/link";
+import { ROUTES } from "@/constants/routes";
+import { getServerLabel, getServerProviderTitle } from "@/lib/server-map";
 import { Switch } from "@/components/ui/switch";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -298,18 +301,47 @@ const VideoPlayerSection = () => {
 
   // Cleanly extract active provider and category regardless of leading slash e.g. "watch/kiwi/178005/sub/slug"
   const cleanParts = activeEpisodeId.replace(/^\//, "").split("/");
-  const currentProviderName = cleanParts[1] || providerNames[0] || "kiwi";
+  const currentProviderName = cleanParts[1] || providerNames[0] || "auto";
   const activeCategory = cleanParts[3] === "dub" ? "dub" : preferredCategory;
+  const activeServerLabel = getServerLabel(providerNames, currentProviderName);
+  const playerHeader = (
+    <div className="flex min-w-0 items-center gap-3 rounded-2xl border border-white/[0.07] bg-[#101018] px-3 py-3 sm:px-4">
+      <Link
+        href={ROUTES.animeDetails(animeIdParam)}
+        aria-label="Back to anime details"
+        className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-white/10 bg-white/[0.04] text-zinc-200 transition hover:border-[#ff2f9d]/40 hover:bg-[#ff2f9d]/10 hover:text-white"
+      >
+        <ArrowLeft className="h-5 w-5" />
+      </Link>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-bold text-white sm:text-base">
+          {anime?.anime?.info?.name || "Now Playing"}
+        </p>
+        <p className="mt-0.5 truncate text-xs text-zinc-400">
+          Episode {currentEpNumber} <span className="px-1 text-zinc-600">·</span> {activeCategory.toUpperCase()} <span className="px-1 text-zinc-600">·</span> {activeServerLabel}
+        </p>
+      </div>
+      <Link
+        href={ROUTES.animeDetails(animeIdParam)}
+        className="shrink-0 rounded-lg px-2 py-2 text-xs font-semibold text-[#ff70bd] transition hover:bg-[#ff2f9d]/10 sm:px-3"
+      >
+        Details
+      </Link>
+    </div>
+  );
 
   if (!activeEpisodeId || isLoadingData) {
     return (
-      <div
+      <div className="space-y-3">
+        {playerHeader}
+        <div
         role="status"
         aria-live="polite"
         className="flex aspect-video w-full flex-col items-center justify-center gap-3 rounded-2xl border border-white/[0.06] bg-white/[0.035] text-sm text-zinc-400"
       >
         <span className="h-7 w-7 animate-spin rounded-full border-2 border-violet-400/25 border-t-violet-300" />
         <span>{activeEpisodeId ? "Finding a playable stream…" : "Preparing episode…"}</span>
+        </div>
       </div>
     );
   }
@@ -321,7 +353,8 @@ const VideoPlayerSection = () => {
     const fallbackSrc = `https://megaplay.buzz/stream/ani/${fallbackAnimeId}/${fallbackEpId}/${activeCategory}`;
 
     return (
-      <div className="flex flex-col gap-4 w-full">
+      <div className="flex w-full flex-col gap-3">
+        {playerHeader}
         <div className="relative aspect-video w-full overflow-hidden rounded-2xl border border-white/10 bg-black shadow-2xl shadow-black/40">
           <iframe
             key={`${fallbackAnimeId}-${fallbackEpId}-${activeCategory}`}
@@ -375,11 +408,11 @@ const VideoPlayerSection = () => {
             <Tv className="h-3.5 w-3.5 text-blue-400" /> Try Primary Player
           </Button>
         </div>
-        <Alert variant="destructive" className="border-red-800/80 bg-red-950/40 text-red-300 rounded-xl">
-          <AlertCircle className="h-4 w-4 text-red-400" />
-          <AlertTitle className="font-bold">Fallback Video Player Activated</AlertTitle>
+        <Alert variant="destructive" className="border-[#ff2f9d]/20 bg-[#ff2f9d]/[0.06] text-zinc-300 rounded-xl">
+          <AlertCircle className="h-4 w-4 text-[#ff70bd]" />
+          <AlertTitle className="font-bold">Fallback player active · MegaPlay</AlertTitle>
           <AlertDescription className="text-xs text-red-300/80 mt-1">
-            The primary video stream is currently unavailable or encountered an error. A fallback player has been automatically loaded for your viewing convenience.
+            Primary extraction did not return a playable stream. MegaPlay is active as the fallback player.
           </AlertDescription>
         </Alert>
       </div>
@@ -388,13 +421,14 @@ const VideoPlayerSection = () => {
 
   return (
     <div>
+      {playerHeader}
       <VideoPlayer
         key={episodeData.sources?.[0]?.url}
         episodeInfo={episodeData}
         serversData={{
           episodeId: activeEpisodeId,
           episodeNo: String(currentEpNumber),
-          sub: providerNames.map((p, idx) => ({ serverId: idx + 1, serverName: p })),
+          sub: providerNames.map((p, idx) => ({ serverId: idx + 1, serverName: getServerLabel(providerNames, p) })),
           dub: [],
           raw: [],
         }}
@@ -410,8 +444,8 @@ const VideoPlayerSection = () => {
       <div className="flex w-full flex-col items-start justify-between gap-4 rounded-2xl border border-white/[0.07] bg-white/[0.035] p-3 sm:p-4 md:flex-row md:items-center">
         <div className="flex w-full flex-col gap-3 md:w-auto">
           <div className="flex flex-wrap items-center gap-3">
-            <Captions className="text-red-400 h-4 w-4 shrink-0" />
-            <p className="text-xs font-semibold tracking-wider text-zinc-400">SERVERS (SUB):</p>
+            <Captions className="text-[#ff70bd] h-4 w-4 shrink-0" />
+            <p className="text-xs font-bold tracking-wider text-zinc-400">SUB · SERVER</p>
             {providerNames.map((pName) => {
               const hasSub = (rawProviders[pName]?.episodes?.sub || []).length > 0;
               if (!hasSub) return null;
@@ -423,14 +457,15 @@ const VideoPlayerSection = () => {
                 <Button
                   size="sm"
                   key={`sub-${pName}`}
-                  className={`uppercase font-bold text-xs px-3 transition-all ${
+                  className={`font-bold text-xs px-3 transition-all ${
                     isActive
-                      ? "bg-[#8b5cf6] text-white shadow-md ring-2 ring-[#8b5cf6]/40 scale-105"
+                      ? "bg-[#ff2f9d] text-white shadow-md ring-2 ring-[#ff2f9d]/30 scale-[1.02]"
                       : "bg-white/[0.05] text-zinc-300 hover:bg-white/[0.1] hover:text-white"
                   }`}
+                  title={getServerProviderTitle(providerNames, pName)} aria-label={getServerProviderTitle(providerNames, pName)}
                   onClick={() => handleProviderSelect(pName, "sub")}
                 >
-                  {pName}
+                  {getServerLabel(providerNames, pName)}
                 </Button>
               );
             })}
@@ -439,7 +474,7 @@ const VideoPlayerSection = () => {
           {providerNames.some((p) => (rawProviders[p]?.episodes?.dub || []).length > 0) && (
             <div className="flex flex-wrap items-center gap-3 mt-1">
               <Mic className="text-green-400 h-4 w-4 shrink-0" />
-              <p className="font-bold text-xs text-gray-300 tracking-wider">SERVERS (DUB):</p>
+              <p className="text-xs font-bold tracking-wider text-zinc-400">DUB · SERVER</p>
               {providerNames.map((pName) => {
                 const hasDub = (rawProviders[pName]?.episodes?.dub || []).length > 0;
                 if (!hasDub) return null;
@@ -451,14 +486,15 @@ const VideoPlayerSection = () => {
                   <Button
                     size="sm"
                     key={`dub-${pName}`}
-                    className={`uppercase font-bold text-xs px-3 transition-all ${
+                    className={`font-bold text-xs px-3 transition-all ${
                       isActive
-                        ? "bg-green-600 text-white shadow-md ring-2 ring-green-500/40 scale-105"
+                        ? "bg-[#ff2f9d] text-white shadow-md ring-2 ring-[#ff2f9d]/30 scale-[1.02]"
                         : "bg-slate-800/80 text-gray-300 hover:bg-slate-700 hover:text-white"
                     }`}
-                    onClick={() => handleProviderSelect(pName, "dub")}
+                    title={getServerProviderTitle(providerNames, pName)} aria-label={getServerProviderTitle(providerNames, pName)}
+                  onClick={() => handleProviderSelect(pName, "dub")}
                   >
-                    {pName}
+                    {getServerLabel(providerNames, pName)}
                   </Button>
                 );
               })}
@@ -472,7 +508,7 @@ const VideoPlayerSection = () => {
             onClick={() => setUseFallback(true)}
             className="h-8 px-3 text-xs border-slate-700 bg-slate-800/80 hover:bg-slate-700 text-gray-200 flex items-center gap-1.5"
           >
-            <Tv className="h-3.5 w-3.5 text-yellow-400" /> Switch to Fallback Player
+            <Tv className="h-3.5 w-3.5 text-[#ff70bd]" /> Fallback player
           </Button>
           <div className="flex flex-row items-center space-x-2">
             <Switch
