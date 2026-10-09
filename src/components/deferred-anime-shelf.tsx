@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import { Flame, Star, Trophy, CheckCircle2, CalendarClock } from "lucide-react";
+import { Flame, Star, Trophy, CheckCircle2, CalendarClock, TrendingUp } from "lucide-react";
 import AnimeShelf from "@/components/anime-shelf";
 import { useGetTrendingAnime } from "@/query/get-trending-anime";
 import { useGetPopularAnime } from "@/query/get-popular-anime";
@@ -29,10 +29,8 @@ function ShelfSkeleton({ title, eyebrow, icon }: Pick<Props, "title" | "eyebrow"
         </div>
       </div>
       <div className="anime-shelf-scroll flex gap-3 overflow-hidden px-4 sm:gap-4 sm:px-6 lg:px-8">
-        {[0, 1, 2, 3, 4].map((item) => <div key={item} className="w-[36%] shrink-0 sm:w-[22%] md:w-[17%] lg:w-[13%]">
-          <div className="aspect-[2/3] animate-pulse rounded-xl border border-white/[0.05] bg-white/[0.035] sm:rounded-2xl" />
-          <div className="mt-3 h-3 w-4/5 animate-pulse rounded bg-white/[0.05]" />
-          <div className="mt-2 h-2.5 w-1/2 animate-pulse rounded bg-white/[0.035]" />
+        {[0, 1, 2, 3, 4].map((item) => <div key={item} className="w-[42vw] max-w-[11.5rem] shrink-0 sm:w-[28vw] md:w-[22vw] lg:w-[16vw]">
+          <div className="aspect-[2/3] animate-pulse rounded-xl border border-white/[0.07] bg-[#17131f] sm:rounded-2xl" />
         </div>)}
       </div>
     </section>
@@ -45,7 +43,7 @@ function CurrentlyAiring({ ...props }: Props) {
 }
 function Trending({ ...props }: Props) {
   const { data, isLoading } = useGetTrendingAnime(1, 18);
-  return <AnimeShelf title={props.title} eyebrow={props.eyebrow} icon={props.icon || <span className="text-[#b8a5ff]">↗</span>} viewAllHref={props.viewAllHref} items={data?.results || []} loading={isLoading} />;
+  return <AnimeShelf title={props.title} eyebrow={props.eyebrow} icon={props.icon || <TrendingUp className="h-5 w-5 text-[#ff2f9d]" />} viewAllHref={props.viewAllHref} items={data?.results || []} loading={isLoading} />;
 }
 function Popular({ ...props }: Props) {
   const { data, isLoading } = useGetPopularAnime(1, 18);
@@ -53,7 +51,7 @@ function Popular({ ...props }: Props) {
 }
 function Upcoming({ ...props }: Props) {
   const { data, isLoading } = useGetUpcomingAnime(1, 18);
-  return <AnimeShelf title={props.title} eyebrow={props.eyebrow} icon={props.icon || <CalendarClock className="h-5 w-5 text-[#b8a5ff]" />} viewAllHref={props.viewAllHref} items={data?.results || []} loading={isLoading} />;
+  return <AnimeShelf title={props.title} eyebrow={props.eyebrow} icon={props.icon || <CalendarClock className="h-5 w-5 text-[#ff2f9d]" />} viewAllHref={props.viewAllHref} items={data?.results || []} loading={isLoading} />;
 }
 function TopAiring({ ...props }: Props) {
   const { data, isLoading } = useGetFilteredAnime("RELEASING", "SCORE_DESC", 18);
