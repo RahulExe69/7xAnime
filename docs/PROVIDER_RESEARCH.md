@@ -154,3 +154,17 @@ No MegaPlay URL template is hard-coded in this document because a current offici
 - **MiruroAPI, Yomi Anime API, and Cosmic API** should not be counted as independent live sources without tracing their underlying upstreams and testing actual playback.
 - **yomi.to MegaPlay ordering/fallback** is included as the user's observed behaviour and a design lead; it is not labelled independently verified.
 - No new external source is marked production-ready by this research alone. The current PR must remain unmerged until the actual Android playback path is verified.
+
+## Implementation update: AniXo and Megavid adapters (2026-10-10)
+
+The current PR now contains independently written, manual-only adapters for AniXo and Megavid under `android-local-backend/extra-providers/`. Each uses the provider's documented AniList ID route and returns a normalized `type: embed` source. The Android packaging script copies both adapters into the bundled Python provider tree; the frontend provider map labels them as iframe servers.
+
+- **AniXo:** confirmed route shape from its live official docs: `/embed/ani/{aniListId}/{episode}?track={sub|dub}`. Its docs also describe a parent-window play event, which can provide positive playback evidence. [Official docs](https://anixo.buzz/).
+- **Megavid:** confirmed route shape from its live official docs: `/ani/{anilist-id}/{ep-num}/{sub|dub}`. Its docs describe progress/completion/error events and state that player pages must be embedded in an iframe. Its documented JSON source API is not used because origin restrictions are described. [Official docs](https://megavid.buzz/).
+- **Auto is intentionally kept separate:** both adapters are excluded from the local Auto extraction race. Their routes can be generated without scraping or resolving a stream, so allowing them to win Auto would turn a syntactically valid URL into a false “working” result.
+- **MegaPlay remains Server 1:** its official site currently documents the AniList form `https://megaplay.buzz/stream/ani/{anilist-id}/{ep-num}/{language}` and the app already uses it as the dedicated iframe choice and when native extraction needs a fallback. MegaPlay-backed wrappers such as Anikoto/Cosmic are not counted as independent upstreams.
+- **Not integrated in this iteration:** NontonGo stays deferred because its own site warns of popup behaviour and it needs a dedicated top-level-navigation/popup review. MiruroAPI remains unsuitable as a required dependency until its hosted service is independently confirmed. AnimeParadise remains a later native-adapter candidate pending fresh live-media and Android verification.
+
+The network-free contract tests now cover the two new route templates, sub/dub paths, synthetic episode metadata when AniList/AniZip gives a count, and exclusion from Auto racing. These tests verify our adapter logic—not the providers' availability or real playback.
+
+**Release gate remains unchanged:** the adapters are implemented in the draft PR, not declared healthy or production-ready. On a physical Android device, verify at least one real frame and time progression for AniXo and Megavid, then test error signalling, sub/dub, correct episode numbering, seeking, fullscreen, back navigation, redirects/popups, and recovery. Where the provider sends no trustworthy playback event, manual observation is still required.
