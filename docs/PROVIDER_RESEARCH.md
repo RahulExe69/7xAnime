@@ -163,17 +163,17 @@ The current PR now contains independently written, manual-only adapters for AniX
 - **Megavid:** confirmed route shape from its live official docs: `/ani/{anilist-id}/{ep-num}/{sub|dub}`. Its docs describe progress/completion/error events and state that player pages must be embedded in an iframe. Its documented JSON source API is not used because origin restrictions are described. [Official docs](https://megavid.buzz/).
 - **Auto is intentionally kept separate:** both adapters are excluded from the local Auto extraction race. Their routes can be generated without scraping or resolving a stream, so allowing them to win Auto would turn a syntactically valid URL into a false “working” result.
 - **MegaPlay remains Server 1:** its official site currently documents the AniList form `https://megaplay.buzz/stream/ani/{anilist-id}/{ep-num}/{language}` and the app already uses it as the dedicated iframe choice and when native extraction needs a fallback. MegaPlay-backed wrappers such as Anikoto/Cosmic are not counted as independent upstreams.
-- **Not integrated in this iteration:** NontonGo stays deferred because its own site warns of popup behaviour and it needs a dedicated top-level-navigation/popup review. MiruroAPI remains unsuitable as a required dependency until its hosted service is independently confirmed. AnimeParadise remains a later native-adapter candidate pending fresh live-media and Android verification.
+- **NontonGo is now integrated as a manual-only embed route**, not as a direct stream extractor. Its site warns about popup ads, so the iframe remains outside Auto and should be checked on Android. **MiruroAPI remains unsuitable as a required dependency** until its hosted service is independently confirmed. AnimeParadise was subsequently added as a manual HLS candidate, still pending device playback.
 
-The network-free contract tests now cover the two new route templates, sub/dub paths, synthetic episode metadata when AniList/AniZip gives a count, and exclusion from Auto racing. These tests verify our adapter logic—not the providers' availability or real playback.
+The network-free contract tests cover manual route construction, sub/dub flags, synthetic episode metadata when AniList/AniZip gives a count, signed AnimeParadise HLS URL encoding, subtitle mapping, and exclusion from Auto racing. These tests verify adapter logic—not upstream availability or actual playback.
 
-**Release gate remains unchanged:** the adapters are implemented in the draft PR, not declared healthy or production-ready. On a physical Android device, verify at least one real frame and time progression for AniXo and Megavid, then test error signalling, sub/dub, correct episode numbering, seeking, fullscreen, back navigation, redirects/popups, and recovery. Where the provider sends no trustworthy playback event, manual observation is still required.
+**Release gate remains unchanged:** adapters in this draft PR are not declared healthy or production-ready. On a physical Android device, verify real frame/time progression for every newly added source; test sub/dub, episode numbering, seeking, fullscreen, back navigation, redirects/popups, and recovery. Where an embed sends no trustworthy playback event, manual observation is required.
 
 ## Provider pause after physical-device verification (2026-10-10)
 
-The user tested the current Android build and reported that **MegaPlay (Server 1), AniXo, and Megavid work** for the tested title/episode. This is stronger evidence than route-construction tests, but it is not a universal availability guarantee. AnimeParadise and Cosmic Player were added afterward as manual-only experiments and have not yet had a real-device playback check.
+The user tested an Android build and reported that **MegaPlay (Server 1), AniXo, and Megavid work** for the tested title/episode. This is stronger evidence than route-construction tests, but not a universal availability guarantee. The user also reports the five player choices on live yomi.to normally work (with some fluctuation); that's useful field evidence for the website, but does not prove this replica's URL adapters work identically. AnimeParadise, Cosmic Player, and the four Yomi-derived routes still need device verification.
 
-To avoid repeatedly hammering unproductive upstreams, the app exposes MegaPlay as Server 1 plus four explicit manual selections: AniXo, Megavid, AnimeParadise, and Cosmic Player. The backend allowlist filters routes to those choices; Auto does not invoke the parked Kuhi native-provider race or any new candidate. AnimeParadise catalogue lookups are deferred until a user explicitly selects it. Cosmic is a MegaPlay-backed player wrapper, not an independent upstream. Legacy Kuhi adapter code remains bundled but parked, and AnimeNoSub remains parked.
+To avoid repeatedly hammering upstreams, the app exposes MegaPlay as Server 1 plus eight manual selections: AniXo, Megavid, AnimeParadise, Cosmic Player, MegaFlix, TryEmbed, CinexStream, and NontonGo. The backend allowlist filters routes to those choices; Auto excludes the embed-only candidates and AnimeParadise. AnimeParadise catalogue lookups are deferred until selected. Cosmic is a MegaPlay-backed player wrapper, not an independent upstream. The four Yomi-derived adapters mirror URL patterns in `api/lib/streams.js`; they construct iframe routes and don't resolve the underlying media themselves. Legacy Kuhi adapters remain bundled but parked, and AnimeNoSub remains parked.
 
 The eight researched, not-yet-integrated candidates remain **research only** and have not been queried or integrated as part of this change:
 1. [amvstrm-ani-api](https://github.com/saurabhgangule/amvstrm-ani-api)
@@ -186,6 +186,22 @@ The eight researched, not-yet-integrated candidates remain **research only** and
 8. [Anivault-Scraper](https://github.com/SH0MIK/Anivault-Scraper)
 
 No requests have been made to those eight candidates as part of this pause. Revisit them only after the user specifies the next step. Do not start probing them in the background.
+
+
+
+### Yomi-derived manual server adapters and stream-loading UX (2026-10-10)
+
+The four requested routes have now been added as separate manual-only adapters, based on the public [yomi-anime-api stream builder](https://github.com/Wabsa-kh/yomi-anime-api/blob/master/api/lib/streams.js), which documents URL construction from known patterns:
+- **MegaFlix:** `https://www.megaflix.buzz/stream/ani/{AniListID}/{episode}/{sub|dub}`
+- **TryEmbed:** `https://tryembed.us.cc/embed/anime/{AniListID}/{episode}/{sub|dub}`
+- **CinexStream:** `https://cinextream.cc/api/embed/anime/{sub|dub}/{AniListID}/{episode}?color=7c6ee0`
+- **NontonGo:** `https://nontongo.win/anime/{AniListID}/{episode}/play` (sub only).
+
+These are embed URL adapters, not direct extractors. MegaPlay is already Server 1; MegaFlix is a distinct documented host, while the other routes target their respective embed hosts. Upstream implementations may themselves aggregate third-party servers, so they are tracked as manual player choices, not guaranteed independent media origins. NontonGo's own site warns about popup ads. The app shows an inline warning and advises users not to accept notification prompts/installers; external top-level navigation remains blocked by the native Android guard.
+
+The watch UI has also been changed so an explicit Server 1 selection renders MegaPlay immediately even if a background provider request is still loading. For unresolved requests, the loading panel is bounded at 15 seconds and becomes a Retry / Server 1 action panel. This is intended to prevent an indefinite “Finding a playable stream…” spinner without hiding actual provider failures.
+
+The Android build must still be checked against the complete final changes. The previous contract-test failure included stale assertions that inactive provider modules must appear in active diagnostics; the final build validation needs to check the bundled-module inventory separately from the eight active manual choices.
 
 
 ### Implementation follow-up: AnimeParadise and Cosmic
