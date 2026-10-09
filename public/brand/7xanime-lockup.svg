@@ -1,22 +1,32 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 220" role="img" aria-labelledby="title">
-  <title id="title">7xAnime</title>
-  <defs>
-    <linearGradient id="markFill" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#ffffff"/>
-      <stop offset="0.56" stop-color="#eeeaff"/>
-      <stop offset="1" stop-color="#b8a3ff"/>
-    </linearGradient>
-    <linearGradient id="brandType" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0" stop-color="#ff45ad"/>
-      <stop offset="0.55" stop-color="#b58aff"/>
-      <stop offset="1" stop-color="#8d72ff"/>
-    </linearGradient>
-  </defs>
-  <rect width="900" height="220" rx="24" fill="#09090f"/>
-  <g transform="translate(12 18) scale(0.36)">
-    <path d="M104 98H408V166H300L194 410H122L229 166H104Z" fill="url(#markFill)"/>
-    <path d="M203 280L239 296L210 316Z" fill="#ff2f9d"/>
-  </g>
-  <text x="205" y="146" font-family="Geist, Inter, Arial, sans-serif" font-size="91" font-weight="750" letter-spacing="-4" fill="url(#brandType)">7x</text>
-  <text x="318" y="146" font-family="Geist, Inter, Arial, sans-serif" font-size="91" font-weight="750" letter-spacing="-4" fill="#f6f4ff">Anime</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1040 260" role="img" aria-labelledby="title">
+<title id="title">7xAnime fused wordmark</title>
+<defs><linearGradient id="wordX" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ff7cc7"/><stop offset=".5" stop-color="#ff2f9d"/><stop offset="1" stop-color="#c50072"/></linearGradient></defs>
+<g transform="translate(8 8) scale(.47)">
+<defs>
+  <linearGradient id="sevenFill" x1="0" y1="0" x2="0.9" y2="1">
+    <stop offset="0" stop-color="#ffffff"/>
+    <stop offset="0.72" stop-color="#f3efff"/>
+    <stop offset="1" stop-color="#c4b5fd"/>
+  </linearGradient>
+  <linearGradient id="xFill" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0" stop-color="#ff69bd"/>
+    <stop offset="0.48" stop-color="#ff2f9d"/>
+    <stop offset="1" stop-color="#c50072"/>
+  </linearGradient>
+</defs>
+<!-- Angular brush-stroke 7: sharp cuts give the mark an anime action-line silhouette. -->
+<path d="M70 86 L433 71 L409 135 L302 151 L204 424 L134 424 L250 151 L62 161 Z" fill="url(#sevenFill)"/>
+<path d="M91 103 L174 99 L116 116 Z M373 89 L414 86 L399 103 Z M165 389 L191 324 L174 398 Z" fill="#ffffff" opacity=".78"/>
+<!-- The magenta x cuts through the 7's diagonal so the two characters read as one fused mark. -->
+<path d="M224 253 L256 226 L306 275 L352 225 L387 252 L340 300 L380 341 L348 371 L306 330 L263 370 L230 341 L274 299 Z" fill="url(#xFill)"/>
+<path d="M230 247 L256 226 L286 254 L257 247 Z M348 225 L387 252 L365 273 L376 250 Z M350 371 L326 348 L350 355 L368 346 Z" fill="#ff9bd2" opacity=".9"/>
+<path d="M196 250 L211 241 L235 266 L222 276 Z M384 220 L401 204 L411 216 L394 236 Z M222 361 L238 346 L252 362 L236 377 Z" fill="#ff2f9d"/>
+</g>
+<g font-family="Arial, Helvetica, sans-serif" font-style="italic" font-weight="900" letter-spacing="-7">
+  <text x="267" y="164" font-size="126" fill="#ffffff">7</text>
+  <text x="335" y="164" font-size="126" fill="url(#wordX)">x</text>
+  <text x="410" y="164" font-size="118" fill="#f8f5ff">Anime</text>
+</g>
+<path d="M282 190 H745" stroke="#ff2f9d" stroke-width="4" stroke-linecap="round" opacity=".92"/>
+<text x="284" y="224" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700" letter-spacing="6" fill="#b9b0ca">ANIME • ANYTIME • ANYWHERE</text>
 </svg>
