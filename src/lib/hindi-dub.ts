@@ -66,7 +66,7 @@ const parseCandidates = (body: any): SearchCandidate[] => {
     }));
 };
 
-const parseEmbeds = (body: any) => {
+const parseEmbeds = (body: any): Array<{ server: string; embed: string }> => {
   const root = body?.results ?? body?.data ?? body;
   const values = Array.isArray(root) ? root : Array.isArray(root?.results) ? root.results : [];
   return values
