@@ -667,7 +667,7 @@ const VideoPlayerSection = () => {
   // Never mount ArtPlayer with an undefined or empty stream response. That
   // transient render happens before useEffect can switch to the fallback player
   // and can crash the entire Next route on slower Android devices.
-  if (hasManualProviderSelection && (streamRequestFailed || manualProviderPlaybackFailed)) {
+  if (hasManualProviderSelection && !useFallback && (streamRequestFailed || manualProviderPlaybackFailed)) {
     const failedProvider = episodeData?.provider || currentProviderName;
     return (
       <div className="space-y-3">
