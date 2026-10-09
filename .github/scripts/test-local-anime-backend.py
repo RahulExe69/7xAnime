@@ -62,7 +62,7 @@ class LocalAnimeApiTests(unittest.TestCase):
                 ("anineko", selected_module), ("anizone", other_module),
             ]),
             patch.object(local_api.provider_race, "build_ctx", new=AsyncMock(return_value={"anilistId": 12345})),
-            patch.object(local_api.provider_race, "_watch_one", new=AsyncMock(side_effect=fake_watch_one)),
+            patch.object(local_api, "_watch_one_for_player", new=AsyncMock(side_effect=fake_watch_one)),
             patch.object(local_api.provider_race, "race_watch", new=AsyncMock(side_effect=AssertionError("manual pick must not race other providers"))),
         ):
             response = self.client.get(
@@ -88,7 +88,7 @@ class LocalAnimeApiTests(unittest.TestCase):
                 ("anineko", selected_module), ("anizone", other_module),
             ]),
             patch.object(local_api.provider_race, "build_ctx", new=AsyncMock(return_value={})),
-            patch.object(local_api.provider_race, "_watch_one", new=AsyncMock(return_value=("anineko", None, 8.0, False))),
+            patch.object(local_api, "_watch_one_for_player", new=AsyncMock(return_value=("anineko", [], 8.0, False))),
             patch.object(local_api.provider_race, "record_latency"),
             patch.object(local_api.provider_race, "race_watch", new=AsyncMock(side_effect=AssertionError("must not silently switch providers"))),
         ):
@@ -126,7 +126,7 @@ class LocalAnimeApiTests(unittest.TestCase):
             self.assertIsNone(preferred)
             return None
 
-        with patch.object(local_api.provider_race, "race_watch", new=AsyncMock(side_effect=fake_race)):
+        with patch.object(local_api, "_race_watch_for_player", new=AsyncMock(side_effect=fake_race)):
             response = self.client.get(
                 "/watch/auto/12345/sub/episode-1",
                 headers=self.auth,
@@ -136,8 +136,8 @@ class LocalAnimeApiTests(unittest.TestCase):
 
     def test_auto_watch_route_converts_provider_exception_to_empty_stream_result(self) -> None:
         with patch.object(
-            local_api.provider_race,
-            "race_watch",
+            local_api,
+            "_race_watch_for_player",
             new=AsyncMock(side_effect=RuntimeError("providers unavailable")),
         ):
             response = self.client.get(
@@ -158,7 +158,7 @@ class LocalAnimeApiTests(unittest.TestCase):
             },
         }
         with patch.object(local_api.provider_race, "providers_status", return_value=snapshot):
-            response = self.client.get("/providers/status", headers=self.auth)
+            response = self.client.get("/api/diagnostics/providers", headers=self.auth)
 
         self.assertEqual(response.status_code, 200, response.text)
         payload = response.json()
