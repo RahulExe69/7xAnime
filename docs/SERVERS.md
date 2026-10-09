@@ -4,9 +4,9 @@
 
 ## Numbered server labels
 
-The bundled Kuhi API uses these provider keys and ranking order:
+The embedded provider list starts with Kuhi’s pinned native providers and appends one extra embed-first adapter, AnimeNoSub. The Android build patches the copied provider list; this is the order used by the app:
 
-| Kuhi rank | API provider key | Display name | Provider site |
+| Local rank | API provider key | Display name | Provider site |
 |---:|---|---|---|
 | 1 | `anineko` | AniNeko | https://anineko.to |
 | 2 | `anizone` | AniZone | https://anizone.to |
@@ -18,8 +18,9 @@ The bundled Kuhi API uses these provider keys and ranking order:
 | 8 | `animegg` | AnimeGG | https://www.animegg.org |
 | 9 | `mkissa` | MKissa | https://mkissa.to |
 | 10 | `animeonsen` | AnimeOnsen | https://www.animeonsen.xyz |
+| 11 | `animenosub` | AnimeNoSub (extra adapter) | https://animenosub.to |
 
-For Sub/Dub, providers are returned in this ranking order, but providers with no matching episodes for that anime are omitted. The visible labels start at **Server 2** because Server 1 is reserved for the fallback. The same number can refer to a different upstream provider on a different series. Focus or long-press the numbered provider button to reveal its current provider name and site.
+For Sub/Dub, the UI filters providers by the selected audio type and media formats the player can use. The visible labels start at **Server 2** because Server 1 is reserved for MegaPlay. A provider can be loaded but still have no stream for a particular anime/episode; its status in diagnostics separates module-load, stream extraction, and actual playback results. Manual selections are strict: selecting one provider never silently returns another provider's stream. Auto is the only cross-provider race. The same server number may refer to a different provider if the compatible provider set changes.
 
 ## Hindi dub catalogue
 
@@ -35,7 +36,7 @@ Server 1 currently opens:
 
 `https://megaplay.buzz/stream/ani/{anilistId}/{episodeNumber}/{sub-or-dub}`
 
-The iframe progress listener also recognises messages from MegaCloud. The pinned Kuhi provider order is defined by `src/providers/_race.py` in the source revision declared in `.github/scripts/fetch-kuhi-backend.sh`. Frontend labels and metadata are kept in `src/lib/server-map.ts`.
+The iframe progress listener also recognises messages from MegaCloud. The pinned Kuhi provider order originates in `src/providers/_race.py` from the source revision declared in `.github/scripts/fetch-kuhi-backend.sh`; the Android packaging script appends the local AnimeNoSub adapter. Frontend labels/audio-format capability metadata are kept in `src/lib/server-map.ts`.
 
 ## Updating the map
 
