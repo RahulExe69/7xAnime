@@ -3,11 +3,11 @@
 import Link from "next/link";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
+import { usePathname } from "next/navigation";
 
 import Container from "./container";
 import { Separator } from "./ui/separator";
 
-import { nightTokyo } from "@/utils/fonts";
 import { ROUTES } from "@/constants/routes";
 import React, { ReactNode, useEffect, useState } from "react";
 
@@ -24,15 +24,19 @@ import { isLocalBackendEnabled } from "@/lib/api";
 
 const menuItems: Array<{ title: string; href?: string }> = [
   { title: "Home", href: ROUTES.HOME },
+  { title: "Trending", href: "/#trending" },
+  { title: "Schedule", href: "/#schedule" },
   { title: "Browse", href: ROUTES.SEARCH },
 
 ];
 
 const NavBar = () => {
+  const pathname = usePathname();
   const auth = useAuthStore();
   const { y } = useScrollPosition();
   const isHeaderFixed = true;
   const isHeaderSticky = y > 0;
+  if (pathname?.replace(/\\/+$/, "") === ROUTES.WATCH) return null;
   useEffect(() => {
     const refreshAuth = async () => {
       if (isLocalBackendEnabled()) {
@@ -90,13 +94,7 @@ const NavBar = () => {
             href={ROUTES.HOME}
             className="flex min-w-0 items-center gap-2 cursor-pointer"
           >
-            <Image src="/brand/7xanime-mark.svg" alt="7xAnime logo" width={44} height={44} unoptimized className="h-11 w-11 rounded-xl object-cover" />
-            <h1
-              className={cn([
-                nightTokyo.className,
-                "text-xl sm:text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-white via-violet-200 to-violet-400 tracking-wide",
-              ])}
-            >7xAnime</h1>
+            <Image src="/brand/7xanime-lockup.svg" alt="7xAnime" width={188} height={48} unoptimized className="h-10 w-[168px] object-contain sm:h-11 sm:w-[184px]" />
           </Link>
 
           <div className="flex items-center gap-3 lg:hidden">

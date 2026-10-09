@@ -39,7 +39,7 @@ const ContinueWatching = (props: Props) => {
         .map((entry) => ({
           id: entry.animeId,
           name: entry.animeTitle || "Continue Watching",
-          poster: entry.poster || "/icon.png",
+          poster: entry.poster || "/brand/7xanime-mark.svg",
           episode: {
             id: "local",
             user: "local",

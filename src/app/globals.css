@@ -15,7 +15,7 @@ body {
 }
 
 ::selection {
-  background: rgb(139 92 246 / 35%);
+  background: rgb(255 47 157 / 35%);
   color: #fff;
 }
 
@@ -61,19 +61,19 @@ body {
     --card-foreground: 0 0% 98%;
     --popover: 240 18% 7%;
     --popover-foreground: 0 0% 98%;
-    --primary: 263 70% 65%;
+    --primary: 329 100% 59%;
     --primary-foreground: 0 0% 100%;
     --secondary: 240 12% 12%;
     --secondary-foreground: 0 0% 98%;
     --muted: 240 12% 12%;
     --muted-foreground: 240 5% 64.9%;
-    --accent: 263 35% 18%;
+    --accent: 329 52% 18%;
     --accent-foreground: 0 0% 98%;
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 0 0% 98%;
     --border: 240 10% 16%;
     --input: 240 10% 16%;
-    --ring: 263 70% 65%;
+    --ring: 329 100% 59%;
     --chart-1: 220 70% 50%;
     --chart-2: 160 60% 45%;
     --chart-3: 30 80% 55%;
@@ -103,7 +103,7 @@ body {
 
 /* Handle */
 ::-webkit-scrollbar-thumb {
-  background: #393344;
+  background: #713452;
   border-radius: 999px;
 }
 

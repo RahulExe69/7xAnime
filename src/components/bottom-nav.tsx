@@ -60,7 +60,7 @@ export default function BottomNav() {
             className={cn(
               "flex min-w-[4rem] flex-col items-center gap-1 rounded-full px-3 py-2 text-[10px] font-medium transition-colors duration-150 sm:min-w-[4.75rem]",
               active
-                ? "bg-violet-500/10 text-violet-300"
+                ? "bg-[#ff2f9d]/10 text-violet-300"
                 : "text-zinc-400 hover:bg-white/5 hover:text-white",
             )}
           >

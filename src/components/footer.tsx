@@ -1,11 +1,17 @@
+"use client";
+
 import React from "react";
 import { DiscordLogoIcon, GitHubLogoIcon } from "@radix-ui/react-icons";
 import Image from "next/image";
+import { usePathname } from "next/navigation";
 
 const Footer = () => {
+  const pathname = usePathname();
+  if (pathname?.replace(/\\/+$/, "") === "/anime/watch") return null;
+
   return (
     <footer className="mt-10 flex w-full flex-col items-center space-y-5 border-t border-white/5 bg-[#09090f] p-6 text-center">
-      <Image src="/icon.png" alt="logo" width="100" height="100" suppressHydrationWarning />
+      <Image src="/brand/7xanime-mark.svg" alt="logo" width="100" height="100" suppressHydrationWarning />
       <div className="flex space-x-5 items-center">
         <a href="https://github.com/RahulExe69/7xAnime" target="_blank">
             <GitHubLogoIcon suppressHydrationWarning width="25" height="25" />
