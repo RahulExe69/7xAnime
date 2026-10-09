@@ -147,9 +147,33 @@ const getAllEpisodes = async (animeId: string): Promise<IEpisodesData> => {
     });
 
     if (episodeList.length === 0) {
-      // Keep partial native provider data attached to the AniList fallback.
-      // Android can poll it while slow provider scrapers finish, without blocking
-      // the player or losing the servers that have already replied.
+      // While Android's progressive catalogue is initializing, return a small
+      // local placeholder immediately instead of waiting on another AniList
+      // network request. The real episode list replaces it as providers reply.
+      if (
+        isLocalBackendEnabled() &&
+        data.source === "native" &&
+        data.complete === false
+      ) {
+        const placeholders: Episode[] = Array.from({ length: 12 }, (_, index) => {
+          const number = index + 1;
+          return {
+            title: `Episode ${number}`,
+            episodeId: `watch/auto/${animeId}/sub/episode-${number}`,
+            number,
+            isFiller: false,
+            hasSub: true,
+            hasDub: false,
+          };
+        });
+        return {
+          totalEpisodes: placeholders.length,
+          episodes: placeholders,
+          rawResponse: data,
+          availableProviders: providerNames,
+        };
+      }
+
       const fallback = await fetchAniListEpisodesFallback(animeId);
       return {
         ...fallback,
