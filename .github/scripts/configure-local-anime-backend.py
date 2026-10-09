@@ -305,6 +305,25 @@ def register_plugin(main_activity: Path) -> None:
     main_activity.write_text(text, encoding="utf-8")
 
 
+def install_navigation_guard(main_activity: Path) -> None:
+    """Keep main-frame navigation in-app without sandboxing the streaming iframe itself."""
+    text = main_activity.read_text(encoding="utf-8")
+    statement = "getBridge().getWebView().setWebViewClient(new StreamingNavigationWebViewClient(getBridge()));"
+    if statement in text:
+        return
+
+    super_call = re.search(
+        r"super\\.onCreate\\s*\\(\\s*savedInstanceState\\s*\\)\\s*;",
+        text,
+    )
+    if not super_call:
+        fail("Could not find MainActivity.onCreate super call to install navigation guard.")
+
+    position = super_call.end()
+    text = text[:position] + "\\n        " + statement + text[position:]
+    main_activity.write_text(text, encoding="utf-8")
+
+
 def copy_python_source() -> None:
     source_dir = Path(os.environ.get("KUHI_SOURCE_DIR", "")).expanduser()
     if not source_dir.is_dir() or not (source_dir / "src/main.py").is_file():
@@ -397,16 +416,23 @@ def main() -> None:
     patch_manifest()
 
     java_source = ROOT / "android-local-backend/LocalAnimeBackendPlugin.java"
+    navigation_source = ROOT / "android-local-backend/StreamingNavigationWebViewClient.java"
+    for source in (java_source, navigation_source):
+        if not source.is_file():
+            fail(f"Required native Android source is missing: {source}")
+
     package_dir = ANDROID / "app/src/main/java/com/sevenx/anime"
     package_dir.mkdir(parents=True, exist_ok=True)
     shutil.copy2(java_source, package_dir / "LocalAnimeBackendPlugin.java")
+    shutil.copy2(navigation_source, package_dir / "StreamingNavigationWebViewClient.java")
 
     candidates = list((ANDROID / "app/src/main/java").rglob("MainActivity.java"))
     if len(candidates) != 1:
         fail(f"Expected one generated MainActivity.java, found {len(candidates)}.")
     register_plugin(candidates[0])
+    install_navigation_guard(candidates[0])
 
-    print("Configured 7xAnime with an embedded Python API (loopback-only, on-demand).")
+    print("Configured 7xAnime with an embedded Python API and native external-navigation guard.")
 
 
 if __name__ == "__main__":
