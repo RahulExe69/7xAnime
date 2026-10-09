@@ -12,7 +12,6 @@ import { useQuery } from "react-query";
 import { getHindiDubStreams } from "@/lib/hindi-dub";
 import { ArrowLeft, Captions, Mic, AlertCircle } from "lucide-react";
 import Link from "next/link";
-import { ROUTES } from "@/constants/routes";
 import { getServerProviderTitle } from "@/lib/server-map";
 import { Switch } from "@/components/ui/switch";
 import { useSearchParams } from "next/navigation";
