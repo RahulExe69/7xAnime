@@ -162,7 +162,7 @@ def write_padded_launcher_svg(source: Path, destination: Path, *, has_background
             raise ValueError(f"Could not find the background layer in {source}.")
         prefix, remainder = source_text.split(background, 1)
         artwork, suffix = remainder.rsplit("</svg>", 1)
-        padded_text = prefix + background + "\\n" + transform + artwork + "\\n</g>\\n</svg>" + suffix
+        padded_text = prefix + background + "\n" + transform + artwork + "\n</g>\n</svg>" + suffix
     else:
         title_end = re.search(r"</title>", source_text)
         if not title_end:
@@ -170,7 +170,7 @@ def write_padded_launcher_svg(source: Path, destination: Path, *, has_background
         prefix = source_text[:title_end.end()]
         remainder = source_text[title_end.end():]
         artwork, suffix = remainder.rsplit("</svg>", 1)
-        padded_text = prefix + "\\n" + transform + artwork + "\\n</g>\\n</svg>" + suffix
+        padded_text = prefix + "\n" + transform + artwork + "\n</g>\n</svg>" + suffix
 
     destination.write_text(padded_text, encoding="utf-8")
 
