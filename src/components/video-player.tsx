@@ -36,7 +36,7 @@ interface ArtPlayerProps extends HTMLAttributes<HTMLDivElement> {
   getInstance?: (art: Artplayer) => void; // Callback to get the instance
   autoSkip?: boolean;
   serversData: IEpisodeServers;
-  onError?: () => void;
+  onError?: (detail?: string) => void;
 }
 
 // --- Helper to generate highlights ---
@@ -125,9 +125,10 @@ function VideoPlayer({
   }, [autoSkip]);
 
   // --- Construct the proxy URI and preserve the provider's actual media format ---
-  const firstSourceUrl = episodeInfo?.sources?.[0]?.url;
-  const sourceReferer = episodeInfo?.headers?.Referer;
-  const sourceType = String(episodeInfo?.sources?.[0]?.type || "").toLowerCase();
+  const firstSource = episodeInfo?.sources?.[0];
+  const firstSourceUrl = firstSource?.url;
+  const sourceReferer = firstSource?.referer || firstSource?.headers?.Referer || episodeInfo?.headers?.Referer;
+  const sourceType = String(firstSource?.type || "").toLowerCase();
   const isHlsSource = sourceType === "m3u8" || sourceType === "hls";
   const uri = useMemo(() => {
     if (!firstSourceUrl) return null;
@@ -419,7 +420,8 @@ function VideoPlayer({
             hls.on(Hls.Events.ERROR, (event, data) => {
               if (data.fatal) {
                 console.error("Fatal HLS error encountered:", data);
-                if (onError) onError();
+                const detail = `HLS playback error: ${data.details || data.type || "fatal media error"}`;
+                onError?.(detail);
               }
             });
             hlsInstanceRef.current = hls; // Store ref
@@ -438,7 +440,8 @@ function VideoPlayer({
             videoElement.src = url; // Fallback for Safari native HLS
           } else {
             artPlayerInstance.notice.show =
-              "HLS playback is not supported on your browser.";
+              "HLS playback is not supported on this WebView.";
+            onError?.("HLS playback is not supported on this WebView.");
           }
         },
       },
@@ -557,7 +560,7 @@ function VideoPlayer({
       art = new Artplayer(finalOptions);
     } catch (error) {
       console.error("ArtPlayer initialization failed; switching to fallback:", error);
-      onError?.();
+      onError?.(error instanceof Error ? error.message : String(error));
       return;
     }
     artInstanceRef.current = art;
@@ -719,7 +722,17 @@ function VideoPlayer({
         "Reconnect attempt:",
         reconnectTime,
       );
-      if (onError) onError();
+      let detail = "The video element reported a media error.";
+      if (error instanceof Error) {
+        detail = error.message;
+      } else if (typeof error === "string") {
+        detail = error;
+      } else if (error && typeof error === "object") {
+        const event = error as { message?: string; code?: number; type?: string; details?: string };
+        detail = event.message || [event.type, event.details, event.code ? `code ${event.code}` : ""]
+          .filter(Boolean).join(": ") || detail;
+      }
+      onError?.(detail);
     });
 
     art.on("video:timeupdate", handleTimeUpdate);
