@@ -315,7 +315,7 @@ class LocalAnimeApiTests(unittest.TestCase):
             fake_modules = [("fast", object()), ("slow", object())]
             with (
                 patch.object(local_api.provider_race, "providers", return_value=fake_modules),
-                patch.object(local_api.provider_race, "build_ctx", new=AsyncMock(return_value={})),
+                patch.object(local_api.provider_race, "build_ctx", new=AsyncMock(return_value={"media": {"id": 87654321, "title": {"english": "Test"}}, "anizip": None})),
                 patch.object(local_api.provider_race, "_episodes_one", new=AsyncMock(side_effect=fake_provider_episodes)),
             ):
                 first = await local_api._progressive_merged_episodes(anime_id)
