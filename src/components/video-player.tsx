@@ -89,7 +89,7 @@ function VideoPlayer({
   const lastUpdateTimeRef = useRef<number>(0);
   const hasMetMinWatchTimeRef = useRef<boolean>(false); // Track if min time met for this episode
   const initialSeekTimeRef = useRef<number | null>(null);
-  const seekFeedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const seekFeedbackTimerRef = useRef<number | null>(null);
   const [seekFeedback, setSeekFeedback] = useState<"backward" | "forward" | null>(null);
 
   const { auth } = useAuthStore();
@@ -578,7 +578,7 @@ function VideoPlayer({
     // tap can cancel the single-tap action. Controls/buttons remain untouched.
     const interactionContainer = artContainerRef.current;
     let lastVideoTapAt = 0;
-    let videoTapTimer: ReturnType<typeof setTimeout> | null = null;
+    let videoTapTimer: number | null = null;
     const isVideoSurfaceTarget = (target: EventTarget | null): target is HTMLElement => {
       if (!(target instanceof HTMLElement)) return false;
       if (target.closest("button, a, input, select, textarea, .art-controls, .art-control, .art-setting, .art-contextmenu")) {
