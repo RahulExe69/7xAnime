@@ -380,8 +380,9 @@ def register_plugin(main_activity: Path) -> None:
 
 
 def install_navigation_guard(main_activity: Path) -> None:
-    """Install the native filter engine and preserve the main-frame navigation guard."""
+    """Install the navigation guard; ad filtering must never prevent app startup."""
     text = main_activity.read_text(encoding="utf-8")
+    text = add_import(text, "import android.util.Log;")
     text = add_import(text, "import com.sevenx.anime.StreamingNavigationWebViewClient;")
     text = add_import(text, "import io.github.edsuns.adfilter.AdFilter;")
 
@@ -393,35 +394,38 @@ def install_navigation_guard(main_activity: Path) -> None:
         fail("Could not find MainActivity.onCreate super call to initialize the WebView filter.")
 
     initialization_marker = "AdFilter.Companion.create(getApplicationContext())"
+    end_marker = "// 7X_ADFILTER_INITIALIZATION_END"
     if initialization_marker not in text:
         initialization = (
-            "\n        // Initialize the EasyList-compatible WebView filter engine.\n"
-            "        AdFilter adFilter = AdFilter.Companion.create(getApplicationContext());\n"
-            "        adFilter.setupWebView(getBridge().getWebView());\n"
-            "        if (!adFilter.getHasInstallation()) {\n"
-            "            io.github.edsuns.adfilter.Filter easyList = adFilter.getViewModel().addFilter(\n"
-            "                \"EasyList\", \"https://easylist.to/easylist/easylist.txt\");\n"
-            "            adFilter.getViewModel().download(easyList.getId());\n"
-            "            io.github.edsuns.adfilter.Filter easyPrivacy = adFilter.getViewModel().addFilter(\n"
-            "                \"EasyPrivacy\", \"https://easylist.to/easylist/easyprivacy.txt\");\n"
-            "            adFilter.getViewModel().download(easyPrivacy.getId());\n"
+            "\n        // Optional: filtering failures must not crash startup on OEM WebViews/JNI variants.\n"
+            "        try {\n"
+            "            AdFilter adFilter = AdFilter.Companion.create(getApplicationContext());\n"
+            "            adFilter.setupWebView(getBridge().getWebView());\n"
+            "            if (!adFilter.getHasInstallation()) {\n"
+            "                io.github.edsuns.adfilter.Filter easyList = adFilter.getViewModel().addFilter(\n"
+            "                    \"EasyList\", \"https://easylist.to/easylist/easylist.txt\");\n"
+            "                adFilter.getViewModel().download(easyList.getId());\n"
+            "                io.github.edsuns.adfilter.Filter easyPrivacy = adFilter.getViewModel().addFilter(\n"
+            "                    \"EasyPrivacy\", \"https://easylist.to/easylist/easyprivacy.txt\");\n"
+            "                adFilter.getViewModel().download(easyPrivacy.getId());\n"
+            "            }\n"
+            "        } catch (RuntimeException | LinkageError error) {\n"
+            "            Log.w(\"7xAnimeAdFilter\", \"Native filter unavailable; continuing without filter lists\", error);\n"
             "        }\n"
+            "        " + end_marker + "\n"
         )
         position = super_call.end()
         text = text[:position] + initialization + text[position:]
 
     statement = "getBridge().getWebView().setWebViewClient(new StreamingNavigationWebViewClient(getBridge()));"
     if statement not in text:
-        marker = "adFilter.getViewModel().download(easyPrivacy.getId());"
-        position = text.find(marker)
+        position = text.find(end_marker)
         if position < 0:
-            fail("Could not locate filter initialization to install the navigation guard.")
-        position += len(marker)
+            fail("Could not locate safe filter initialization boundary to install the navigation guard.")
+        position += len(end_marker)
         text = text[:position] + "\n        " + statement + text[position:]
 
     main_activity.write_text(text, encoding="utf-8")
-
-
 def install_streaming_chrome_client(main_activity: Path) -> None:
     """Install popup filtering, native iframe fullscreen, and fullscreen Back handling."""
     text = main_activity.read_text(encoding="utf-8")
