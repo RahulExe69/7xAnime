@@ -4,7 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import React, { useEffect, useState } from "react";
 import { Compass, Search } from "lucide-react";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { toast } from "sonner";
 
 import Container from "./container";
@@ -24,7 +24,6 @@ const menuItems = [
 
 export default function NavBar() {
   const pathname = usePathname() || ROUTES.HOME;
-  const router = useRouter();
   const auth = useAuthStore();
   const [searchOpen, setSearchOpen] = useState(false);
 
