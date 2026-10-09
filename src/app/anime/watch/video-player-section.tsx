@@ -171,6 +171,14 @@ const VideoPlayerSection = () => {
     const requestFailed = isEpisodeDataError || (!!episodeData && !episodeData.sources?.length);
     if (!requestFailed) return;
 
+    // The local "auto" route has already raced every bundled stream provider.
+    // If that race returned no source, trying the same providers sequentially
+    // can add another long wait per host; move to Server 1 instead.
+    if (isLocalBackendEnabled() && activeEpisodeId.startsWith("watch/auto/")) {
+      setUseFallback(true);
+      return;
+    }
+
     // Let the initial local provider discovery yield at least a first batch
     // before falling back. If every known candidate has already failed, keep
     // waiting for the in-flight catalogue rather than giving up after two hosts.
@@ -390,7 +398,12 @@ const VideoPlayerSection = () => {
     : useFallback || isFallbackActive
       ? fallbackServerNumber
       : selectedProviderIndex >= 0 ? selectedProviderIndex + 2 : 1;
-  const activeServerLabel = `Server ${activeServerNumber}`;
+  const isAutomaticServerActive =
+    isLocalBackendEnabled() &&
+    currentProviderName === "auto" &&
+    !isHindiMode &&
+    !useFallback;
+  const activeServerLabel = isAutomaticServerActive ? "Auto" : `Server ${activeServerNumber}`;
 
   const selectFallbackServer = (category?: "sub" | "dub") => {
     if (category) setPreferredCategory(category);
