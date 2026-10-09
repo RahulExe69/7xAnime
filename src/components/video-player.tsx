@@ -124,9 +124,11 @@ function VideoPlayer({
     isAutoSkipEnabledRef.current = autoSkip;
   }, [autoSkip]);
 
-  // --- Construct Stream URI via Next.js internal /api/proxy ---
+  // --- Construct the proxy URI and preserve the provider's actual media format ---
   const firstSourceUrl = episodeInfo?.sources?.[0]?.url;
   const sourceReferer = episodeInfo?.headers?.Referer;
+  const sourceType = String(episodeInfo?.sources?.[0]?.type || "").toLowerCase();
+  const isHlsSource = sourceType === "m3u8" || sourceType === "hls";
   const uri = useMemo(() => {
     if (!firstSourceUrl) return null;
     return getProxyUrl(firstSourceUrl, sourceReferer);
@@ -397,7 +399,9 @@ function VideoPlayer({
     const finalOptions: Option = {
       container: artContainerRef.current,
       url: uri,
-      type: "m3u8", // Explicitly set type for HLS
+      // Only force HLS for an HLS source. MP4 should use the browser's native
+      // video pipeline; forcing every source to m3u8 makes MP4 providers fail.
+      ...(isHlsSource ? { type: "m3u8" as const } : {}),
       customType: {
         m3u8: (
           videoElement: HTMLMediaElement,
