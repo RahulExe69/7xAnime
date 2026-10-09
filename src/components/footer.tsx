@@ -18,6 +18,7 @@ const Footer = () => {
       <a href="https://github.com/RahulExe69/7xAnime" target="_blank" rel="noreferrer" className="text-xs font-semibold text-[#bdb2f3] transition hover:text-white">Source code</a>
       <p className="text-[11px] text-[#686176]">© 7xAnime</p>
     </footer>
-  );};
+  );
+};
 
 export default Footer;
