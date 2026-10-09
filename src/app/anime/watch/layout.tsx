@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useGetAnimeDetails } from "@/query/get-anime-details";
-import React, { ReactNode, Suspense, useEffect, useMemo, useState } from "react";
+import React, { ReactNode, Suspense, useEffect, useState } from "react";
 import AnimeCarousel from "@/components/anime-carousel";
 import { IAnime } from "@/types/anime";
 import useBookMarks from "@/hooks/use-get-bookmark";
@@ -42,22 +42,12 @@ const LayoutContent = (props: Props) => {
   const { setAnime, setSelectedEpisode } = useAnimeStore();
   const router = useRouter();
 
-  const currentAnimeId = useMemo(
-    () => searchParams.get("anime"),
-    [searchParams],
-  );
+  const currentAnimeId = searchParams.get("anime");
+  const animeId = currentAnimeId;
   const episodeId = searchParams.get("episode");
 
   const epNumberParam = searchParams.get("ep");
   const currentEpNum = epNumberParam ? Number(epNumberParam) : 1;
-
-  const [animeId, setAnimeId] = useState<string | null>(currentAnimeId);
-
-  useEffect(() => {
-    if (currentAnimeId !== animeId) {
-      setAnimeId(currentAnimeId);
-    }
-  }, [currentAnimeId, animeId]);
 
   const { data: anime, isLoading } = useGetAnimeDetails(animeId as string);
 
@@ -68,8 +58,11 @@ const LayoutContent = (props: Props) => {
   }, [anime, setAnime]);
 
   useEffect(() => {
+    // Derive animeId directly from the URL; mirroring it in local state can
+    // briefly leave an old/null ID during navigation and redirect a valid
+    // Start Watching transition back to the homepage.
     if (!animeId && typeof window !== "undefined") {
-      router.push(ROUTES.HOME);
+      router.replace(ROUTES.HOME);
     }
   }, [animeId, router]);
 
