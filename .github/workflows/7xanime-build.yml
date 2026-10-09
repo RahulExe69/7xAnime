@@ -93,6 +93,11 @@ jobs:
           print("Local API health, auth guard, slug parsing, and CORS checks passed.")
           PY
 
+      - name: Run local API contract tests
+        env:
+          PYTHONPATH: android-local-backend:${{ env.KUHI_SOURCE_DIR }}
+        run: python .github/scripts/test-local-anime-backend.py
+
       - name: Setup Java 21
         uses: actions/setup-java@v5
         with:
