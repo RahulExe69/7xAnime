@@ -77,12 +77,12 @@ export default function RootLayout({
         <link rel="icon" href="/brand/7xanime-mark.svg" type="image/svg+xml" sizes="any" />
       </head>
       <body
-        className={`${geistSans.className} antialiased max-w-[100vw] overflow-x-hidden pb-24 lg:pb-0`}
+        className={`${geistSans.className} antialiased max-w-[100vw] overflow-x-hidden bg-background text-foreground pb-[78px] lg:pb-0`}
       >
         <ThemeProvider
           attribute="class"
-          defaultTheme="dark"
-          enableSystem
+          defaultTheme="light"
+          enableSystem={false}
           disableTransitionOnChange
         >
           <QueryProvider>

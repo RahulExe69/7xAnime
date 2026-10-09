@@ -74,6 +74,9 @@ export default function NativeBackHandler() {
     };
 
     void App.addListener("backButton", () => {
+      const overlayBack = new Event("7xanime:back", { cancelable: true });
+      window.dispatchEvent(overlayBack);
+      if (overlayBack.defaultPrevented) return;
       const rememberedRoute = routeStack.current.pop();
       if (rememberedRoute) {
         navigate(rememberedRoute);

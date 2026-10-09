@@ -2,40 +2,40 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { cn } from "@/lib/utils";
-import { usePathname } from "next/navigation";
+import React, { useEffect, useState } from "react";
+import { Bell, Moon, Search, Shuffle, Sun } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
+import { useTheme } from "next-themes";
+import { toast } from "sonner";
 
 import Container from "./container";
-import { Separator } from "./ui/separator";
-
 import { ROUTES } from "@/constants/routes";
-import React, { ReactNode, useEffect, useState } from "react";
-
-import SearchBar from "./search-bar";
-import { MenuIcon, X } from "lucide-react";
-import useScrollPosition from "@/hooks/use-scroll-position";
-import { Sheet, SheetClose, SheetContent, SheetTrigger } from "./ui/sheet";
-import LoginPopoverButton from "./login-popover-button";
+import { api, isLocalBackendEnabled } from "@/lib/api";
+import { MediaList, PaginatedResponse } from "@/types/miruro-api";
 import { useAuthStore } from "@/store/auth-store";
-import { pb } from "@/lib/pocketbase";
+import LoginPopoverButton from "./login-popover-button";
 import NavbarAvatar from "./navbar-avatar";
-import { toast } from "sonner";
-import { isLocalBackendEnabled } from "@/lib/api";
+import { pb } from "@/lib/pocketbase";
+import SearchOverlay from "./search-overlay";
 
-const menuItems: Array<{ title: string; href?: string }> = [
+const menuItems = [
   { title: "Home", href: ROUTES.HOME },
   { title: "Trending", href: "/#trending" },
   { title: "Schedule", href: "/#schedule" },
   { title: "Browse", href: ROUTES.SEARCH },
-
 ];
 
-const NavBar = () => {
-  const pathname = usePathname();
+export default function NavBar() {
+  const pathname = usePathname() || ROUTES.HOME;
+  const router = useRouter();
   const auth = useAuthStore();
-  const { y } = useScrollPosition();
-  const isHeaderFixed = true;
-  const isHeaderSticky = y > 0;
+  const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [randomLoading, setRandomLoading] = useState(false);
+
+  useEffect(() => { setMounted(true); }, []);
+
   useEffect(() => {
     const refreshAuth = async () => {
       if (isLocalBackendEnabled()) {
@@ -44,116 +44,67 @@ const NavBar = () => {
         localStorage.removeItem("pocketbase_auth");
         return;
       }
-
-      const auth_token = JSON.parse(
-        localStorage.getItem("pocketbase_auth") as string,
-      );
-      if (auth_token) {
-        try {
-          const user = await pb.collection("users").authRefresh();
-          if (user) {
-            auth.setAuth({
-              id: user.record.id,
-              email: user.record.email,
-              username: user.record.username,
-              avatar: user.record.avatar,
-              collectionId: user.record.collectionId,
-              collectionName: user.record.collectionName,
-              autoSkip: user.record.autoSkip,
-              created: user.record.created,
-            });
-          }
-        } catch (e) {
-          console.error("Auth refresh error:", e);
-          localStorage.removeItem("pocketbase_auth");
-          auth.clearAuth();
-          toast.error("Login session expired.", {
-            style: { background: "red" },
-          });
-        }
+      let authToken: any = null;
+      try { authToken = JSON.parse(localStorage.getItem("pocketbase_auth") || "null"); }
+      catch { localStorage.removeItem("pocketbase_auth"); }
+      if (!authToken) return;
+      try {
+        const user = await pb.collection("users").authRefresh();
+        if (!user) return;
+        auth.setAuth({
+          id: user.record.id, email: user.record.email, username: user.record.username,
+          avatar: user.record.avatar, collectionId: user.record.collectionId,
+          collectionName: user.record.collectionName, autoSkip: user.record.autoSkip,
+          created: user.record.created,
+        });
+      } catch (error) {
+        console.warn("Auth refresh error:", error);
+        localStorage.removeItem("pocketbase_auth");
+        auth.clearAuth();
+        toast.error("Login session expired.");
       }
     };
-    refreshAuth();
+    void refreshAuth();
   }, []);
+
+  const openRandomAnime = async () => {
+    if (randomLoading) return;
+    setRandomLoading(true);
+    try {
+      const response = await api.get<PaginatedResponse<MediaList>>("/trending", { params: { page: 1, per_page: 30 }, timeout: 12000 });
+      const options = (response.data.results || []).filter((item) => !item.isAdult && item.id);
+      if (!options.length) throw new Error("No anime available to randomize");
+      const selected = options[Math.floor(Math.random() * options.length)];
+      router.push(ROUTES.animeDetails(selected.id));
+    } catch {
+      toast.error("Could not load a random anime. Try again in a moment.");
+    } finally { setRandomLoading(false); }
+  };
 
   if (pathname === ROUTES.WATCH || pathname === `${ROUTES.WATCH}/`) return null;
 
   return (
-    <div
-      className={cn([
-        "h-fit w-full",
-        "sticky top-0 z-[100] duration-300",
-        isHeaderFixed ? "fixed border-b border-white/[0.06] bg-[#09090f]/90 backdrop-blur-xl" : "",
-        isHeaderSticky
-          ? "shadow-lg shadow-black/10"
-          : "",
-      ])}
-    >
-      <Container className="flex flex-col items-stretch gap-2 py-2 lg:flex-row lg:items-center lg:justify-between lg:gap-8">
-        <div className="flex w-full items-center justify-between lg:w-auto">
-          <Link
-            href={ROUTES.HOME}
-            className="flex min-w-0 items-center gap-2 cursor-pointer"
-          >
-            <Image src="/brand/7xanime-lockup.svg" alt="7xAnime" width={188} height={48} unoptimized className="h-10 w-[168px] object-contain sm:h-11 sm:w-[184px]" />
+    <>
+      <header className="fixed inset-x-0 top-0 z-[100] border-b border-[#e2deee] bg-white/90 text-[#5d5874] shadow-[0_2px_12px_rgba(40,28,80,0.025)] backdrop-blur-xl dark:border-[#2a2738] dark:bg-[#13111b]/90 dark:text-[#c0bad7]">
+        <Container className="flex h-[62px] items-center justify-between gap-3 px-3 sm:px-5 lg:h-[72px] lg:gap-6">
+          <Link href={ROUTES.HOME} aria-label="7xAnime home" className="flex shrink-0 items-center gap-2">
+            <Image src="/brand/7xanime-mark.svg" alt="" width={38} height={38} unoptimized className="h-9 w-9 rounded-xl object-cover lg:hidden" />
+            <Image src="/brand/7xanime-lockup.svg" alt="7xAnime" width={188} height={48} unoptimized className="hidden h-11 w-[174px] object-contain lg:block" />
           </Link>
-
-          <div className="flex items-center gap-3 lg:hidden">
-            <MobileMenuSheet trigger={<MenuIcon className="h-5 w-5" suppressHydrationWarning />} />
-            {auth.auth ? <NavbarAvatar auth={auth} /> : <LoginPopoverButton />}
+          <nav className="hidden items-center gap-5 text-sm font-semibold lg:flex">{menuItems.map((item) => <Link key={item.title} href={item.href} className="transition hover:text-[#604bd3] dark:hover:text-[#b7aaff]">{item.title}</Link>)}</nav>
+          <div className="flex min-w-0 items-center justify-end gap-1.5 sm:gap-2 lg:gap-2.5">
+            {auth.auth ? <NavbarAvatar auth={auth} /> : <div className="flex h-9 items-center justify-center rounded-full bg-[#7563d8]/15 px-1 text-sm font-bold text-[#5f4acb] dark:bg-[#7563d8]/20 dark:text-[#c2b7ff]"><LoginPopoverButton /></div>}
+            <a href="https://discord.gg/6yAJ3XDHTt" target="_blank" rel="noreferrer" aria-label="Join 7xAnime Discord" title="Discord" className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#5865f2] text-white shadow-sm transition hover:bg-[#4752d8]">
+              <svg viewBox="0 0 24 24" className="h-5 w-5 fill-current" aria-hidden="true"><path d="M19.7 5.4a18.5 18.5 0 0 0-4.6-1.4l-.6 1.2a17 17 0 0 0-5 0L8.9 4a18.5 18.5 0 0 0-4.6 1.4C1.4 9.7.6 13.9 1 18a18.7 18.7 0 0 0 5.6 2.8l1.2-2a11.8 11.8 0 0 1-1.9-.9l.5-.4a13.3 13.3 0 0 0 11.2 0l.5.4a11.8 11.8 0 0 1-1.9.9l1.2 2A18.7 18.7 0 0 0 23 18c.5-4.8-.8-8.9-3.3-12.6ZM8.8 15.3c-1.1 0-2-1-2-2.2s.9-2.2 2-2.2 2 1 2 2.2-.9 2.2-2 2.2Zm6.4 0c-1.1 0-2-1-2-2.2s.9-2.2 2-2.2 2 1 2 2.2-.9 2.2-2 2.2Z"/></svg>
+            </a>
+            <button type="button" onClick={() => toast("You're all caught up.", { duration: 1600 })} aria-label="Notifications" title="Notifications" className="grid h-9 w-9 shrink-0 place-items-center rounded-xl transition hover:bg-[#efedf7] hover:text-[#604bd3] dark:hover:bg-white/5 dark:hover:text-[#b7aaff]"><Bell className="h-[21px] w-[21px]" /></button>
+            <button type="button" onClick={() => mounted && setTheme(theme === "dark" ? "light" : "dark")} aria-label={mounted && theme === "dark" ? "Switch to light theme" : "Switch to dark theme"} title="Toggle theme" className="grid h-9 w-9 shrink-0 place-items-center rounded-xl transition hover:bg-[#efedf7] hover:text-[#604bd3] dark:hover:bg-white/5 dark:hover:text-[#b7aaff]">{mounted && theme === "dark" ? <Sun className="h-[21px] w-[21px]" /> : <Moon className="h-[21px] w-[21px]" />}</button>
+            <button type="button" onClick={openRandomAnime} disabled={randomLoading} aria-label="Surprise me with a random anime" title="Random anime" className="grid h-9 w-9 shrink-0 place-items-center rounded-xl transition hover:bg-[#efedf7] hover:text-[#604bd3] disabled:opacity-50 dark:hover:bg-white/5 dark:hover:text-[#b7aaff]"><Shuffle className={`h-[21px] w-[21px] ${randomLoading ? "animate-pulse" : ""}`} /></button>
+            <button type="button" onClick={() => setSearchOpen(true)} aria-label="Search anime" title="Search anime" className="grid h-9 w-9 shrink-0 place-items-center rounded-xl transition hover:bg-[#efedf7] hover:text-[#604bd3] dark:hover:bg-white/5 dark:hover:text-[#b7aaff]"><Search className="h-[22px] w-[22px]" /></button>
           </div>
-        </div>
-        <div className="hidden lg:flex items-center gap-8">
-          {menuItems.map((menu, idx) => (
-            <Link href={menu.href || "#"} key={idx}>
-              {menu.title}
-            </Link>
-          ))}
-        </div>
-        <div className="hidden lg:flex w-full max-w-2xl items-center gap-4">
-          <SearchBar />
-          {auth.auth ? <NavbarAvatar auth={auth} /> : <LoginPopoverButton />}
-        </div>
-        <div className="px-0 pb-1 lg:hidden">
-          <SearchBar className="w-full" />
-        </div>
-      </Container>
-    </div>
+        </Container>
+      </header>
+      <SearchOverlay open={searchOpen} onClose={() => setSearchOpen(false)} />
+    </>
   );
-};
-
-const MobileMenuSheet = ({ trigger }: { trigger: ReactNode }) => {
-  const [open, setOpen] = useState<boolean>(false);
-  return (
-    <Sheet open={open} onOpenChange={setOpen}>
-      <SheetTrigger>{trigger}</SheetTrigger>
-      <SheetContent
-        className="flex flex-col w-[80vw] z-[150]"
-        hideCloseButton
-        onOpenAutoFocus={(e) => e.preventDefault()}
-        onCloseAutoFocus={(e) => e.preventDefault()}
-      >
-        <div className="w-full h-full relative">
-          <SheetClose className="absolute top-0 right-0">
-            <X />
-          </SheetClose>
-          <div className="flex flex-col gap-5 mt-10">
-            {menuItems.map((menu, idx) => (
-              <Link
-                href={menu.href || "#"}
-                key={idx}
-                onClick={() => setOpen(false)}
-              >
-                {menu.title}
-              </Link>
-            ))}
-            <Separator />
-            <p className="text-xs text-muted-foreground">Find your next favourite anime.</p>
-          </div>
-        </div>
-      </SheetContent>
-    </Sheet>
-  );
-};
-
-export default NavBar;
+}
