@@ -44,8 +44,10 @@ LOCAL_WATCH_TIMEOUT = 45.0
 LOCAL_WATCH_CACHE_TTL = 35.0
 LOCAL_ROUTE_TIMEOUT = 80.0
 _LOCAL_CONTEXT_CACHE: dict[int, tuple[float, dict]] = {}
-_LOCAL_CONTEXT_TASKS: dict[int, asyncio.Task] = {}
-_LOCAL_CONTEXT_LOCK = asyncio.Lock()
+# Asyncio primitives are event-loop-bound. Keep in-flight work and locks scoped
+# to the current loop so isolated test loops cannot reuse a task from another loop.
+_LOCAL_CONTEXT_TASKS: dict[tuple[int, int], asyncio.Task] = {}
+_LOCAL_CONTEXT_LOCKS: dict[int, asyncio.Lock] = {}
 
 
 def _safe_provider_error(error: Exception) -> str:
@@ -78,20 +80,28 @@ def _record_local_provider_outcome(
 
 
 async def _get_local_provider_context(anilist_id: int) -> dict:
-    """Share and cache AniList/AniZip identity setup across episode discovery and playback."""
+    """Share and cache AniList/AniZip identity setup across discovery and playback."""
     anime_id = int(anilist_id)
+    loop = asyncio.get_running_loop()
+    loop_id = id(loop)
+    task_key = (loop_id, anime_id)
+    lock = _LOCAL_CONTEXT_LOCKS.get(loop_id)
+    if lock is None:
+        lock = asyncio.Lock()
+        _LOCAL_CONTEXT_LOCKS[loop_id] = lock
+
     now = time.time()
-    async with _LOCAL_CONTEXT_LOCK:
+    async with lock:
         cached = _LOCAL_CONTEXT_CACHE.get(anime_id)
         if cached and cached[0] > now:
             return cached[1]
         if cached:
             _LOCAL_CONTEXT_CACHE.pop(anime_id, None)
 
-        task = _LOCAL_CONTEXT_TASKS.get(anime_id)
-        if task is None:
+        task = _LOCAL_CONTEXT_TASKS.get(task_key)
+        if task is None or task.cancelled():
             task = asyncio.create_task(provider_race.build_ctx(anime_id))
-            _LOCAL_CONTEXT_TASKS[anime_id] = task
+            _LOCAL_CONTEXT_TASKS[task_key] = task
 
     try:
         context = await asyncio.wait_for(
@@ -99,25 +109,33 @@ async def _get_local_provider_context(anilist_id: int) -> dict:
             timeout=LOCAL_CONTEXT_TIMEOUT,
         )
     except asyncio.TimeoutError as error:
+        async with lock:
+            if _LOCAL_CONTEXT_TASKS.get(task_key) is task:
+                _LOCAL_CONTEXT_TASKS.pop(task_key, None)
+            if not task.done():
+                task.cancel()
         raise RuntimeError(
             f"Provider metadata setup timed out after {LOCAL_CONTEXT_TIMEOUT:.0f}s"
         ) from error
     except Exception:
-        async with _LOCAL_CONTEXT_LOCK:
-            if task.done() and _LOCAL_CONTEXT_TASKS.get(anime_id) is task:
-                _LOCAL_CONTEXT_TASKS.pop(anime_id, None)
+        async with lock:
+            if _LOCAL_CONTEXT_TASKS.get(task_key) is task:
+                _LOCAL_CONTEXT_TASKS.pop(task_key, None)
         raise
 
     if not isinstance(context, dict) or not isinstance(context.get("media"), dict):
+        async with lock:
+            if _LOCAL_CONTEXT_TASKS.get(task_key) is task:
+                _LOCAL_CONTEXT_TASKS.pop(task_key, None)
         raise RuntimeError("Provider metadata setup returned an invalid context.")
 
-    async with _LOCAL_CONTEXT_LOCK:
+    async with lock:
         _LOCAL_CONTEXT_CACHE[anime_id] = (
             time.time() + LOCAL_CONTEXT_CACHE_TTL,
             context,
         )
-        if _LOCAL_CONTEXT_TASKS.get(anime_id) is task:
-            _LOCAL_CONTEXT_TASKS.pop(anime_id, None)
+        if _LOCAL_CONTEXT_TASKS.get(task_key) is task:
+            _LOCAL_CONTEXT_TASKS.pop(task_key, None)
     return context
 
 # Episode discovery should not hold the watch page hostage while every scraper
@@ -520,8 +538,8 @@ async def legacy_watch_route(provider: str, anilist_id: int, audio: str, episode
             "subtitles": provider_race.merge_subtitles(streams),
         }
 
-    # Bound provider context creation and extraction together. The direct provider
-    # branch uses _watch_one's shorter per-provider timeout; Auto races everyone.
+    # Bound metadata setup plus stream extraction. Manual selection stays strict;
+    # Auto races eligible providers while sharing context and per-source budgets.
     try:
         data = await asyncio.wait_for(extract_streams(), timeout=LOCAL_ROUTE_TIMEOUT)
     except asyncio.TimeoutError:
@@ -552,7 +570,7 @@ async def legacy_watch_route(provider: str, anilist_id: int, audio: str, episode
             "provider": preferred or ("auto" if is_auto else requested_provider),
             "requestedProvider": preferred or ("auto" if is_auto else requested_provider),
             "providerStatus": "error",
-            "providerError": str(error)[:200],
+            "providerError": _safe_provider_error(error),
             "streams": [],
             "subtitles": [],
         }
