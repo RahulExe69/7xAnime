@@ -47,7 +47,11 @@ export const useGetEpisodeData = (episodeId: string, enabled: boolean = true) =>
     queryFn: () => getEpisodeData(episodeId),
     queryKey: [GET_EPISODE_DATA, episodeId],
     refetchOnWindowFocus: false,
-    refetchOnReconnect: true,
+    // The source response can contain short-lived signed URLs; do not tear down
+    // a playing video just because Android briefly reconnects after app switching.
+    // A retry remains available through the player/server fallback path.
+    refetchOnReconnect: false,
+    staleTime: 1000 * 60,
     retry: 1,
     retryDelay: 1000,
     enabled: !!episodeId && enabled,
