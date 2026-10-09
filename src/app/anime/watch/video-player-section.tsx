@@ -58,9 +58,13 @@ const VideoPlayerSection = () => {
   const isPrimaryDisabled = isSourceAvailable === false;
 
   const [useFallback, setUseFallback] = useState<boolean>(false);
+  const [forcePrimary, setForcePrimary] = useState<boolean>(false);
 
-  const { data: episodeData, isLoading: isLoadingData } =
-    useGetEpisodeData(activeEpisodeId, !isPrimaryDisabled && !useFallback);
+  const {
+    data: episodeData,
+    isLoading: isLoadingData,
+    refetch: retryEpisodeData,
+  } = useGetEpisodeData(activeEpisodeId, (!isPrimaryDisabled || forcePrimary) && !useFallback);
 
   const [autoSkip, setAutoSkip] = useState<boolean>(true);
   const [preferredCategory, setPreferredCategory] = useState<"sub" | "dub">("sub");
@@ -76,6 +80,7 @@ const VideoPlayerSection = () => {
 
   useEffect(() => {
     setUseFallback(false);
+    setForcePrimary(false);
   }, [activeEpisodeId]);
 
   useEffect(() => {
@@ -172,7 +177,7 @@ const VideoPlayerSection = () => {
   ]);
 
   const isFallbackActive =
-    isSourceAvailable === false ||
+    (!forcePrimary && isSourceAvailable === false) ||
     useFallback ||
     (!isLoadingData && (!episodeData || !episodeData.sources?.length));
 
@@ -364,7 +369,11 @@ const VideoPlayerSection = () => {
           <Button
             size="sm"
             variant="outline"
-            onClick={() => setUseFallback(false)}
+            onClick={() => {
+              setForcePrimary(true);
+              setUseFallback(false);
+              void retryEpisodeData();
+            }}
             className="flex h-8 shrink-0 items-center gap-1.5 self-start border-white/10 bg-white/[0.04] px-3 text-xs text-zinc-200 hover:bg-white/[0.08] sm:self-auto"
           >
             <Tv className="h-3.5 w-3.5 text-blue-400" /> Try Primary Player
