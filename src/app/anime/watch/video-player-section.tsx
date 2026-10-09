@@ -752,7 +752,7 @@ const VideoPlayerSection = () => {
             Provider diagnostics {localProviderStatus ? `· ${localProviderStatus.loadedCount}/${localProviderStatus.providerCount} modules loaded` : isLoadingProviderStatus ? "· checking…" : ""}
           </summary>
           <p className="mt-2 leading-5 text-zinc-500">
-            Loaded means the provider module is present, not that every anime has a playable stream. “Embed URL returned” is not playback proof; AniXo and Megavid need a player event before they count as observed playback.
+            Loaded means the provider module is present, not that every anime has a playable stream. “URL returned” is not playback proof; AniXo, Megavid, and Cosmic need a trusted player event, while AnimeParadise needs successful HLS playback.
           </p>
           <div className="mt-2 max-h-52 space-y-1.5 overflow-y-auto pr-1">
             {(localProviderStatus?.providers || []).map((item) => (
