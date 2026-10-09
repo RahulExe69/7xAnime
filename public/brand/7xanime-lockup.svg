@@ -15,18 +15,16 @@
   </linearGradient>
 </defs>
 <!-- Angular brush-stroke 7: sharp cuts give the mark an anime action-line silhouette. -->
-<path d="M68 82 L442 68 L414 136 L330 151 L202 430 L124 430 L251 151 L58 164 Z" fill="url(#sevenFill)"/>
+<path d="M68 82 L442 68 L414 136 L324 151 L166 430 L88 430 L218 151 L58 164 Z" fill="url(#sevenFill)"/>
 <path d="M88 99 L164 96 L109 113 Z M383 86 L424 82 L405 105 Z M151 397 L188 322 L166 406 Z" fill="#ffffff" opacity=".78"/>
 <!-- The magenta x cuts through the 7's diagonal so the two characters read as one fused mark. -->
-<path d="M238 253 L270 226 L320 275 L366 225 L401 252 L354 300 L394 341 L362 371 L320 330 L277 370 L244 341 L288 299 Z" fill="url(#xFill)"/>
-<path d="M244 247 L270 226 L300 254 L271 247 Z M362 225 L401 252 L379 273 L390 250 Z M364 371 L340 348 L364 355 L382 346 Z" fill="#ff9bd2" opacity=".9"/>
-<path d="M210 250 L225 241 L249 266 L236 276 Z M398 220 L415 204 L425 216 L408 236 Z M236 361 L252 346 L266 362 L250 377 Z" fill="#ff2f9d"/>
+<path d="M270 253 L302 226 L352 275 L398 225 L433 252 L386 300 L426 341 L394 371 L352 330 L309 370 L276 341 L320 299 Z" fill="url(#xFill)"/>
+<path d="M276 247 L302 226 L332 254 L303 247 Z M394 225 L433 252 L411 273 L422 250 Z M396 371 L372 348 L396 355 L414 346 Z" fill="#ff9bd2" opacity=".9"/>
+<path d="M242 250 L257 241 L281 266 L268 276 Z M430 220 L447 204 L457 216 L440 236 Z M268 361 L284 346 L298 362 L282 377 Z" fill="#ff2f9d"/>
 </g>
 <g font-family="Arial, Helvetica, sans-serif" font-style="italic" font-weight="900" letter-spacing="-7">
-  <text x="267" y="164" font-size="126" fill="#ffffff">7</text>
-  <text x="335" y="164" font-size="126" fill="url(#wordX)">x</text>
-  <text x="410" y="164" font-size="118" fill="#f8f5ff">Anime</text>
+  <text x="267" y="164" font-size="118" fill="#f8f5ff">Anime</text>
 </g>
-<path d="M282 190 H745" stroke="#ff2f9d" stroke-width="4" stroke-linecap="round" opacity=".92"/>
-<text x="284" y="224" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700" letter-spacing="6" fill="#b9b0ca">ANIME • ANYTIME • ANYWHERE</text>
+<path d="M267 190 H745" stroke="#ff2f9d" stroke-width="4" stroke-linecap="round" opacity=".92"/>
+<text x="267" y="224" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700" letter-spacing="6" fill="#b9b0ca">ANIME • ANYTIME • ANYWHERE</text>
 </svg>
