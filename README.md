@@ -72,6 +72,10 @@ The Android local backend exposes manual server choices for AniXo, Megavid, Anim
 
 Megavid can occasionally display a deceptive “Click Allow” prompt, and NontonGo warns about pop-up ads. Do not grant notification permissions or install anything from those embeds; use MegaPlay or AniXo if suspicious prompts appear. The parent app cannot safely remove content rendered inside a cross-origin iframe. The player now offers Retry or Server 1 after 15 seconds of unresolved stream loading, and an explicitly selected MegaPlay fallback renders without waiting for the background request.
 
+## Android ad filtering
+
+The Android app extends its existing WebView ad/redirect guard with EasyList-compatible filtering. Scope, third-party licensing, and known limitations are documented in [docs/ANDROID-ADBLOCKING.md](docs/ANDROID-ADBLOCKING.md). This uses an Android-native filter engine; it is not the official uBlock Origin extension or its core package.
+
 ## Player experience marathon
 
 The Android player work also includes a best-effort ad/redirect filter, blocked pop-up and remote JavaScript prompt dialogs, a native landscape fullscreen bridge with swipe/Back support, and double-tap ±10-second seeking in the app-owned ArtPlayer player. See [the player marathon notes](docs/PLAYER-MARATHON.md) for exact coverage and cross-origin iframe limitations. Known ad-domain filtering can never remove every in-page ad, especially content served by the player itself.
