@@ -387,7 +387,7 @@ def copy_python_source() -> None:
     race_text = race_file.read_text(encoding="utf-8")
 
     # Register the added adapter only in the copied, packaged provider tree.
-    ranking_match = re.search(r"(?s)RANKING\\s*=\\s*\\[(.*?)\\]", race_text)
+    ranking_match = re.search(r"(?s)RANKING\s*=\s*\[(.*?)\]", race_text)
     if not ranking_match:
         fail("Could not locate Kuhi's provider ranking.")
     ranking_block = ranking_match.group(1)
