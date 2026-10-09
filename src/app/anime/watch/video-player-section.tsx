@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useAnimeStore } from "@/store/anime-store";
 import dynamic from "next/dynamic";
 
@@ -94,8 +94,11 @@ const VideoPlayerSection = () => {
   }
 
   // Extract dynamic providers from EpisodeResponse
-  const rawProviders = allEpisodesData?.rawResponse?.providers || {};
-  const providerNames = Object.keys(rawProviders);
+  const rawProviders = useMemo(
+    () => allEpisodesData?.rawResponse?.providers || {},
+    [allEpisodesData?.rawResponse?.providers],
+  );
+  const providerNames = useMemo(() => Object.keys(rawProviders), [rawProviders]);
 
   // Extract current episode number from activeEpisodeId
   const activeEpisodeNumberFromList = allEpisodesData?.episodes?.find(
@@ -288,6 +291,7 @@ const VideoPlayerSection = () => {
     const targetEp = pData.find((ep: any) => ep.number === currentEpNumber) || pData[0];
     if (targetEp?.id) {
       setSelectedEpisode(targetEp.id);
+      updateEpisodeUrl(targetEp.id);
     }
   };
 
@@ -298,7 +302,14 @@ const VideoPlayerSection = () => {
 
   if (!activeEpisodeId || isLoadingData) {
     return (
-      <div className="aspect-video w-full animate-pulse rounded-2xl bg-white/[0.06]"></div>
+      <div
+        role="status"
+        aria-live="polite"
+        className="flex aspect-video w-full flex-col items-center justify-center gap-3 rounded-2xl border border-white/[0.06] bg-white/[0.035] text-sm text-zinc-400"
+      >
+        <span className="h-7 w-7 animate-spin rounded-full border-2 border-violet-400/25 border-t-violet-300" />
+        <span>{activeEpisodeId ? "Finding a playable stream…" : "Preparing episode…"}</span>
+      </div>
     );
   }
 
