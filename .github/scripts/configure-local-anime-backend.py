@@ -320,11 +320,25 @@ def copy_python_source() -> None:
     if destination_src.exists():
         shutil.rmtree(destination_src)
     shutil.copytree(source_dir / "src", destination_src)
+
+    # The upstream race waits up to eight seconds after finding a winning stream,
+    # only to collect optional latency measurements. That tail delay is noticeable
+    # on mobile, so cancel slower competitors almost immediately after a winner.
+    race_file = destination_src / "providers" / "_race.py"
+    race_text = race_file.read_text(encoding="utf-8")
+    slow_cleanup = "await asyncio.wait(pending, timeout=8.0)"
+    if slow_cleanup in race_text:
+        race_text = race_text.replace(slow_cleanup, "await asyncio.wait(pending, timeout=0.2)", 1)
+    elif "await asyncio.wait(pending, timeout=0.2)" not in race_text:
+        fail("Could not locate the upstream stream-race cleanup wait.")
+    race_file.write_text(race_text, encoding="utf-8")
+
     shutil.copy2(local_api, PYTHON_ROOT / "local_api.py")
     shutil.copy2(requirements, PYTHON_ROOT / "requirements.txt")
 
     import py_compile
     py_compile.compile(str(PYTHON_ROOT / "local_api.py"), doraise=True)
+    py_compile.compile(str(race_file), doraise=True)
 
 
 def main() -> None:
