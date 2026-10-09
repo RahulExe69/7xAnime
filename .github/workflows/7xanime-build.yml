@@ -136,11 +136,23 @@ jobs:
               ("onJsConfirm", chrome),
               ("onPermissionRequest", chrome),
               ("handleBackPressed", chrome),
+              ("reportBlockedPlayerAction", chrome),
+              ("reportBlockedNavigation", nav),
           ):
               if item not in text:
                   raise SystemExit(f"Native ad/fullscreen feature missing: {item}")
 
-          print("Native ad filtering, popup/JS prompt protection, fullscreen plugin and Back integration are wired.")
+          watch_section = Path("src/app/anime/watch/video-player-section.tsx").read_text(encoding="utf-8")
+          player_component = Path("src/components/video-player.tsx").read_text(encoding="utf-8")
+          viewport = Path("src/components/player-viewport.tsx").read_text(encoding="utf-8")
+          if "7xanime:blocked-player-action" not in watch_section:
+              raise SystemExit("Player page is not wired to blocked-ad auto-switch events")
+          if "YouTube-style double tap" not in player_component or "art.seek = targetTime" not in player_component:
+              raise SystemExit("Double-tap ±10-second seeking wiring missing")
+          if "SWIPE_THRESHOLD" not in viewport or "enterNativePlayerFullscreen" not in viewport:
+              raise SystemExit("Player swipe/fullscreen wiring missing")
+
+          print("Native ad filtering, popup prompt protection, auto-switch event, fullscreen and seeking gestures are wired.")
           PY
 
       # Test the exact patched Python tree that Chaquopy packages in the APK,
