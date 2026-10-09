@@ -331,7 +331,7 @@ class LocalAnimeApiTests(unittest.TestCase):
             self.assertEqual(episodes[0]["number"], 1)
 
             with patch.object(animenosub, "fetch_text", new=AsyncMock(return_value=embeds_html)):
-                streams = await animenosub.scrape_embeds(
+                streams = await animenosub.source_options(
                     "https://animenosub.to/attack-on-titan-dub/episode-1"
                 )
             self.assertEqual(len(streams), 1)
