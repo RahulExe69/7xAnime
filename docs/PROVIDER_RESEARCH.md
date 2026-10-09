@@ -168,3 +168,21 @@ The current PR now contains independently written, manual-only adapters for AniX
 The network-free contract tests now cover the two new route templates, sub/dub paths, synthetic episode metadata when AniList/AniZip gives a count, and exclusion from Auto racing. These tests verify our adapter logic—not the providers' availability or real playback.
 
 **Release gate remains unchanged:** the adapters are implemented in the draft PR, not declared healthy or production-ready. On a physical Android device, verify at least one real frame and time progression for AniXo and Megavid, then test error signalling, sub/dub, correct episode numbering, seeking, fullscreen, back navigation, redirects/popups, and recovery. Where the provider sends no trustworthy playback event, manual observation is still required.
+
+## Provider pause after physical-device verification (2026-10-10)
+
+The user tested the current Android build and reported that **MegaPlay (Server 1), AniXo, and Megavid work** for the tested title/episode. This is stronger evidence than route-construction tests, but it is not a universal availability guarantee.
+
+To avoid repeatedly hammering unproductive upstreams, the app now exposes only AniXo and Megavid in its manual provider map alongside the existing MegaPlay Server 1 iframe. The backend allowlist filters episode discovery, diagnostics, and manual watch routes to AniXo/Megavid; Auto no longer invokes the Kuhi native provider race. Legacy Kuhi adapter code remains bundled for now but is parked and must not be contacted by the active watch flow. AnimeNoSub is also parked.
+
+The eight researched, not-yet-integrated candidates remain **research only** and have not been queried or integrated as part of this change:
+1. [amvstrm-ani-api](https://github.com/saurabhgangule/amvstrm-ani-api)
+2. [Streambert](https://github.com/truelockmc/streambert)
+3. [Seanime](https://github.com/5rahim/seanime)
+4. [Consumet API](https://github.com/consumet/api.consumet.org)
+5. [AniProject](https://github.com/solo12345689/api.consumet.org)
+6. [Anify](https://github.com/Eltik/Anify)
+7. [ani-cli](https://github.com/pystardust/ani-cli)
+8. [Anivault-Scraper](https://github.com/SH0MIK/Anivault-Scraper)
+
+No requests have been made to those eight candidates as part of this pause. Revisit them only after the user specifies the next step. Do not start probing them in the background.
