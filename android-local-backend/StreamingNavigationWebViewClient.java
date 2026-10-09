@@ -146,7 +146,8 @@ public final class StreamingNavigationWebViewClient extends BridgeWebViewClient 
                     Log.d(TAG, "Blocked filter-list resource: " + host);
                     return result.getResourceResponse();
                 }
-            } catch (RuntimeException error) {
+            } catch (RuntimeException | LinkageError error) {
+                // Optional native/JNI filtering must never crash a media request.
                 Log.w(TAG, "Filter-list engine unavailable; using conservative fallback only", error);
             }
         }
@@ -158,7 +159,8 @@ public final class StreamingNavigationWebViewClient extends BridgeWebViewClient 
         super.onPageStarted(view, url, favicon);
         try {
             AdFilter.Companion.get().performScript(view, url);
-        } catch (RuntimeException error) {
+        } catch (RuntimeException | LinkageError error) {
+            // Keep playback alive if the optional filter engine is unavailable on this device.
             Log.w(TAG, "Filter-list cosmetic/scriptlet injection unavailable", error);
         }
     }
