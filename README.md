@@ -68,21 +68,21 @@ More details, optional Google OAuth setup, and the Android HTTPS endpoint requir
 
 ## Manual playback candidates
 
-The Android local backend also exposes two manual test choices: **AnimeParadise** (a direct HLS candidate with subtitle tracks) and **Cosmic Player** (a custom embedded player whose documented response points to MegaPlay). Cosmic is for comparing player UI; it must not be counted as an independent provider. Both choices stay out of Auto until tested on a real Android device. See [server notes](docs/SERVERS.md) and the [provider research log](docs/PROVIDER_RESEARCH.md).
+The Android local backend exposes manual server choices for AniXo, Megavid, AnimeParadise, Cosmic Player, MegaFlix, TryEmbed, CinexStream, and NontonGo, alongside the dedicated MegaPlay Server 1 iframe. The last four are the URL patterns documented by [Wabsa-kh/yomi-anime-api](https://github.com/Wabsa-kh/yomi-anime-api); the repository constructs embed URLs rather than extracting media itself. Cosmic wraps MegaPlay and is a player-UI comparison, not an independent source. All candidates stay out of Auto until verified on a real Android device. See [server notes](docs/SERVERS.md) and the [provider research log](docs/PROVIDER_RESEARCH.md).
 
-Megavid can occasionally display a deceptive “Click Allow” prompt inside its third-party embed. Do not grant notification permissions or tap the prompt; use MegaPlay or AniXo instead. The parent app cannot safely remove content rendered inside a cross-origin iframe.
+Megavid can occasionally display a deceptive “Click Allow” prompt, and NontonGo warns about pop-up ads. Do not grant notification permissions or install anything from those embeds; use MegaPlay or AniXo if suspicious prompts appear. The parent app cannot safely remove content rendered inside a cross-origin iframe. The player now offers Retry or Server 1 after 15 seconds of unresolved stream loading, and an explicitly selected MegaPlay fallback renders without waiting for the background request.
 
 ## Android APK with an on-device API
 
 The Android debug build has an experimental **local-backend** path: the APK bundles
 a Python runtime and a pinned Kuhi API snapshot plus independently authored adapters,
 starts the API on `127.0.0.1:8000`, and routes provider requests and media proxy traffic
-through that loopback service. The provider map now offers MegaPlay as Server 1, followed by
-AniXo, Megavid, AnimeParadise, and Cosmic Player. The other Kuhi adapters remain parked.
+through that loopback service. The provider map offers MegaPlay as Server 1, followed by
+AniXo, Megavid, AnimeParadise, Cosmic Player, MegaFlix, TryEmbed, CinexStream, and NontonGo. The other Kuhi adapters remain parked.
 AnimeParadise is a direct HLS candidate exposed only after manual selection; Cosmic is a
 MegaPlay-backed custom player for UI comparison, not an independent provider. AniXo,
-Megavid, AnimeParadise, and Cosmic remain manual-only until tested on a physical Android
-device; a returned URL is not proof that the selected episode actually plays. This path does **not** require the three hosted API/proxy/PocketBase Actions
+Megavid, AnimeParadise, Cosmic, MegaFlix, TryEmbed, CinexStream, and NontonGo remain
+manual-only until tested on a physical Android device; a returned URL is not proof that the selected episode actually plays. This path does **not** require the three hosted API/proxy/PocketBase Actions
 secrets or a server we own.
 
 The app still uses the internet to reach AniList, providers, and stream CDNs. The
