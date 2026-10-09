@@ -331,6 +331,14 @@ def copy_python_source() -> None:
         race_text = race_text.replace(slow_cleanup, "await asyncio.wait(pending, timeout=0.2)", 1)
     elif "await asyncio.wait(pending, timeout=0.2)" not in race_text:
         fail("Could not locate the upstream stream-race cleanup wait.")
+
+    # A failed stream race must also fail fast enough for the UI to try the next
+    # provider or Server 1. Successful providers still return as soon as one wins.
+    old_watch_timeout = "WATCH_TIMEOUT = 75.0"
+    if old_watch_timeout in race_text:
+        race_text = race_text.replace(old_watch_timeout, "WATCH_TIMEOUT = 18.0", 1)
+    elif "WATCH_TIMEOUT = 18.0" not in race_text:
+        fail("Could not locate the upstream stream provider timeout.")
     race_file.write_text(race_text, encoding="utf-8")
 
     shutil.copy2(local_api, PYTHON_ROOT / "local_api.py")
