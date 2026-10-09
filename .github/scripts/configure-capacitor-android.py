@@ -150,7 +150,7 @@ density_specs = [
     ("xxhdpi", 144, 324),
     ("xxxhdpi", 192, 432),
 ]
-def write_padded_launcher_svg(source: Path, destination: Path, *, has_background: bool, scale: float = 0.84) -> None:
+def write_padded_launcher_svg(source: Path, destination: Path, *, has_background: bool, scale: float = 0.62) -> None:
     """Center the 7x artwork within Android's launcher safe area without altering web assets."""
     source_text = source.read_text(encoding="utf-8")
     offset = 512 * (1 - scale) / 2
@@ -175,7 +175,8 @@ def write_padded_launcher_svg(source: Path, destination: Path, *, has_background
     destination.write_text(padded_text, encoding="utf-8")
 
 
-# Only generated Android launcher art gets the extra inset. The web/PWA SVGs stay full-size.
+# Android launcher masks vary by OEM (circle, squircle, rounded square). Keep the mark
+# inside the central safe area with generous space on every edge. Web/PWA assets stay full-size.
 with tempfile.TemporaryDirectory(prefix="7xanime-launcher-") as temp_dir:
     temp_root = Path(temp_dir)
     padded_mark = temp_root / "7xanime-mark-padded.svg"
