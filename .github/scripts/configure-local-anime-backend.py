@@ -336,7 +336,7 @@ def copy_python_source() -> None:
     # provider or Server 1. Successful providers still return as soon as one wins.
     old_watch_timeout = "WATCH_TIMEOUT = 75.0"
     if old_watch_timeout in race_text:
-        race_text = race_text.replace(old_watch_timeout, "WATCH_TIMEOUT = 18.0", 1)
+        race_text = race_text.replace(old_watch_timeout, "WATCH_TIMEOUT = 12.0", 1)
     elif "WATCH_TIMEOUT = 18.0" not in race_text:
         fail("Could not locate the upstream stream provider timeout.")
     race_file.write_text(race_text, encoding="utf-8")
