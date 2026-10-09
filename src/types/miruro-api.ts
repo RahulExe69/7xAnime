@@ -252,12 +252,15 @@ export interface ProviderCategory {
 }
 
 export interface EpisodeResponse {
-  mappings: {
+  mappings?: {
     anilistId: number;
     malId?: number;
     kitsuId?: number;
     [key: string]: any;
   };
+  anilistId?: number;
+  source?: string;
+  complete?: boolean;
   providers: Record<
     string,
     {
