@@ -71,6 +71,10 @@ function VideoPlayer({
   const artContainerRef = useRef<HTMLDivElement>(null); // Ref for the mounting div
   const artInstanceRef = useRef<Artplayer | null>(null); // Ref for the ArtPlayer instance
   const hlsInstanceRef = useRef<Hls | null>(null); // Ref for the Hls.js instance
+  const animeInfoRef = useRef(animeInfo);
+  const serversDataRef = useRef(serversData);
+  animeInfoRef.current = animeInfo;
+  serversDataRef.current = serversData;
 
   // State only needed for the current auto-skip setting
   const isAutoSkipEnabledRef = useRef(autoSkip);
@@ -92,14 +96,16 @@ function VideoPlayer({
     current: number,
     duration: number,
   ): Promise<string | null> => {
-    const episodeNumber = parseInt(serversData.episodeNo, 10) || 1;
+    const currentAnimeInfo = animeInfoRef.current;
+    const currentServersData = serversDataRef.current;
+    const episodeNumber = parseInt(currentServersData.episodeNo, 10) || 1;
     if (isLocalBackendEnabled()) {
       saveLocalWatchProgress({
-        animeId: animeInfo.id,
-        episodeId: serversData.episodeId,
+        animeId: currentAnimeInfo.id,
+        episodeId: currentServersData.episodeId,
         episodeNumber,
-        animeTitle: animeInfo.title,
-        poster: animeInfo.image,
+        animeTitle: currentAnimeInfo.title,
+        poster: currentAnimeInfo.image,
         current,
         duration,
       });
@@ -107,7 +113,7 @@ function VideoPlayer({
     }
 
     return syncWatchProgress(bookmarkIdRef.current, watchedRecordIdRef.current, {
-      episodeId: serversData.episodeId,
+      episodeId: currentServersData.episodeId,
       episodeNumber,
       current,
       duration,
@@ -506,7 +512,7 @@ function VideoPlayer({
           "Outro",
         ),
       ],
-      poster: animeInfo.image,
+      poster: animeInfoRef.current.image,
       volume: 0.8,
       isLive: false,
       muted: false,
@@ -808,7 +814,7 @@ function VideoPlayer({
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [uri, episodeInfoSignature, animeInfo.id, animeInfo.title, animeInfo.image, subOrDub, getInstance]);
+  }, [uri, episodeInfoSignature, subOrDub, getInstance]);
 
   // --- Render ---
   return (
