@@ -64,7 +64,7 @@ docker compose up --build
 
 Open `http://localhost:3000`. The stack runs the 7xAnime web app, Miruro API (port 8000), PocketBase (port 8090) and M3U8 proxy (port 4040). Backend ports are bound to localhost for local development only. PocketBase imports the schema from `docs/pb.json` automatically and persists data in the `pb_data` volume.
 
-More details, optional Google OAuth setup, and the Android HTTPS endpoint requirements are in [docs/SELF_HOSTING.md](docs/SELF_HOSTING.md). The bundled Miruro API may be blocked by Cloudflare or the hosting provider's IP range, so verify it from the actual deployment before relying on it.
+More details, optional Google OAuth setup, and the Android HTTPS endpoint requirements are in [docs/SELF_HOSTING.md](docs/SELF_HOSTING.md). The bundled Miruro API may be blocked by Cloudflare or the hosting provider's IP range, so verify it from the actual deployment before relying on it. The candidate provider API audit and integration decisions are tracked in [docs/PROVIDER_RESEARCH.md](docs/PROVIDER_RESEARCH.md).
 
 ## Android APK with an on-device API
 
