@@ -719,7 +719,7 @@ const VideoPlayerSection = () => {
   }
 
   const firstResolvedSource = episodeData?.sources?.[0];
-  if (firstResolvedSource?.type === "embed" && firstResolvedSource.url) {
+  if (episodeData && firstResolvedSource?.type === "embed" && firstResolvedSource.url) {
     const embedProvider = episodeData.provider || currentProviderName;
     return (
       <div className="flex w-full flex-col gap-3">
