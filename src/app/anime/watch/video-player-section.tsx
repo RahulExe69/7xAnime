@@ -357,6 +357,15 @@ const VideoPlayerSection = () => {
     setIsHindiMode(true);
   };
 
+  const playerAnimeInfo = useMemo(
+    () => ({
+      id: anime?.anime?.info?.id || "0",
+      title: anime?.anime?.info?.name || "Anime",
+      image: anime?.anime?.info?.poster || "",
+    }),
+    [anime?.anime?.info?.id, anime?.anime?.info?.name, anime?.anime?.info?.poster],
+  );
+
   const playerControls = (
     <div className="flex w-full flex-col gap-3 rounded-2xl border border-white/[0.07] bg-[#101018] p-3 sm:p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -430,6 +439,7 @@ const VideoPlayerSection = () => {
           <span>Finding Hindi dub for episode {currentEpNumber}…</span>
         </div>
         <p className="text-xs text-[#77728f] dark:text-zinc-500">Hindi sources come from a community-maintained catalogue, so some anime or episodes may be missing.</p>
+        {playerControls}
       </div>
     );
   }
@@ -477,6 +487,7 @@ const VideoPlayerSection = () => {
         <span className="h-7 w-7 animate-spin rounded-full border-2 border-violet-400/25 border-t-violet-300" />
         <span>{activeEpisodeId ? "Finding a playable stream…" : "Preparing episode…"}</span>
         </div>
+        {playerControls}
       </div>
     );
   }
@@ -510,11 +521,7 @@ const VideoPlayerSection = () => {
           dub: [],
           raw: [],
         }}
-        animeInfo={{
-          id: anime?.anime?.info?.id || "0",
-          title: anime?.anime?.info?.name || "Anime",
-          image: anime?.anime?.info?.poster || "",
-        }}
+        animeInfo={playerAnimeInfo}
         subOrDub={activeCategory}
         autoSkip={autoSkip}
         onError={advanceAfterSourceFailure}
