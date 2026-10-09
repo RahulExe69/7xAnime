@@ -36,6 +36,9 @@ const getEpisodeData = async (
     sources: (data.streams || []).map((stream) => ({
       url: stream.url,
       type: stream.type,
+      referer: stream.referer || stream.headers?.Referer || "",
+      headers: stream.headers,
+      server: stream.server,
     })),
     anilistID: anilistId,
     malID: 0,
