@@ -175,15 +175,6 @@ def write_padded_launcher_svg(source: Path, destination: Path, *, has_background
     destination.write_text(padded_text, encoding="utf-8")
 
 
-resource_root = Path("android/app/src/main/res")
-density_specs = [
-    ("mdpi", 48, 108),
-    ("hdpi", 72, 162),
-    ("xhdpi", 96, 216),
-    ("xxhdpi", 144, 324),
-    ("xxxhdpi", 192, 432),
-]
-
 # Only generated Android launcher art gets the extra inset. The web/PWA SVGs stay full-size.
 with tempfile.TemporaryDirectory(prefix="7xanime-launcher-") as temp_dir:
     temp_root = Path(temp_dir)
