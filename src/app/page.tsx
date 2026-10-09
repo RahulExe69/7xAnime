@@ -27,7 +27,7 @@ export default function Home() {
   const { data: completedRes, isLoading: loadingCompleted } = useGetFilteredAnime("FINISHED", "SCORE_DESC", 18);
 
   return (
-    <main className="min-h-screen overflow-hidden bg-[#f6f5fc] pb-10 text-[#1a1830]">
+    <main className="min-h-screen overflow-hidden bg-[#f6f5fc] pb-10 text-[#1a1830] dark:bg-[#111019] dark:text-white">
       <HeroSection spotlightAnime={spotlightList} isDataLoading={loadingSpotlight} />
       <div id="continue-watching" className="scroll-mt-20">
         <ContinueWatching loading={false} />

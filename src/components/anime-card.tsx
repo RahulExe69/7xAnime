@@ -42,7 +42,7 @@ const AnimeCard = ({ displayDetails = true, variant = "sm", ...props }: Props) =
 
   return (
     <div className={cn(
-      "group relative isolate flex w-full min-w-0 flex-col overflow-hidden rounded-2xl border border-[#dedbea] bg-white shadow-[0_5px_18px_rgba(37,25,81,0.045)] transition duration-200 hover:-translate-y-0.5 hover:border-[#8b73ed]/65 hover:shadow-[0_9px_26px_rgba(88,68,173,0.12)]",
+      "group relative isolate flex w-full min-w-0 flex-col overflow-hidden rounded-2xl border border-[#dedbea] bg-white shadow-[0_5px_18px_rgba(37,25,81,0.045)] transition duration-200 hover:-translate-y-0.5 hover:border-[#8b73ed]/65 hover:shadow-[0_9px_26px_rgba(88,68,173,0.12)] dark:border-[#332f47] dark:bg-[#191724] dark:hover:border-[#7565ce]",
       variant === "sm" && "max-w-[11.5rem]",
       variant === "lg" && "max-w-[15rem]",
       props.className,
@@ -91,10 +91,10 @@ const AnimeCard = ({ displayDetails = true, variant = "sm", ...props }: Props) =
 
       {displayDetails && (
         <div className="flex min-h-[108px] flex-1 flex-col gap-2.5 px-3 py-3 sm:min-h-[118px] sm:px-3.5">
-          <h3 className="line-clamp-2 min-h-[2.6em] text-[13px] font-bold leading-[1.3] text-[#1e1b32] sm:text-[15px]">
+          <h3 className="line-clamp-2 min-h-[2.6em] text-[13px] font-bold leading-[1.3] text-[#1e1b32] dark:text-white sm:text-[15px]">
             {props.title}
           </h3>
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-[#716d85] sm:text-xs">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-[#716d85] dark:text-[#aaa5c0] sm:text-xs">
             {score && <span className="font-bold text-[#b49a0b]">★ {score}</span>}
             {props.format && <span>{props.format}</span>}
             {!!props.episodes && <span>{props.episodes} ep</span>}
@@ -102,11 +102,11 @@ const AnimeCard = ({ displayDetails = true, variant = "sm", ...props }: Props) =
           </div>
           {props.watchDetail && (
             <div className="mt-auto flex flex-col gap-1.5">
-              <p className="text-[10px] text-[#716d85]">Episode {props.watchDetail.episodeNumber} · {formatSecondsToMMSS(props.watchDetail.current)} / {formatSecondsToMMSS(props.watchDetail.timestamp)}</p>
+              <p className="text-[10px] text-[#716d85] dark:text-[#aaa5c0]">Episode {props.watchDetail.episodeNumber} · {formatSecondsToMMSS(props.watchDetail.current)} / {formatSecondsToMMSS(props.watchDetail.timestamp)}</p>
               <Progress value={percentage} className="h-1.5 bg-[#e8e5f1]" />
             </div>
           )}
-          {props.subTitle && <p className="line-clamp-1 text-[11px] text-[#716d85]">{props.subTitle}</p>}
+          {props.subTitle && <p className="line-clamp-1 text-[11px] text-[#716d85] dark:text-[#aaa5c0]">{props.subTitle}</p>}
         </div>
       )}
     </div>

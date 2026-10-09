@@ -25,12 +25,25 @@ type IHeroSectionProps = {
 
 const HeroSection = (props: IHeroSectionProps) => {
   const [api, setApi] = React.useState<CarouselApi>();
+  const [selectedSlide, setSelectedSlide] = React.useState(0);
+
+  React.useEffect(() => {
+    if (!api) return;
+    const updateSelected = () => setSelectedSlide(api.selectedScrollSnap());
+    updateSelected();
+    api.on("select", updateSelected);
+    api.on("reInit", updateSelected);
+    return () => {
+      api.off("select", updateSelected);
+      api.off("reInit", updateSelected);
+    };
+  }, [api]);
 
   if (props.isDataLoading || !props.spotlightAnime?.length)
     return <LoadingSkeleton />;
 
   return (
-    <div className="relative h-[64svh] min-h-[430px] max-h-[700px] w-full md:h-[78vh] md:min-h-[560px]">
+    <div className="relative h-[36svh] min-h-[270px] max-h-[430px] w-full md:h-[78vh] md:min-h-[560px]">
       <Carousel className="w-full" setApi={setApi} opts={{ loop: true }}>
         <CarouselContent>
           {props.spotlightAnime.map((anime, index) => (
@@ -40,12 +53,17 @@ const HeroSection = (props: IHeroSectionProps) => {
           ))}
         </CarouselContent>
       </Carousel>
-      <div className="absolute hidden md:flex items-center gap-5 right-10 3xl:bottom-10 bottom-24 z-50 isolate">
+      <div className="absolute bottom-3 left-1/2 z-50 flex -translate-x-1/2 items-center gap-2 md:bottom-5">
+        {props.spotlightAnime.map((anime, index) => (
+          <button key={anime.id || index} type="button" aria-label={`Show spotlight ${index + 1}`} aria-current={selectedSlide === index ? "true" : undefined} onClick={() => api?.scrollTo(index)} className={`h-2 rounded-full transition-all duration-200 ${selectedSlide === index ? "w-7 bg-[#604bd3]" : "w-2 bg-[#77728f]/30 hover:bg-[#77728f]/55 dark:bg-white/25 dark:hover:bg-white/50"}`} />
+        ))}
+      </div>
+      <div className="absolute hidden md:flex items-center gap-5 right-10 3xl:bottom-10 bottom-20 z-50 isolate">
         <Button
           onClick={() => {
             api?.scrollPrev();
           }}
-          className="h-10 w-10 rounded-full border border-white/20 bg-black/40 text-white backdrop-blur hover:bg-violet-600"
+          className="h-10 w-10 rounded-full border border-white/20 bg-black/40 text-white backdrop-blur hover:bg-[#604bd3]"
         >
           <ArrowLeft className="shrink-0" />
         </Button>
@@ -75,8 +93,8 @@ const HeroCarouselItem = ({ anime }: { anime: MediaList }) => {
       style={{ backgroundImage: `url(${bgImage})` }}
     >
       {/* Gradient Overlay */}
-      <div className="absolute h-full w-full inset-0 m-auto bg-gradient-to-r from-[#09090f]/95 via-[#09090f]/65 to-transparent z-10"></div>
-      <div className="absolute h-full w-full inset-0 m-auto bg-gradient-to-t from-[#09090f] via-[#09090f]/20 to-transparent z-10"></div>
+      <div className="absolute h-full w-full inset-0 m-auto bg-gradient-to-r from-black/75 via-black/40 to-transparent z-10"></div>
+      <div className="absolute h-full w-full inset-0 m-auto bg-gradient-to-t from-[#f6f5fc] via-[#f6f5fc]/25 to-transparent dark:from-[#111019] dark:via-[#111019]/25 z-10"></div>
 
       {/* Content Section */}
       <div className="relative z-20 h-full w-full">
@@ -88,17 +106,17 @@ const HeroCarouselItem = ({ anime }: { anime: MediaList }) => {
 
             <div className="flex flex-wrap items-center gap-2 text-xs">
               {anime.format && (
-                <Badge className="border-0 bg-violet-500/90 text-white font-semibold">
+                <Badge className="border-0 bg-[#604bd3] text-white font-semibold">
                   {anime.format}
                 </Badge>
               )}
               {anime.seasonYear && (
-                <Badge variant="outline" className="text-gray-300 border-gray-600">
+                <Badge variant="outline" className="text-gray-100 border-white/35">
                   {anime.season ? `${anime.season} ` : ""}{anime.seasonYear}
                 </Badge>
               )}
               {!!anime.averageScore && (
-                <Badge variant="secondary" className="bg-yellow-500/20 text-yellow-300 border border-yellow-500/40">
+                <Badge variant="secondary" className="bg-black/40 text-yellow-200 border border-yellow-300/30">
                   ⭐ {anime.averageScore}% Score
                 </Badge>
               )}
@@ -113,13 +131,13 @@ const HeroCarouselItem = ({ anime }: { anime: MediaList }) => {
               <ButtonLink
                 href={ROUTES.watchAnime(anime.id)}
                 LeftIcon={Play}
-                className="h-11 rounded-xl bg-[#ff2f9d] px-5 text-sm font-bold text-white shadow-lg shadow-[#ff2f9d]/20 transition hover:bg-[#ff56ad]"
+                className="h-11 rounded-xl bg-[#604bd3] px-5 text-sm font-bold text-white shadow-lg shadow-[#604bd3]/25 transition hover:bg-[#513cc4]"
               >
                 Watch Now
               </ButtonLink>
               <ButtonLink
                 href={ROUTES.animeDetails(anime.id)}
-                className="h-11 rounded-xl border border-white/20 bg-white/[0.06] px-5 text-sm font-semibold text-white backdrop-blur transition hover:bg-white/[0.12]"
+                className="h-11 rounded-xl border border-white/30 bg-black/20 px-5 text-sm font-semibold text-white backdrop-blur transition hover:bg-black/35"
               >
                 View Details
               </ButtonLink>
@@ -133,7 +151,7 @@ const HeroCarouselItem = ({ anime }: { anime: MediaList }) => {
 
 const LoadingSkeleton = () => {
   return (
-    <div className="relative h-[64svh] min-h-[430px] max-h-[700px] w-full md:h-[78vh] md:min-h-[560px]">
+    <div className="relative h-[36svh] min-h-[270px] max-h-[430px] w-full md:h-[78vh] md:min-h-[560px]">
       <div className="relative z-20 h-full w-full">
         <Container className="flex h-full w-full flex-col justify-end pb-12 pt-24 md:justify-center md:pb-10 md:pt-20">
           <div className="space-y-2 lg:w-[40vw]">
