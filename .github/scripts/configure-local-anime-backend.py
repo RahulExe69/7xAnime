@@ -96,6 +96,31 @@ def patch_settings_gradle() -> None:
     path.write_text(text, encoding="utf-8")
 
 
+def patch_dependency_repositories() -> None:
+    """Add JitPack for the Android-native EasyList-compatible filter dependency."""
+    path = ANDROID / "settings.gradle"
+    text = path.read_text(encoding="utf-8")
+    if "https://jitpack.io" in text:
+        return
+
+    management = re.search(r"(?m)^\s*dependencyResolutionManagement\s*\{", text)
+    if not management:
+        fail("Could not locate dependencyResolutionManagement in generated settings.gradle.")
+
+    open_index = text.find("{", management.start())
+    close_index = matching_brace(text, open_index)
+    block = text[open_index:close_index]
+    repositories = re.search(r"(?m)^\s*repositories\s*\{", block)
+    if not repositories:
+        fail("Could not locate dependency repositories in generated settings.gradle.")
+
+    repo_open = block.find("{", repositories.start())
+    repo_close = matching_brace(block, repo_open)
+    block = block[:repo_close] + '\n        maven { url = uri("https://jitpack.io") }\n    ' + block[repo_close:]
+    text = text[:open_index] + block + text[close_index:]
+    path.write_text(text, encoding="utf-8")
+
+
 def patch_root_gradle() -> None:
     path = ANDROID / "build.gradle"
     if not path.is_file():
@@ -208,6 +233,23 @@ def patch_app_gradle() -> None:
     path.write_text(text, encoding="utf-8")
 
 
+def patch_adblock_dependency() -> None:
+    """Add the Android-native EasyList-compatible engine to the generated app module."""
+    path = ANDROID / "app/build.gradle"
+    text = path.read_text(encoding="utf-8")
+    dependency = "implementation 'com.github.Edsuns.AdblockAndroid:ad-filter:1.0'"
+    if dependency in text:
+        return
+
+    match = re.search(r"(?m)^\s*dependencies\s*\{", text)
+    if not match:
+        fail("Could not locate app dependencies block for the WebView filter engine.")
+    open_index = text.find("{", match.start())
+    close_index = matching_brace(text, open_index)
+    text = text[:close_index] + "\n    " + dependency + "\n" + text[close_index:]
+    path.write_text(text, encoding="utf-8")
+
+
 def patch_manifest() -> None:
     path = ANDROID / "app/src/main/AndroidManifest.xml"
     if not path.is_file():
@@ -299,22 +341,45 @@ def register_plugin(main_activity: Path) -> None:
 
 
 def install_navigation_guard(main_activity: Path) -> None:
-    """Keep main-frame navigation in-app without sandboxing the streaming iframe itself."""
+    """Install the native filter engine and preserve the main-frame navigation guard."""
     text = main_activity.read_text(encoding="utf-8")
     text = add_import(text, "import com.sevenx.anime.StreamingNavigationWebViewClient;")
-    statement = "getBridge().getWebView().setWebViewClient(new StreamingNavigationWebViewClient(getBridge()));"
-    if statement in text:
-        return
+    text = add_import(text, "import io.github.edsuns.adfilter.AdFilter;")
 
     super_call = re.search(
         r"super\.onCreate\s*\(\s*savedInstanceState\s*\)\s*;",
         text,
     )
     if not super_call:
-        fail("Could not find MainActivity.onCreate super call to install navigation guard.")
+        fail("Could not find MainActivity.onCreate super call to initialize the WebView filter.")
 
-    position = super_call.end()
-    text = text[:position] + "\n        " + statement + text[position:]
+    initialization_marker = "AdFilter.Companion.create(getApplicationContext())"
+    if initialization_marker not in text:
+        initialization = (
+            "\n        // Initialize the EasyList-compatible WebView filter engine.\n"
+            "        AdFilter adFilter = AdFilter.Companion.create(getApplicationContext());\n"
+            "        adFilter.setupWebView(getBridge().getWebView());\n"
+            "        if (!adFilter.getHasInstallation()) {\n"
+            "            io.github.edsuns.adfilter.Filter easyList = adFilter.getViewModel().addFilter(\n"
+            "                \"EasyList\", \"https://easylist.to/easylist/easylist.txt\");\n"
+            "            adFilter.getViewModel().download(easyList.getId());\n"
+            "            io.github.edsuns.adfilter.Filter easyPrivacy = adFilter.getViewModel().addFilter(\n"
+            "                \"EasyPrivacy\", \"https://easylist.to/easylist/easyprivacy.txt\");\n"
+            "            adFilter.getViewModel().download(easyPrivacy.getId());\n"
+            "        }\n"
+        )
+        position = super_call.end()
+        text = text[:position] + initialization + text[position:]
+
+    statement = "getBridge().getWebView().setWebViewClient(new StreamingNavigationWebViewClient(getBridge()));"
+    if statement not in text:
+        marker = "adFilter.getViewModel().download(easyPrivacy.getId());"
+        position = text.find(marker)
+        if position < 0:
+            fail("Could not locate filter initialization to install the navigation guard.")
+        position += len(marker)
+        text = text[:position] + "\n        " + statement + text[position:]
+
     main_activity.write_text(text, encoding="utf-8")
 
 
@@ -500,8 +565,10 @@ def main() -> None:
 
     copy_python_source()
     patch_settings_gradle()
+    patch_dependency_repositories()
     patch_root_gradle()
     patch_app_gradle()
+    patch_adblock_dependency()
     patch_manifest()
 
     native_sources = {
