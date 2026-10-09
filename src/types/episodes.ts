@@ -65,4 +65,7 @@ export interface Outro {
 export interface Source {
   url: string;
   type: string;
+  referer?: string;
+  headers?: Record<string, string>;
+  server?: string;
 }
