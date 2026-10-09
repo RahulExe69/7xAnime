@@ -1,18 +1,19 @@
 # 7xAnime playback server guide
 
-**Server 1 remains MegaPlay**, followed by manually selectable AniXo, Megavid, AnimeParadise, and Cosmic Player. The first three of the previously tested choices (MegaPlay, AniXo, and Megavid) are user-reported working; AnimeParadise and Cosmic are new manual tests and are not verified on a real device yet. Other Kuhi adapters remain parked. Auto excludes these manual-only test sources.
+**Server 1 remains MegaPlay**, followed by manually selectable AniXo, Megavid, AnimeParadise, Cosmic Player, MegaFlix, TryEmbed, CinexStream, and NontonGo. MegaPlay, AniXo and Megavid are user-reported working on a tested title; the four Yomi-derived routes plus AnimeParadise/Cosmic are new manual tests and still need real-device verification. Other Kuhi adapters remain parked. Auto excludes these manual-only choices.
 
 ## New manual test servers
 
 - **AnimeParadise** — independent candidate using its documented JSON catalog and signed HLS stream endpoint. It is manual-only initially; selecting it triggers matching/resolution so the app does not scrape its API for every anime page. Sub only is exposed because the documented adapter supports subbed episodes.
 - **Cosmic Player** — opens Cosmic's custom embedded Vidstack player to compare the player interface with Server 1. Cosmic's documented API sample identifies **MegaPlay** as its stream source, so this is a player comparison, not a new independent provider. The deployed embed host may vary or be unavailable; verify on-device.
-- **Megavid warning** — its third-party embed sometimes displays a deceptive “Click Allow” / robot-check card. Do not tap Allow or grant notification permissions. Because the overlay is inside a cross-origin iframe, the app cannot safely remove it from the parent document. Switch to MegaPlay or AniXo if it appears.
+- **Megavid warning** — its third-party embed can display a deceptive “Click Allow” / robot-check card. Do not tap Allow or grant notification permissions. The overlay is inside a cross-origin iframe, so the app cannot safely remove it from the parent document.
+- **Yomi-derived routes** — the four manual URL adapters use the route patterns documented in [Wabsa-kh/yomi-anime-api](https://github.com/Wabsa-kh/yomi-anime-api): MegaFlix `/stream/ani/{AniListID}/{episode}/{sub|dub}`, TryEmbed `/embed/anime/{AniListID}/{episode}/{sub|dub}`, CinexStream `/api/embed/anime/{sub|dub}/{AniListID}/{episode}?color=7c6ee0`, and NontonGo `/anime/{AniListID}/{episode}/play`. These routes construct embeds; they are not proof of independently verified streams. NontonGo is sub-only and warns about popup ads.
 
-Both new choices are held out of automatic provider racing until real Android playback is verified. A module-loaded diagnostic only proves the Python adapter imported; it does not guarantee that a title or episode plays.
+All four Yomi-derived routes, AnimeParadise, and Cosmic are held out of automatic provider racing until real Android playback is verified. A module-loaded diagnostic only proves the Python adapter imported; it does not guarantee that a title or episode plays.
 
 ## Numbered server labels
 
-The Android package still contains legacy adapter code, but the app exposes only the four allowlisted manual selections below after Server 1. AnimeParadise is resolved only after explicit selection to avoid unnecessary searches; its HLS/signed-link flow still requires a phone playback check. Other Kuhi adapters are disabled at the app/backend allowlist and must not be contacted by episode discovery or playback. The active server map is:
+The Android package still contains legacy adapter code, but the app exposes only the eight allowlisted manual selections below after Server 1. AnimeParadise is resolved only after explicit selection to avoid unnecessary searches; its HLS/signed-link flow still requires a phone playback check. Other Kuhi adapters are disabled at the app/backend allowlist and must not be contacted by episode discovery or playback. The active server map is:
 
 | Local rank | API provider key | Display name | Provider site |
 |---:|---|---|---|
@@ -21,8 +22,12 @@ The Android package still contains legacy adapter code, but the app exposes only
 | 3 | `megavid` | Megavid (manual embed) | https://megavid.buzz |
 | 4 | `animeparadise` | AnimeParadise (manual HLS) | https://animeparadise.moe |
 | 5 | `cosmic` | Cosmic Player (MegaPlay-backed embed) | https://cosmic-api-azure.vercel.app |
+| 6 | `megaflix` | MegaFlix (manual embed) | https://www.megaflix.buzz |
+| 7 | `tryembed` | TryEmbed (manual embed) | https://tryembed.us.cc |
+| 8 | `cinexstream` | CinexStream (manual embed) | https://cinextream.cc |
+| 9 | `nontongo` | NontonGo (sub-only manual embed) | https://nontongo.win |
 
-For Sub/Dub, the UI filters providers by the selected audio type and media formats the player can use. The visible provider labels start at **Server 2** because Server 1 is reserved for MegaPlay. AniXo, Megavid, and Cosmic are manually selectable iframe endpoints; AnimeParadise returns HLS but stays manual-only during verification. A route response is not playback proof, and these four are deliberately excluded from Auto. A provider can be loaded but still have no stream for a particular anime/episode; diagnostics distinguish module-load, route/stream extraction, and observed player events. Manual selections are strict: selecting one provider never silently returns another provider's stream. Auto is the only cross-provider race. The same server number may refer to a different provider if the compatible provider set changes.
+For Sub/Dub, the UI filters providers by the selected audio type and media formats the player can use. The visible provider labels start at **Server 2** because Server 1 is reserved for MegaPlay. AniXo, Megavid, Cosmic, MegaFlix, TryEmbed, CinexStream, and NontonGo are manually selectable iframe endpoints; AnimeParadise returns HLS but stays manual-only during verification. A route response is not playback proof, and all eight choices after MegaPlay are deliberately excluded from Auto. A provider can be loaded but still have no stream for a particular anime/episode; diagnostics distinguish module-load, route/stream extraction, and observed player events. Manual selections are strict: selecting one provider never silently returns another provider's stream. Auto is the only cross-provider race. The same server number may refer to a different provider if the compatible provider set changes.
 
 ## Hindi dub catalogue
 
@@ -38,7 +43,7 @@ Server 1 currently opens:
 
 `https://megaplay.buzz/stream/ani/{anilistId}/{episodeNumber}/{sub-or-dub}`
 
-The iframe progress listener also recognises messages from MegaCloud. Kuhi's pinned source remains in the repository for later research, but it is currently parked: local diagnostics and watch routes allow only AniXo, Megavid, AnimeParadise, and Cosmic; background episode discovery skips AnimeParadise until a user selects it. Frontend labels/audio-format capability metadata are kept in `src/lib/server-map.ts`.
+The iframe progress listener also recognises messages from MegaCloud. Kuhi's pinned source remains in the repository for later research, but it is currently parked: local diagnostics and watch routes allow only AniXo, Megavid, AnimeParadise, Cosmic, MegaFlix, TryEmbed, CinexStream, and NontonGo; background episode discovery skips AnimeParadise until a user selects it. Frontend labels/audio-format capability metadata are kept in `src/lib/server-map.ts`.
 
 ## Updating the map
 
