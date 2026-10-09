@@ -1,6 +1,5 @@
 "use client";
 
-import Loading from "@/app/loading";
 import parse from "html-react-parser";
 import { ROUTES } from "@/constants/routes";
 
@@ -31,8 +30,23 @@ type Props = {
   children: ReactNode;
 };
 
+const WatchLayoutFallback = () => (
+  <div role="status" aria-live="polite" className="mx-auto mt-3 w-full max-w-screen-2xl px-3 sm:px-5">
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-4">
+      <div className="space-y-3 lg:col-span-3">
+        <div className="aspect-video w-full animate-pulse rounded-2xl bg-[#171421]" />
+        <div className="h-10 w-full animate-pulse rounded-xl bg-[#171421]" />
+      </div>
+      <div className="space-y-2 rounded-2xl border border-white/[0.06] bg-[#101018] p-3">
+        <div className="h-5 w-24 animate-pulse rounded bg-white/[0.06]" />
+        {Array.from({ length: 6 }, (_, index) => <div key={index} className="h-11 animate-pulse rounded-xl bg-white/[0.04]" />)}
+      </div>
+    </div>
+  </div>
+);
+
 const Layout = (props: Props) => (
-  <Suspense fallback={<Loading />}>
+  <Suspense fallback={<WatchLayoutFallback />}>
     <LayoutContent {...props} />
   </Suspense>
 );
