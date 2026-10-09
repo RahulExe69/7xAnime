@@ -3,13 +3,13 @@ import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import Button from "./common/custom-button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import { Input } from "./ui/input";
-import DiscordIcon from "@/icons/discord";
 import GoogleIcon from "@/icons/google";
 import { pb } from "@/lib/pocketbase";
 import { toast } from "sonner";
 import { UserRound } from "lucide-react";
 import { useAuthStore } from "@/store/auth-store";
 import { isLocalBackendEnabled } from "@/lib/api";
+import { UserRound } from "lucide-react";
 
 type FormData = {
   username: string;
@@ -115,30 +115,6 @@ function LoginPopoverButton() {
     });
   };
 
-  const loginWithDiscord = async () => {
-    const res = await pb.collection("users").authWithOAuth2({
-      provider: "discord",
-    });
-
-    if (pb.authStore.isValid && pb.authStore.record) {
-      await pb.collection("users").update(pb.authStore.record?.id!, {
-        username: res.meta?.username,
-      });
-
-      toast.success("Login successful", { style: { background: "green" } });
-      auth.setAuth({
-        id: pb.authStore.record.id,
-        email: pb.authStore.record.email,
-        username: pb.authStore.record.username,
-        avatar: pb.authStore.record.avatar,
-        collectionId: pb.authStore.record.collectionId,
-        collectionName: pb.authStore.record.collectionName,
-        autoSkip: pb.authStore.record.autoSkip,
-        created: pb.authStore.record.created,
-      });
-    }
-  };
-
   const loginWithGoogle = async () => {
     try {
       const result = await pb.collection("users").authWithOAuth2({
@@ -219,7 +195,7 @@ function LoginPopoverButton() {
       </PopoverTrigger>
       <PopoverContent
         side="bottom"
-        className="bg-black bg-opacity-50 backdrop-blur-sm w-[300px] mt-4 mr-4 p-4"
+        className="w-[300px] rounded-2xl border-white/10 bg-[#171421] text-white shadow-2xl shadow-black/40"
       >
         <Tabs
           defaultValue={tabValue}
@@ -269,15 +245,6 @@ function LoginPopoverButton() {
               Login
             </Button>
             <hr className="text-white text-xs text-center" />
-            <Button
-              variant="default"
-              className="w-full bg-blue-600 text-xs text-white hover:bg-blue-700"
-              size="sm"
-              onClick={loginWithDiscord}
-            >
-              <DiscordIcon className="mr-2 h-4 w-4" />
-              Login with Discord
-            </Button>
             <Button
               variant="default"
               className="w-full bg-white text-xs text-black hover:bg-gray-100"
@@ -343,15 +310,6 @@ function LoginPopoverButton() {
               Signup
             </Button>
             <hr className="text-white text-xs text-center" />
-            <Button
-              variant="default"
-              className="w-full bg-blue-600 text-xs text-white hover:bg-blue-700"
-              size="sm"
-              onClick={loginWithDiscord}
-            >
-              <DiscordIcon className="mr-2 h-4 w-4" />
-              Signup with Discord
-            </Button>
             <Button
               variant="default"
               className="w-full bg-white text-xs text-black hover:bg-gray-100"
