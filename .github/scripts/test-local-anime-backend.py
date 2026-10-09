@@ -2,6 +2,7 @@
 """Network-free contract tests for the bundled Android API adapter."""
 from __future__ import annotations
 
+import asyncio
 import unittest
 from unittest.mock import AsyncMock, patch
 
@@ -136,6 +137,44 @@ class LocalAnimeApiTests(unittest.TestCase):
             "https://anime-api-ashen-chi.vercel.app/api/stream",
             params={"id": "solo-leveling", "season": 1, "ep": 1},
         )
+
+    def test_episode_discovery_returns_fast_providers_before_slow_ones(self) -> None:
+        async def exercise() -> None:
+            anime_id = 87654321
+            local_api._episode_discovery_cache.pop(anime_id, None)
+
+            async def fake_provider_episodes(mod, name, requested_id, ctx):
+                if name == "slow":
+                    await asyncio.sleep(1.2)
+                return name, {"episodes": {"sub": [{"number": 1, "id": f"{name}-1"}], "dub": []}}
+
+            fake_modules = [("fast", object()), ("slow", object())]
+            with (
+                patch.object(local_api.provider_race, "providers", return_value=fake_modules),
+                patch.object(local_api.provider_race, "build_ctx", new=AsyncMock(return_value={})),
+                patch.object(local_api.provider_race, "_episodes_one", new=AsyncMock(side_effect=fake_provider_episodes)),
+            ):
+                first = await local_api._progressive_merged_episodes(anime_id)
+                self.assertIsNotNone(first)
+                self.assertIn("fast", first["providers"])
+                self.assertNotIn("slow", first["providers"])
+                self.assertFalse(first["complete"])
+
+                await asyncio.sleep(0.6)
+                second = await local_api._progressive_merged_episodes(anime_id)
+                self.assertIn("fast", second["providers"])
+                self.assertNotIn("slow", second["providers"])
+                self.assertFalse(second["complete"])
+
+                await asyncio.sleep(0.7)
+                third = await local_api._progressive_merged_episodes(anime_id)
+                self.assertIn("fast", third["providers"])
+                self.assertIn("slow", third["providers"])
+                self.assertTrue(third["complete"])
+
+            local_api._episode_discovery_cache.pop(anime_id, None)
+
+        asyncio.run(exercise())
 
     def test_proxy_rejects_loopback_targets(self) -> None:
         response = self.client.get(
