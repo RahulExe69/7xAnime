@@ -1,5 +1,5 @@
 import { GET_EPISODE_DATA } from "@/constants/query-keys";
-import { api } from "@/lib/api";
+import { api, isLocalBackendEnabled } from "@/lib/api";
 import { IEpisodeSource } from "@/types/episodes";
 import { WatchSourcesResponse } from "@/types/miruro-api";
 import { useQuery } from "react-query";
@@ -52,7 +52,9 @@ export const useGetEpisodeData = (episodeId: string, enabled: boolean = true) =>
     // A retry remains available through the player/server fallback path.
     refetchOnReconnect: false,
     staleTime: 1000 * 60,
-    retry: 1,
+    // The embedded API already races providers; repeating the same race on a
+    // failed result can add another long wait without trying a new server.
+    retry: isLocalBackendEnabled() ? 0 : 1,
     retryDelay: 1000,
     enabled: !!episodeId && enabled,
   });
