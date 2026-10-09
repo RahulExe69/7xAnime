@@ -30,7 +30,7 @@ const EpisodePlaylist = ({
   const searchParams = useSearchParams();
 
   const episodeId = searchParams.get("episode");
-
+  const episodeNumberParam = searchParams.get("ep");
   const isLatestEpisode = searchParams.get("type");
 
   const { setSelectedEpisode } = useAnimeStore();
@@ -52,21 +52,44 @@ const EpisodePlaylist = ({
     React.useState<Episode[]>(filtered);
 
   useEffect(() => {
-    if (
-      (!episodeId || !episodeId.includes("ep")) &&
-      !!episodes &&
-      !!episodes.episodes.length
-    ) {
-      if (!!isLatestEpisode) {
-        setSelectedEpisode(
-          episodes.episodes[episodes.episodes.length - 1].episodeId as string,
-        );
-      } else {
-        setSelectedEpisode(episodes.episodes[0].episodeId as string);
-      }
+    if (!episodes?.episodes?.length) return;
+
+    // Route parameters are authoritative. Never guess from the characters in a
+    // provider's episode slug (some IDs end in "12", not "episode-12").
+    if (episodeId) {
+      setSelectedEpisode(episodeId);
+      return;
     }
-    //eslint-disable-next-line
-  }, [episodes]);
+
+    if (episodeNumberParam) {
+      const requestedEpisode = episodes.episodes.find(
+        (episode) => episode.number === Number(episodeNumberParam),
+      );
+      if (requestedEpisode?.episodeId) {
+        setSelectedEpisode(requestedEpisode.episodeId);
+      }
+      return;
+    }
+
+    const currentSelectionBelongsToThisAnime = episodes.episodes.some(
+      (episode) => episode.episodeId === selectedEpisode,
+    );
+    if (currentSelectionBelongsToThisAnime) return;
+
+    const fallbackEpisode = isLatestEpisode
+      ? episodes.episodes[episodes.episodes.length - 1]
+      : episodes.episodes[0];
+    if (fallbackEpisode?.episodeId) {
+      setSelectedEpisode(fallbackEpisode.episodeId);
+    }
+  }, [
+    episodes,
+    episodeId,
+    episodeNumberParam,
+    isLatestEpisode,
+    selectedEpisode,
+    setSelectedEpisode,
+  ]);
 
   useEffect(() => {
     if (!episodes || currentGroup === "") return;
