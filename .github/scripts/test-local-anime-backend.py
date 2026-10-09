@@ -52,7 +52,7 @@ class LocalAnimeApiTests(unittest.TestCase):
             self.assertEqual(anilist_id, 12345)
             self.assertEqual(episode, 12)
             self.assertEqual(audio, "sub")
-            self.assertEqual(ctx, {"anilistId": 12345})
+            self.assertEqual(ctx, {"media": {"id": 12345, "title": {"english": "Test"}}, "anizip": None})
             return "anineko", [{
                 "url": "https://cdn.example/master.m3u8",
                 "type": "hls",
@@ -63,7 +63,7 @@ class LocalAnimeApiTests(unittest.TestCase):
             patch.object(local_api.provider_race, "providers", return_value=[
                 ("anineko", selected_module), ("anizone", other_module),
             ]),
-            patch.object(local_api.provider_race, "build_ctx", new=AsyncMock(return_value={"anilistId": 12345})),
+            patch.object(local_api.provider_race, "build_ctx", new=AsyncMock(return_value={"media": {"id": 12345, "title": {"english": "Test"}}, "anizip": None})),
             patch.object(local_api, "_watch_one_for_player", new=AsyncMock(side_effect=fake_watch_one)),
             patch.object(local_api.provider_race, "race_watch", new=AsyncMock(side_effect=AssertionError("manual pick must not race other providers"))),
         ):
@@ -89,7 +89,7 @@ class LocalAnimeApiTests(unittest.TestCase):
             patch.object(local_api.provider_race, "providers", return_value=[
                 ("anineko", selected_module), ("anizone", other_module),
             ]),
-            patch.object(local_api.provider_race, "build_ctx", new=AsyncMock(return_value={})),
+            patch.object(local_api.provider_race, "build_ctx", new=AsyncMock(return_value={"media": {"id": 12345, "title": {"english": "Test"}}, "anizip": None})),
             patch.object(local_api, "_watch_one_for_player", new=AsyncMock(return_value=("anineko", [], 8.0, False))),
             patch.object(local_api.provider_race, "record_latency"),
             patch.object(local_api.provider_race, "race_watch", new=AsyncMock(side_effect=AssertionError("must not silently switch providers"))),
@@ -183,7 +183,7 @@ class LocalAnimeApiTests(unittest.TestCase):
                 self.assertIs(second, fake_context)
                 build_context.assert_awaited_once_with(anime_id)
             local_api._LOCAL_CONTEXT_CACHE.pop(anime_id, None)
-            local_api._LOCAL_CONTEXT_TASKS.pop(anime_id, None)
+            local_api._LOCAL_CONTEXT_TASKS.pop((id(asyncio.get_running_loop()), anime_id), None)
 
         asyncio.run(exercise())
 
@@ -302,7 +302,10 @@ class LocalAnimeApiTests(unittest.TestCase):
     def test_episode_discovery_returns_fast_providers_before_slow_ones(self) -> None:
         async def exercise() -> None:
             anime_id = 87654321
+            loop_task_key = (id(asyncio.get_running_loop()), anime_id)
             local_api._episode_discovery_cache.pop(anime_id, None)
+            local_api._LOCAL_CONTEXT_CACHE.pop(anime_id, None)
+            local_api._LOCAL_CONTEXT_TASKS.pop(loop_task_key, None)
 
             async def fake_provider_episodes(mod, name, requested_id, ctx):
                 if name == "slow":
@@ -334,6 +337,8 @@ class LocalAnimeApiTests(unittest.TestCase):
                 self.assertTrue(third["complete"])
 
             local_api._episode_discovery_cache.pop(anime_id, None)
+            local_api._LOCAL_CONTEXT_CACHE.pop(anime_id, None)
+            local_api._LOCAL_CONTEXT_TASKS.pop(loop_task_key, None)
 
         asyncio.run(exercise())
 
