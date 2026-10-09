@@ -7,7 +7,7 @@ export const KUHI_PROVIDER_ORDER = [
 
 /**
  * The pinned Kuhi provider ranking. A provider without episodes for an anime
- * is omitted, so ServerN uses the order returned for that particular anime.
+ * is omitted, so Server N uses the order returned for that particular anime.
  */
 export const PROVIDER_INFO: Record<string, ProviderInfo> = {
   anineko: { name: "AniNeko", site: "https://anineko.to" },
@@ -26,8 +26,8 @@ export const getServerLabel = (providerNames: string[], providerName: string): s
   const index = providerNames.indexOf(providerName);
   // If the episode list came from the API metadata fallback, the "auto" route
   // tries the provider race; it is the only visible route until provider data resolves.
-  if (index >= 0) return `Server${index + 2}`;
-  return providerName.toLowerCase() === "auto" ? "Server2" : "Server1";
+  if (index >= 0) return `Server ${index + 1}`;
+  return providerName.toLowerCase() === "auto" ? "Automatic server selection" : "Unnumbered provider";
 };
 
 export const getServerProviderTitle = (providerNames: string[], providerName: string): string => {
