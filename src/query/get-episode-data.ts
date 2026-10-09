@@ -15,7 +15,7 @@ const getEpisodeData = async (
   episodeId: string,
 ): Promise<IEpisodeSource> => {
   const endpoint = episodeId.startsWith("/") ? episodeId : `/${episodeId}`;
-  const res = await api.get<WatchSourcesResponse>(endpoint);
+  const res = await api.get<WatchSourcesResponse>(endpoint, { timeout: 20000 });
   const data = res.data;
 
   // IDs supplied by Kuhi use watch/{provider}/{anilistId}/{audio}/{episode}.
@@ -47,6 +47,9 @@ export const useGetEpisodeData = (episodeId: string, enabled: boolean = true) =>
     queryFn: () => getEpisodeData(episodeId),
     queryKey: [GET_EPISODE_DATA, episodeId],
     refetchOnWindowFocus: false,
+    refetchOnReconnect: true,
+    retry: 1,
+    retryDelay: 1000,
     enabled: !!episodeId && enabled,
   });
 };
