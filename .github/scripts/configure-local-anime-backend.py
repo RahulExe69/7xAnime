@@ -326,18 +326,26 @@ def copy_python_source() -> None:
     # 3.11, so make these two provider modules compatible before importing them.
     anibd_file = destination_src / "providers" / "anibd.py"
     anibd_text = anibd_file.read_text(encoding="utf-8")
-    anibd_bad = ```    data = await fetch_json(f"{BASE}/apilink.php?data={quote(provider_link, safe="-_.!~*'()")}")```
-    anibd_good = ```    encoded_link = quote(provider_link, safe="-_.!~*'()")
-    data = await fetch_json(f"{BASE}/apilink.php?data={encoded_link}")```
-    if anibd_bad in anibd_text:
-        anibd_text = anibd_text.replace(anibd_bad, anibd_good, 1)
+    anibd_lines = anibd_text.splitlines()
+    anibd_patched = False
+    for index, line in enumerate(anibd_lines):
+        if "apilink.php?data=" in line and "quote(provider_link" in line:
+            indent = line[:len(line) - len(line.lstrip())]
+            anibd_lines[index:index + 1] = [
+                indent + """encoded_link = quote(provider_link, safe="-_.!~*'()")""",
+                indent + """data = await fetch_json(f"{BASE}/apilink.php?data={encoded_link}")""",
+            ]
+            anibd_patched = True
+            break
+    if anibd_patched:
+        anibd_text = "\n".join(anibd_lines) + "\n"
     elif "encoded_link = quote(provider_link," not in anibd_text:
         fail("Could not apply the Python 3.11 compatibility patch to anibd.py.")
     anibd_file.write_text(anibd_text, encoding="utf-8")
 
     mkissa_file = destination_src / "providers" / "mkissa.py"
     mkissa_text = mkissa_file.read_text(encoding="utf-8")
-    pep701_fragment = ```safe="'")```
+    pep701_fragment = """safe="'")"""
     if pep701_fragment in mkissa_text:
         if mkissa_text.count(pep701_fragment) != 2:
             fail("Expected two Python 3.11-incompatible quote expressions in mkissa.py.")
