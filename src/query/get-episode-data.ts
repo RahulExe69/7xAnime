@@ -39,6 +39,11 @@ const getEpisodeData = async (
     })),
     anilistID: anilistId,
     malID: 0,
+    provider: data.provider,
+    requestedProvider: data.requestedProvider,
+    defaultProvider: data.defaultProvider,
+    providerStatus: data.providerStatus,
+    providerError: data.providerError,
   };
 };
 
