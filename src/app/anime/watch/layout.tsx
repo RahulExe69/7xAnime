@@ -151,6 +151,7 @@ const LayoutContent = (props: Props) => {
           if (typeof window !== "undefined") {
             const url = new URL(window.location.href);
             url.searchParams.set("episode", matchedEp.episodeId);
+            url.searchParams.delete("ep");
             window.history.replaceState({}, "", url.toString());
           }
         }
