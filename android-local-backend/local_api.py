@@ -485,13 +485,20 @@ def _proxied_url(target: str, referer: str) -> str:
 
 
 @app.get("/api/proxy")
-async def local_media_proxy(url: str, referer: str = ""):
-    """Proxy HLS manifests and segments on-device, rewriting child URLs."""
+async def local_media_proxy(request: Request, url: str, referer: str = ""):
+    """Proxy HLS manifests and segments, preserving byte ranges for MP4/media playback."""
     try:
         target = _validated_remote_url(url)
         effective_referer = referer.strip() or f"{urlsplit(target).scheme}://{urlsplit(target).netloc}/"
         headers = dict(HEADERS)
         headers["Referer"] = effective_referer
+        # Media elements use Range requests for video metadata, seeking and
+        # segmented delivery. Forward the range headers rather than turning
+        # every MP4/server response into an unseekable full-file download.
+        for name in ("range", "if-range"):
+            value = request.headers.get(name)
+            if value:
+                headers[name.title()] = value
 
         async with httpx.AsyncClient(timeout=35.0, follow_redirects=True) as client:
             upstream = await client.get(target, headers=headers)
@@ -503,10 +510,16 @@ async def local_media_proxy(url: str, referer: str = ""):
             or upstream.content[:128].lstrip().startswith(b"#EXTM3U")
         )
         if not upstream.is_success:
+            forwarded_headers = {"Cache-Control": "no-store"}
+            for header in ("content-range", "accept-ranges", "content-length", "last-modified", "etag"):
+                value = upstream.headers.get(header)
+                if value:
+                    forwarded_headers[header] = value
             return Response(
                 content=upstream.content,
                 status_code=upstream.status_code,
                 media_type=content_type,
+                headers=forwarded_headers,
             )
 
         if is_manifest:
@@ -534,11 +547,16 @@ async def local_media_proxy(url: str, referer: str = ""):
                 headers={"Cache-Control": "no-store"},
             )
 
+        forwarded_headers = {"Cache-Control": "no-store"}
+        for header in ("content-range", "accept-ranges", "content-length", "last-modified", "etag"):
+            value = upstream.headers.get(header)
+            if value:
+                forwarded_headers[header] = value
         return Response(
             content=upstream.content,
             status_code=upstream.status_code,
             media_type=content_type,
-            headers={"Cache-Control": "no-store"},
+            headers=forwarded_headers,
         )
     except ValueError as error:
         return JSONResponse({"detail": str(error)}, status_code=400)
