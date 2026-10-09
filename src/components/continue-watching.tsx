@@ -74,7 +74,7 @@ export default function ContinueWatching({ loading = false }: { loading: boolean
   if (loading || !anime?.length) return null;
 
   return (
-    <section className="w-full py-5 sm:py-7">
+    <section className="w-full pt-[82px] pb-5 sm:pt-[92px] sm:pb-7">
       <div className="mb-4 flex items-center justify-between gap-3 px-4 sm:mb-5 sm:px-6 lg:px-8">
         <SectionHeading title="Continue Watching" icon={<Clock3 className="h-5 w-5" />} />
         <div className="flex shrink-0 items-center gap-2">
@@ -103,7 +103,7 @@ export default function ContinueWatching({ loading = false }: { loading: boolean
           const total = typeof episode === "string" ? 0 : episode.timestamp || 0;
           const percent = total > 0 ? Math.min(100, (current / total) * 100) : 0;
           return (
-            <Link key={`${item.id}-${index}`} href={ROUTES.watchAnime(item.id, episodeNumber)} className="group flex w-[68%] max-w-[360px] shrink-0 snap-start items-center gap-3 rounded-2xl border border-[#dedbea] bg-white p-2.5 shadow-[0_4px_16px_rgba(37,25,81,0.035)] transition hover:border-[#8b73ed]/65 hover:shadow-[0_9px_24px_rgba(88,68,173,0.10)] dark:border-[#332f47] dark:bg-[#191724] dark:hover:border-[#7565ce] sm:w-[48%] md:w-[38%] lg:w-[30%]">
+            <Link key={`${item.id}-${index}`} href={ROUTES.watchAnime(item.id, episodeNumber)} className="group flex w-[68%] max-w-[360px] shrink-0 snap-start items-center gap-3 rounded-2xl border border-[#dedbea] bg-white p-2.5 shadow-[0_4px_16px_rgba(37,25,81,0.035)] transition duration-150 hover:border-[#ff2f9d]/65 hover:shadow-[0_9px_24px_rgba(88,68,173,0.10)] dark:border-[#332f47] dark:bg-[#191724] dark:hover:border-[#ff2f9d] sm:w-[48%] md:w-[38%] lg:w-[30%]">
               <div className="relative h-[70px] w-[50px] shrink-0 overflow-hidden rounded-xl bg-[#ebe9f4] dark:bg-[#2b273b]">
                 <Image src={item.poster || "/brand/7xanime-mark.svg"} alt={item.name} fill sizes="72px" className="object-cover" unoptimized />
                 <AnimeLanguageBadges animeId={String(item.id)} titles={[item.name, item.jname || ""]} />
@@ -111,7 +111,7 @@ export default function ContinueWatching({ loading = false }: { loading: boolean
               </div>
               <div className="min-w-0 flex-1">
                 <p className="line-clamp-2 text-sm font-bold leading-snug text-[#1d1a32] dark:text-white">{item.name}</p>
-                <p className="mt-2 text-xs font-semibold text-[#6856c3] dark:text-[#b7aaff]">Ep {episodeNumber}{total > 0 ? ` · ${Math.round(percent)}% watched` : ""}</p>
+                <p className="mt-2 text-xs font-semibold text-[#ff69b4] dark:text-[#ff8bc8]">Ep {episodeNumber}{total > 0 ? ` · ${Math.round(percent)}% watched` : ""}</p>
                 <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#e4e0ef] dark:bg-[#343044]"><div className="h-full rounded-full bg-[#6650d8]" style={{ width: `${percent}%` }} /></div>
               </div>
             </Link>
