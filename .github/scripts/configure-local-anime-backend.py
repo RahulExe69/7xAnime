@@ -347,6 +347,8 @@ def copy_python_source() -> None:
         "animenosub": "android-local-backend/extra-providers/animenosub.py",
         "anixo": "android-local-backend/extra-providers/anixo.py",
         "megavid": "android-local-backend/extra-providers/megavid.py",
+        "animeparadise": "android-local-backend/extra-providers/animeparadise.py",
+        "cosmic": "android-local-backend/extra-providers/cosmic.py",
     }
     for provider_name, relative_path in extra_providers.items():
         extra_provider = ROOT / relative_path
@@ -405,7 +407,7 @@ def copy_python_source() -> None:
 
     # These documented iframe integrations are selectable manually, but are
     # intentionally filtered out of the Auto race in local_api.py.
-    for provider_name in ("anixo", "megavid"):
+    for provider_name in ("anixo", "megavid", "animeparadise", "cosmic"):
         if f'"{provider_name}"' not in ranking_block:
             ranking_block = ranking_block.rstrip().rstrip(",") + f', "{provider_name}"'
     race_text = race_text[:ranking_match.start(1)] + ranking_block + race_text[ranking_match.end(1):]
