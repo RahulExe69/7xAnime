@@ -74,12 +74,12 @@ export default function ContinueWatching({ loading = false }: { loading: boolean
   if (loading || !anime?.length) return null;
 
   return (
-    <section className="w-full pt-[82px] pb-5 sm:pt-[92px] sm:pb-7">
+    <section className="w-full py-5 sm:py-7">
       <div className="mb-4 flex items-center justify-between gap-3 px-4 sm:mb-5 sm:px-6 lg:px-8">
         <SectionHeading title="Continue Watching" icon={<Clock3 className="h-5 w-5" />} />
         <div className="flex shrink-0 items-center gap-2">
-          <Button variant="outline" size="icon" onClick={() => scroll(-1)} aria-label="Previous continue watching" className="h-9 w-9 rounded-full border-[#dedbea] bg-white text-[#77728f] hover:bg-[#f1effa] dark:border-[#332f47] dark:bg-[#191724] dark:text-[#c3bdd8]"><ArrowLeft className="h-4 w-4" /></Button>
-          <Button variant="outline" size="icon" onClick={() => scroll(1)} aria-label="Next continue watching" className="h-9 w-9 rounded-full border-[#d9d5e8] bg-[#efedf8] text-[#514b70] hover:bg-[#e2def5] dark:border-[#332f47] dark:bg-[#201d2d] dark:text-[#d0c9ea]"><ArrowRight className="h-4 w-4" /></Button>
+          <Button variant="outline" size="icon" onClick={() => scroll(-1)} aria-label="Previous continue watching" className="h-9 w-9 rounded-full border-white/[0.08] bg-white/[0.035] text-[#aaa2bd] hover:bg-white/[0.07] dark:border-white/[0.08] dark:bg-white/[0.035] dark:text-[#c3bdd8]"><ArrowLeft className="h-4 w-4" /></Button>
+          <Button variant="outline" size="icon" onClick={() => scroll(1)} aria-label="Next continue watching" className="h-9 w-9 rounded-full border-white/[0.08] bg-white/[0.06] text-[#d0c9ea] hover:bg-white/[0.10] dark:border-white/[0.08] dark:bg-white/[0.06] dark:text-[#d0c9ea]"><ArrowRight className="h-4 w-4" /></Button>
         </div>
       </div>
       <div ref={scrollRef} className="anime-shelf-scroll flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-1 sm:gap-4 sm:px-6 lg:px-8">
@@ -103,7 +103,7 @@ export default function ContinueWatching({ loading = false }: { loading: boolean
           const total = typeof episode === "string" ? 0 : episode.timestamp || 0;
           const percent = total > 0 ? Math.min(100, (current / total) * 100) : 0;
           return (
-            <Link key={`${item.id}-${index}`} href={ROUTES.watchAnime(item.id, episodeNumber)} className="group flex w-[68%] max-w-[360px] shrink-0 snap-start items-center gap-3 rounded-2xl border border-[#dedbea] bg-white p-2.5 shadow-[0_4px_16px_rgba(37,25,81,0.035)] transition duration-150 hover:border-[#ff2f9d]/65 hover:shadow-[0_9px_24px_rgba(88,68,173,0.10)] dark:border-[#332f47] dark:bg-[#191724] dark:hover:border-[#ff2f9d] sm:w-[48%] md:w-[38%] lg:w-[30%]">
+            <Link key={`${item.id}-${index}`} href={ROUTES.watchAnime(item.id, episodeNumber)} className="group flex w-[68%] max-w-[360px] shrink-0 snap-start items-center gap-3 rounded-2xl border border-white/[0.07] bg-[#15121d] p-2.5 transition-colors duration-150 hover:border-[#ff2f9d]/65 dark:border-white/[0.07] dark:bg-[#15121d] dark:hover:border-[#ff2f9d] sm:w-[48%] md:w-[38%] lg:w-[30%]">
               <div className="relative h-[70px] w-[50px] shrink-0 overflow-hidden rounded-xl bg-[#ebe9f4] dark:bg-[#2b273b]">
                 <Image src={item.poster || "/brand/7xanime-mark.svg"} alt={item.name} fill sizes="72px" className="object-cover" unoptimized />
                 <AnimeLanguageBadges animeId={String(item.id)} titles={[item.name, item.jname || ""]} />
