@@ -6,7 +6,6 @@ import { Search, SearchX } from "lucide-react";
 import { ROUTES } from "@/constants/routes";
 import AnimeCard from "@/components/anime-card";
 
-import BlurFade from "@/components/ui/blur-fade";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useGetSearchAnimeResults } from "@/query/get-search-results";
 import Pagination from "@/components/common/pagination";
@@ -229,18 +228,17 @@ const SearchResults = () => {
         </div>
       )}
       <div className="grid w-full grid-cols-2 content-start gap-x-3 gap-y-5 sm:grid-cols-3 sm:gap-4 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7">
-        {searchResults?.animes.map((anime, idx) => (
-          <BlurFade key={idx} delay={idx * 0.05} inView>
-            <AnimeCard
-              title={anime.name}
-              format={anime.type}
-              poster={anime.poster}
-              href={ROUTES.animeDetails(anime.id)}
-              quickWatchHref={ROUTES.watchAnime(anime.id)}
-              className="self-center justify-self-center"
-              showGenre={false}
-            />
-          </BlurFade>
+        {searchResults?.animes.map((anime) => (
+          <AnimeCard
+            key={anime.id}
+            title={anime.name}
+            format={anime.type}
+            poster={anime.poster}
+            href={ROUTES.animeDetails(anime.id)}
+            quickWatchHref={ROUTES.watchAnime(anime.id)}
+            className="w-full min-w-0"
+            showGenre={false}
+          />
         ))}
       </div>
       {searchResults && searchResults.totalPages && (
