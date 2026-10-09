@@ -88,7 +88,7 @@ export default function NavBar() {
           <div className="flex min-w-0 items-center justify-end gap-1.5 sm:gap-2 lg:gap-2.5">
 
             <Link href={ROUTES.SEARCH} aria-label="Explore anime" title="Explore" className="grid h-9 w-9 place-items-center rounded-xl text-[#bdb5d6] transition-colors hover:bg-white/[0.07] hover:text-white lg:hidden"><Compass className="h-5 w-5" /></Link>
-            <button type="button" onClick={openRandomAnime disabled={randomLoading} aria-label="Surprise me with a random anime" title="Random anime" className="grid h-9 w-9 shrink-0 place-items-center rounded-xl text-[#bdb5d6] transition-colors hover:bg-white/[0.07] hover:text-white disabled:opacity-50"><Shuffle className={`h-[21px] w-[21px] ${randomLoading ? "animate-pulse" : ""}`} /></button>
+            <button type="button" onClick={openRandomAnime} disabled={randomLoading} aria-label="Surprise me with a random anime" title="Random anime" className="grid h-9 w-9 shrink-0 place-items-center rounded-xl text-[#bdb5d6] transition-colors hover:bg-white/[0.07] hover:text-white disabled:opacity-50"><Shuffle className={`h-[21px] w-[21px] ${randomLoading ? "animate-pulse" : ""}`} /></button>
             <button type="button" onClick={() => setSearchOpen(true)} aria-label="Search anime" title="Search anime" className="grid h-9 w-9 shrink-0 place-items-center rounded-xl text-[#bdb5d6] transition-colors hover:bg-white/[0.07] hover:text-white"><Search className="h-[22px] w-[22px]" /></button>
             {auth.auth ? <NavbarAvatar auth={auth} /> : <LoginPopoverButton />}
           </div>
