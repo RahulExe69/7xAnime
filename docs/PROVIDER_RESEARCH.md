@@ -49,3 +49,25 @@
 - Consumet fork README / self-hosting note: https://github.com/solo12345689/api.consumet.org
 - ani-cli releases: https://github.com/pystardust/ani-cli/releases
 - Anivault API routes and source claims: https://github.com/SH0MIK/Anivault-Scraper
+
+
+## Follow-up review: why the Android provider set failed
+
+### Source-of-truth and runtime findings
+
+The bundled Kuhi pin in `.github/scripts/fetch-kuhi-backend.sh` is `aryaniiil/anime-api@d9a785ad030d6fc6a8ad709291be9612c864449e`. At this audit, GitHub's compare endpoint reported that pin as identical to upstream `main`; the problem is not simply an obviously stale commit. Upstream describes the API as experimental and explicitly disclaims reliability. Its native race uses a 75-second per-provider watch timeout and catches provider exceptions as an empty result, which can hide the difference between a missing episode, an HTTP error, and a timeout.
+
+The Android packaging patch had reduced that 75-second provider timeout to 8 seconds and wrapped the whole extraction route in a 10-second deadline. The client request timeout was 20 seconds. That mismatch is a confirmed local implementation defect and a strong possible cause of the broad failures seen in the phone screenshots. The follow-up branch changes the packaged provider budget to 22 seconds, raises the local route to 28 seconds and the frontend timeout to 32 seconds. It records sanitized per-provider outcomes for timeout, request exception, empty result, unsupported format, or usable streams, and returns Auto-race outcomes to the picker so failures for the active anime/episode/audio can be hidden and retried. This is still a hypothesis about upstream failures until the new diagnostic output is reviewed on a phone; 22 seconds may not cover every cold, multi-request extraction.
+
+### Newly checked candidate repositories
+
+- **Anivexa-API** ([repository](https://github.com/walterwhite-69/Anivexa-API)): current repository contains 12 JavaScript provider modules and requires a Node service with Playwright Core and `wreq-js`. It documents self-hosting and warns that shared datacenter IPs are often blocked. GitHub did not expose a root LICENSE file at the expected path during this audit, so do not copy its scraper modules into this repository or assume a public endpoint exists. It is a candidate only for a remote adapter after a base URL is deployed, reuse terms are established, and its response contract and stream playback are tested.
+- **amvstrm-ani-api** ([repository](https://github.com/saurabhgangule/amvstrm-ani-api)): GPL-3.0, with `https://api.amvstr.me` documented as the official base. The endpoint could not be independently confirmed live in this audit (the earlier endpoint probe returned a gateway error, and direct retrieval was unavailable to the browser tool). Do not add a picker entry based on a README URL alone; retry a live health/schema probe before enabling it.
+- **Anivault-Scraper** ([repository](https://github.com/SH0MIK/Anivault-Scraper)): documents AnimeHeaven and Anikoto extraction routes and a Node/TypeScript service. No root LICENSE file was found in the expected path and no independently verified public base URL was identified. Prefer a user-owned deployment plus a configurable remote adapter; Anikoto would duplicate the existing Kuhi route.
+- **Streambert** is still a desktop client rather than a server. Its source families must be assessed individually; do not expose one fake “Streambert” server.
+- **Seanime** is a self-hosted server/extension system; the appropriate integration is a user-configured Seanime endpoint, not bundling its whole stack.
+- **Consumet/AniProject** require a verified repository/deployment; the public deployment claims in the supplied links do not currently establish a dependable source. **Anify** reports its former proxy approach is no longer maintained, and **ani-cli** is a shell CLI rather than a portable Android API.
+
+### Integration gate
+
+A source becomes selectable only when a supported adapter is present, its external requirements are configured, it returns normalized streams, and a real Android playback attempt confirms the URL/headers/media type work. Module import, a successful API response, or a repository's “active” table are not sufficient evidence. The three outcomes remain distinct: module loaded, usable stream extracted, and playback actually started. No additional external backend has been deployed as part of this audit, so these candidates are researched but not yet shipped as available servers.
