@@ -1,73 +1,35 @@
 "use client";
 
-import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CalendarDays, House, Search, UserRound } from "lucide-react";
-
+import { Bookmark, CalendarDays, House, LayoutGrid, Trophy } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ROUTES } from "@/constants/routes";
-import { useAuthStore } from "@/store/auth-store";
+
+const items = [
+  { label: "Home", icon: House, href: ROUTES.HOME, active: (path: string) => path === ROUTES.HOME },
+  { label: "Browse", icon: LayoutGrid, href: ROUTES.SEARCH, active: (path: string) => path.startsWith(ROUTES.SEARCH) },
+  { label: "Top", icon: Trophy, href: "/#trending", active: (_path: string) => false },
+  { label: "Schedule", icon: CalendarDays, href: "/#schedule", active: (path: string) => path.startsWith("/schedule") },
+  { label: "My List", icon: Bookmark, href: "/library", active: (path: string) => path.startsWith("/library") },
+];
 
 export default function BottomNav() {
-  const pathname = usePathname();
-  const auth = useAuthStore();
-
-  // Keep navigation off the dedicated video player surface on small screens.
-  if (pathname?.replace(/\/$/, "") === ROUTES.WATCH) return null;
-
-  const items = [
-    {
-      label: "Home",
-      icon: House,
-      href: ROUTES.HOME,
-      active: pathname === ROUTES.HOME,
-    },
-    {
-      label: "Browse",
-      icon: Search,
-      href: ROUTES.SEARCH,
-      active: pathname?.startsWith(ROUTES.SEARCH) ?? false,
-    },
-    {
-      label: "Schedule",
-      icon: CalendarDays,
-      href: "/#schedule",
-      active: false,
-    },
-  ];
-
-  if (auth.auth?.username) {
-    items.push({
-      label: "Profile",
-      icon: UserRound,
-      href: ROUTES.profile(auth.auth.username),
-      active: pathname?.startsWith(ROUTES.PROFILE) ?? false,
-    });
-  }
+  const pathname = usePathname() || ROUTES.HOME;
+  if (pathname.replace(/\/$/, "") === ROUTES.WATCH) return null;
 
   return (
-    <nav
-      aria-label="Primary mobile navigation"
-      className="fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+0.75rem)] z-[120] flex justify-center px-4 lg:hidden"
-    >
-      <div className="flex max-w-full items-center gap-1 rounded-full border border-white/10 bg-[#101014]/90 px-2 py-2 shadow-2xl shadow-black/40 backdrop-blur-xl">
-        {items.map(({ label, icon: Icon, href, active }) => (
-          <Link
-            key={label}
-            href={href}
-            aria-current={active ? "page" : undefined}
-            className={cn(
-              "flex min-w-[4rem] flex-col items-center gap-1 rounded-full px-3 py-2 text-[10px] font-medium transition-colors duration-150 sm:min-w-[4.75rem]",
-              active
-                ? "bg-[#ff2f9d]/10 text-violet-300"
-                : "text-zinc-400 hover:bg-white/5 hover:text-white",
-            )}
-          >
-            <Icon aria-hidden="true" className="h-[18px] w-[18px]" />
-            <span>{label}</span>
-          </Link>
-        ))}
+    <nav aria-label="Primary mobile navigation" className="fixed inset-x-0 bottom-0 z-[120] border-t border-[#dedbea] bg-white/95 pb-[env(safe-area-inset-bottom)] shadow-[0_-3px_16px_rgba(48,36,90,0.035)] backdrop-blur-xl dark:border-[#2a2738] dark:bg-[#12111a]/95 lg:hidden">
+      <div className="mx-auto grid min-h-[66px] max-w-[620px] grid-cols-5">
+        {items.map(({ label, icon: Icon, href, active }) => {
+          const selected = active(pathname);
+          return (
+            <Link key={label} href={href} aria-current={selected ? "page" : undefined} className={cn("flex min-w-0 flex-col items-center justify-center gap-1 px-1 py-2 text-[10px] font-semibold leading-tight transition-colors sm:text-xs", selected ? "text-[#604bd3] dark:text-[#b5a8ff]" : "text-[#68637e] hover:text-[#604bd3] dark:text-[#aaa5c0] dark:hover:text-[#c7bdff]")}>
+              <Icon className={cn("h-[21px] w-[21px] sm:h-6 sm:w-6", selected && "stroke-[2.5]")} aria-hidden="true" />
+              <span className="truncate">{label}</span>
+            </Link>
+          );
+        })}
       </div>
     </nav>
   );
