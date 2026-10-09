@@ -89,12 +89,12 @@ const AnimeCard = ({ displayDetails = true, variant = "sm", ...props }: Props) =
           </span>
         )}
         {props.episodeCard && !!props.episodes && !props.episodeLabel && (
-          <span className="absolute bottom-2 left-2 z-[5] rounded-lg border border-white/10 bg-[#08060d]/85 px-2 py-1 text-[10px] font-bold text-white backdrop-blur-sm">
+          <span className="absolute left-2 top-10 z-[5] rounded-lg border border-white/10 bg-[#08060d]/85 px-2 py-1 text-[10px] font-bold text-white backdrop-blur-sm">
             EP {props.episodes}
           </span>
         )}
         {props.episodeLabel && !props.watchDetail && (
-          <span className="absolute bottom-2 left-2 z-[5] max-w-[calc(100%-1rem)] truncate rounded-lg border border-white/10 bg-[#08060d]/85 px-2 py-1 text-[10px] font-bold text-white backdrop-blur-sm">
+          <span className="absolute left-2 top-10 z-[5] max-w-[calc(100%-1rem)] truncate rounded-lg border border-white/10 bg-[#08060d]/85 px-2 py-1 text-[10px] font-bold text-white backdrop-blur-sm">
             {props.episodeLabel}
           </span>
         )}
