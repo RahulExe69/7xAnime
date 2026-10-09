@@ -78,11 +78,14 @@ export default function SearchOverlay({ open, onClose }: Props) {
               <div className="space-y-2">{[0,1,2,3,4].map((key) => <div key={key} className="flex animate-pulse gap-3 rounded-xl bg-[#efedf7] p-2.5 dark:bg-[#1d1a28]"><div className="h-16 w-12 rounded-lg bg-[#e1deee] dark:bg-[#343044]" /><div className="flex-1 space-y-2 pt-2"><div className="h-3 w-4/5 rounded bg-[#e1deee] dark:bg-[#343044]" /><div className="h-3 w-2/5 rounded bg-[#e1deee] dark:bg-[#343044]" /></div></div>)}</div>
             ) : results?.length ? (
               <div className="space-y-1.5">{results.slice(0, 10).map((anime) => (
-                <Link key={anime.id} href={ROUTES.animeDetails(anime.id)} onClick={onClose} className="flex items-center gap-3 rounded-xl p-2.5 transition hover:bg-[#eeebf7] dark:hover:bg-white/[0.06]">
+                <div key={anime.id} className="flex items-center gap-2 rounded-xl p-2.5 transition hover:bg-[#eeebf7] dark:hover:bg-white/[0.06]">
+                  <Link href={ROUTES.watchAnime(anime.id)} onClick={onClose} aria-label={`Watch ${anime.name || anime.jname}`} className="flex min-w-0 flex-1 items-center gap-3">
                   <div className="relative h-[70px] w-[50px] shrink-0 overflow-hidden rounded-lg bg-[#e8e5f1] dark:bg-[#262233]"><Image src={anime.poster || "/brand/7xanime-mark.svg"} alt={anime.name} fill sizes="50px" className="object-cover" unoptimized /></div>
                   <div className="min-w-0 flex-1"><p className="line-clamp-2 text-sm font-bold text-[#28243f] dark:text-white">{anime.name || anime.jname}</p><p className="mt-1 text-xs text-[#7f7996] dark:text-[#aaa4c0]">{anime.moreInfo?.filter(Boolean).join(" · ") || anime.type || "Anime"}</p></div>
-                  <span className="px-2 text-xs font-semibold text-[#8b83a3]">›</span>
-                </Link>
+                  <span className="px-1 text-xs font-semibold text-[#8b83a3]">▶</span>
+                  </Link>
+                  <Link href={ROUTES.animeDetails(anime.id)} onClick={onClose} title={`Details for ${anime.name || anime.jname}`} aria-label={`Details for ${anime.name || anime.jname}`} className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-[#dedbea] text-[#77718f] hover:bg-[#ded8f5] dark:border-[#38344a] dark:text-[#bdb6d2] dark:hover:bg-white/10"><span aria-hidden="true">i</span></Link>
+                </div>
               ))}</div>
             ) : (
               <div className="rounded-2xl border border-[#e4e0ef] bg-white px-4 py-10 text-center dark:border-[#2c2939] dark:bg-[#191724]"><Search className="mx-auto mb-3 h-7 w-7 text-[#8e86a8]" /><p className="font-semibold">No matches found</p><p className="mt-1 text-sm text-[#8a849e] dark:text-[#a49eb8]">Try a shorter title or an alternate name.</p></div>

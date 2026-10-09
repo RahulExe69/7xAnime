@@ -1,7 +1,8 @@
 import React from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Play } from "lucide-react";
+import { Info } from "lucide-react";
+import AnimeLanguageBadges from "@/components/anime-language-badges";
 
 import { cn, formatSecondsToMMSS } from "@/lib/utils";
 import { ROUTES } from "@/constants/routes";
@@ -25,6 +26,7 @@ type Props = {
   watchDetail?: WatchHistory | null;
   episodeLabel?: string | null;
   statusLabel?: string | null;
+  animeId?: string | number;
 };
 
 const formatScore = (score?: number | null) => {
@@ -39,6 +41,20 @@ const AnimeCard = ({ displayDetails = true, variant = "sm", ...props }: Props) =
   const percentage = safeTotal > 0 ? (clampedCurrent / safeTotal) * 100 : 0;
   const score = formatScore(props.score);
   const detailsHref = props.href || ROUTES.HOME;
+  const getAnimeId = () => {
+    if (props.animeId !== undefined && props.animeId !== null) return String(props.animeId);
+    try {
+      const route = new URL(props.quickWatchHref || detailsHref, "https://7xanime.local");
+      const queryId = route.searchParams.get("id") || route.searchParams.get("anime");
+      if (queryId) return queryId;
+      const legacyPathId = route.pathname.match(/^\\/anime\\/([^/]+)$/)?.[1];
+      return legacyPathId ? decodeURIComponent(legacyPathId) : "";
+    } catch {
+      return "";
+    }
+  };
+  const animeId = getAnimeId();
+  const playHref = props.quickWatchHref || (animeId ? ROUTES.watchAnime(animeId) : detailsHref);
 
   return (
     <div className={cn(
@@ -63,7 +79,7 @@ const AnimeCard = ({ displayDetails = true, variant = "sm", ...props }: Props) =
           </span>
         )}
         {props.episodeCard && !!props.episodes && (
-          <span className="absolute left-2 top-2 rounded-lg bg-[#12111c]/90 px-2.5 py-1.5 text-[11px] font-bold text-white shadow-sm">
+          <span className="absolute left-2 top-10 z-20 rounded-lg bg-[#12111c]/90 px-2.5 py-1.5 text-[11px] font-bold text-white shadow-sm">
             EP {props.episodes}
           </span>
         )}
@@ -78,15 +94,15 @@ const AnimeCard = ({ displayDetails = true, variant = "sm", ...props }: Props) =
             {props.episodeLabel}
           </span>
         )}
-        <Link href={detailsHref} aria-label={`View details for ${props.title}`} className="absolute inset-0 z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#6b55d9]">
-          <span className="sr-only">View details for {props.title}</span>
+        <Link href={playHref} aria-label={`Watch ${props.title}`} className="absolute inset-0 z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#6b55d9]">
+          <span className="sr-only">Watch {props.title}</span>
         </Link>
-        {props.quickWatchHref && (
-          <Link href={props.quickWatchHref} title={`Watch ${props.title} now`} aria-label={`Watch ${props.title} now`} className="absolute bottom-2 right-2 z-20 inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/35 bg-[#604bd3] text-white shadow-lg shadow-black/30 transition hover:scale-105 hover:bg-[#5038c4] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white sm:h-10 sm:w-10 sm:group-hover:w-auto sm:group-hover:rounded-full sm:group-hover:px-3">
-            <Play className="ml-0.5 h-4 w-4 fill-current" />
-            <span className="hidden pl-1 text-xs font-bold sm:group-hover:inline">Watch now</span>
+        {animeId && (
+          <Link href={detailsHref} title={`Details for ${props.title}`} aria-label={`Details for ${props.title}`} className="absolute bottom-2 right-2 z-30 grid h-8 w-8 place-items-center rounded-full border border-white/25 bg-black/75 text-white shadow-lg backdrop-blur transition hover:bg-[#604bd3] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white">
+            <Info className="h-4 w-4" />
           </Link>
         )}
+        {animeId && <AnimeLanguageBadges animeId={animeId} titles={[props.title, props.subTitle || ""].filter(Boolean)} />}
       </div>
 
       {displayDetails && (

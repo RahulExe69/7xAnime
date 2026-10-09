@@ -83,6 +83,31 @@ const seasonFromTitle = (title: string) => {
   return Number(match?.[1] || match?.[2]) || 0;
 };
 
+/** Strict badge lookup: only announce Hindi when an exact title/alias has a playable episode-1 embed. */
+export async function hasHindiDubForAnime(titles: string[]): Promise<boolean> {
+  const queries = [...new Set(titles.map((title) => title.trim()).filter(Boolean))].slice(0, 3);
+  for (const title of queries) {
+    try {
+      const body = await getHindiJson<any>("search", { s: title, page: 1 });
+      const titleKey = normalize(title);
+      const candidate = parseCandidates(body).find((item) =>
+        normalize(item.title) === titleKey || normalize(item.anime_id.replace(/-/g, " ")) === titleKey,
+      );
+      if (!candidate) continue;
+
+      const season = seasonFromTitle(candidate.title) || Number(candidate.season) || 1;
+      const seasons = [...new Set([season, ...(season > 1 ? [1] : [])])];
+      for (const candidateSeason of seasons) {
+        const streams = await getHindiJson<any>("stream", { id: candidate.anime_id, season: candidateSeason, ep: 1 });
+        if (parseEmbeds(streams).length > 0) return true;
+      }
+    } catch {
+      // Unknown/unavailable means no Hindi badge: do not advertise unverified language support.
+    }
+  }
+  return false;
+}
+
 export async function getHindiDubStreams(
   titles: string[],
   episode: number,
