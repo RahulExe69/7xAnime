@@ -268,7 +268,7 @@ def patch_adblock_dependency() -> None:
     """Add the Android-native EasyList-compatible engine to the generated app module."""
     path = ANDROID / "app/build.gradle"
     text = path.read_text(encoding="utf-8")
-    dependency = "implementation 'com.github.Edsuns.AdblockAndroid:ad-filter:a585487eb1'"
+    dependency = "implementation 'com.github.Edsuns.AdblockAndroid:ad-filter:v0.9.1'"
     if dependency in text:
         return
 
