@@ -33,7 +33,7 @@ const EpisodePlaylist = ({
   const episodeNumberParam = searchParams.get("ep");
   const isLatestEpisode = searchParams.get("type");
 
-  const { setSelectedEpisode } = useAnimeStore();
+  const { selectedEpisode, setSelectedEpisode } = useAnimeStore();
 
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const episodeRefs = useRef<(HTMLDivElement | null)[]>([]);
