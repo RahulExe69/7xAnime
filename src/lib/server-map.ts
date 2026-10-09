@@ -1,4 +1,11 @@
-export type ProviderInfo = { name: string; site: string };
+export type ProviderAudio = "sub" | "dub";
+
+export type ProviderInfo = {
+  name: string;
+  site: string;
+  audio: readonly ProviderAudio[];
+  formats: readonly ("hls" | "mp4" | "embed" | "dash")[];
+};
 
 export const KUHI_PROVIDER_ORDER = [
   "anineko", "anizone", "anikoto", "reanime", "aniwaves",
@@ -6,20 +13,27 @@ export const KUHI_PROVIDER_ORDER = [
 ] as const;
 
 /**
- * The pinned Kuhi provider ranking. A provider without episodes for an anime
- * is omitted. Server 1 is reserved for MegaPlay; upstream providers start at Server 2.
+ * Embedded Kuhi provider capabilities from the pinned adapters/documentation.
+ * These are general capabilities, not a promise that every title/episode has a stream.
+ * DASH-only results are deliberately excluded until a DASH player is bundled.
  */
 export const PROVIDER_INFO: Record<string, ProviderInfo> = {
-  anineko: { name: "AniNeko", site: "https://anineko.to" },
-  anizone: { name: "AniZone", site: "https://anizone.to" },
-  anikoto: { name: "AniKoto", site: "https://anikototv.to" },
-  reanime: { name: "ReAnime", site: "https://reanime.to" },
-  aniwaves: { name: "AniWaves", site: "https://aniwaves.ru" },
-  kaa: { name: "KAA", site: "https://kaa.lt" },
-  anibd: { name: "AniBD", site: "https://epeng.animeapps.top" },
-  animegg: { name: "AnimeGG", site: "https://www.animegg.org" },
-  mkissa: { name: "MKissa", site: "https://mkissa.to" },
-  animeonsen: { name: "AnimeOnsen", site: "https://www.animeonsen.xyz" },
+  anineko: { name: "AniNeko", site: "https://anineko.to", audio: ["sub", "dub"], formats: ["hls", "embed"] },
+  anizone: { name: "AniZone", site: "https://anizone.to", audio: ["sub"], formats: ["hls"] },
+  anikoto: { name: "AniKoto", site: "https://anikototv.to", audio: ["sub", "dub"], formats: ["hls", "mp4", "embed"] },
+  reanime: { name: "ReAnime", site: "https://reanime.to", audio: ["sub", "dub"], formats: ["hls"] },
+  aniwaves: { name: "AniWaves", site: "https://aniwaves.ru", audio: ["sub", "dub"], formats: ["hls", "embed"] },
+  kaa: { name: "KAA", site: "https://kaa.lt", audio: ["sub", "dub"], formats: ["hls"] },
+  anibd: { name: "AniBD", site: "https://epeng.animeapps.top", audio: ["sub"], formats: ["hls", "embed"] },
+  animegg: { name: "AnimeGG", site: "https://www.animegg.org", audio: ["sub", "dub"], formats: ["hls", "mp4", "embed"] },
+  mkissa: { name: "MKissa", site: "https://mkissa.to", audio: ["sub", "dub"], formats: ["hls", "mp4", "embed"] },
+  animeonsen: { name: "AnimeOnsen", site: "https://www.animeonsen.xyz", audio: ["sub"], formats: ["dash"] },
+};
+
+export const isProviderSelectable = (providerName: string, category: ProviderAudio): boolean => {
+  const provider = PROVIDER_INFO[providerName.toLowerCase()];
+  if (!provider) return true;
+  return provider.audio.includes(category) && provider.formats.some((format) => format !== "dash");
 };
 
 export const getServerLabel = (providerNames: string[], providerName: string): string => {
