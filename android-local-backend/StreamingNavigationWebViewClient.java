@@ -162,6 +162,7 @@ public final class StreamingNavigationWebViewClient extends BridgeWebViewClient 
         Uri url = Uri.parse(rawUrl == null ? "" : rawUrl);
         if (isExternalTopLevel(url)) {
             Log.d(TAG, "Blocked external top-level navigation: " + url.getScheme() + "://" + url.getHost());
+            reportBlockedNavigation(view, url);
             return true;
         }
         return super.shouldOverrideUrlLoading(view, rawUrl);
