@@ -30,6 +30,17 @@ export const getServerLabel = (providerNames: string[], providerName: string): s
   return providerName.toLowerCase() === "auto" ? "Automatic server selection" : "Unnumbered provider";
 };
 
+export const getProviderDisplayName = (providerName: string): string => {
+  const normalized = (providerName || "").toLowerCase();
+  const provider = PROVIDER_INFO[normalized];
+  if (provider) return provider.name;
+  if (normalized === "auto") return "Auto";
+  if (!normalized) return "Unknown provider";
+  return normalized.replace(/(^|[-_])([a-z])/g, (_match, prefix: string, letter: string) =>
+    `${prefix ? " " : ""}${letter.toUpperCase()}`,
+  );
+};
+
 export const getServerProviderTitle = (providerNames: string[], providerName: string): string => {
   const label = getServerLabel(providerNames, providerName);
   const provider = PROVIDER_INFO[providerName.toLowerCase()];
