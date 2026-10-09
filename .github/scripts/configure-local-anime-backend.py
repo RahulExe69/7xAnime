@@ -259,29 +259,29 @@ def register_plugin(main_activity: Path) -> None:
     if "import com.getcapacitor.BridgeActivity;" not in text:
         text = add_import(text, "import com.getcapacitor.BridgeActivity;")
 
-    on_create = re.search(r"(?s)void\\s+onCreate\\s*\\([^)]*\\)\\s*\\{", text)
+    on_create = re.search(r"(?s)void\s+onCreate\s*\([^)]*\)\s*\{", text)
     if not on_create:
-        class_match = re.search(r"class\\s+MainActivity\\s+extends\\s+BridgeActivity\\s*\\{", text)
+        class_match = re.search(r"class\s+MainActivity\s+extends\s+BridgeActivity\s*\{", text)
         if not class_match:
             fail("Could not locate MainActivity.onCreate or class declaration.")
         text = add_import(text, "import android.os.Bundle;")
-        class_match = re.search(r"class\\s+MainActivity\\s+extends\\s+BridgeActivity\\s*\\{", text)
+        class_match = re.search(r"class\s+MainActivity\s+extends\s+BridgeActivity\s*\{", text)
         close = text.rfind("}")
         if close < class_match.end():
             fail("Could not locate MainActivity class terminator.")
         method = (
-            "\\n    @Override\\n"
-            "    public void onCreate(Bundle savedInstanceState) {\\n"
-            "        registerPlugin(LocalAnimeBackendPlugin.class);\\n"
-            "        registerPlugin(PlayerFullscreenPlugin.class);\\n"
-            "        super.onCreate(savedInstanceState);\\n"
-            "    }\\n"
+            "\n    @Override\n"
+            "    public void onCreate(Bundle savedInstanceState) {\n"
+            "        registerPlugin(LocalAnimeBackendPlugin.class);\n"
+            "        registerPlugin(PlayerFullscreenPlugin.class);\n"
+            "        super.onCreate(savedInstanceState);\n"
+            "    }\n"
         )
         text = text[:close] + method + text[close:]
     else:
         remaining = text[on_create.end():]
         super_call = re.search(
-            r"super\\.onCreate\\s*\\(\\s*savedInstanceState\\s*\\)\\s*;",
+            r"super\.onCreate\s*\(\s*savedInstanceState\s*\)\s*;",
             remaining,
         )
         if not super_call:
@@ -293,7 +293,7 @@ def register_plugin(main_activity: Path) -> None:
             missing_registrations.append("registerPlugin(PlayerFullscreenPlugin.class);")
         if missing_registrations:
             position = on_create.end() + super_call.start()
-            insert = "\\n        " + "\\n        ".join(missing_registrations) + "\\n        "
+            insert = "\n        " + "\n        ".join(missing_registrations) + "\n        "
             text = text[:position] + insert + text[position:]
     main_activity.write_text(text, encoding="utf-8")
 
@@ -325,13 +325,13 @@ def install_streaming_chrome_client(main_activity: Path) -> None:
         return
 
     super_call = re.search(
-        r"super\\.onCreate\\s*\\(\\s*savedInstanceState\\s*\\)\\s*;",
+        r"super\.onCreate\s*\(\s*savedInstanceState\s*\)\s*;",
         text,
     )
     if not super_call:
         fail("Could not find MainActivity.onCreate super call to install fullscreen Chrome client.")
     position = super_call.end()
-    text = text[:position] + "\\n        " + statement + text[position:]
+    text = text[:position] + "\n        " + statement + text[position:]
     main_activity.write_text(text, encoding="utf-8")
 
 
