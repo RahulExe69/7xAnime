@@ -54,52 +54,8 @@ jobs:
       - name: Install SVG renderer for Android launcher icons
         run: python -m pip install --disable-pip-version-check cairosvg
 
-      - name: Smoke test pinned Python API
-        run: |
-          python -m pip install --disable-pip-version-check -r android-local-backend/requirements-android.txt
-          PYTHONPATH="android-local-backend:$KUHI_SOURCE_DIR" python - <<'PY'
-          import local_api
-          from fastapi.testclient import TestClient
-          from src.providers import _race
-
-          providers = _race.providers()
-          if not providers:
-              raise SystemExit("Kuhi loaded no native providers")
-          print("Local API import OK; providers:", ", ".join(name for name, _ in providers))
-
-          assert local_api._episode_number_from_slug("anineko-12") == 12
-          assert local_api._episode_number_from_slug("episode-3") == 3
-          assert local_api._validated_remote_url("https://example.com/master.m3u8").startswith("https://")
-          try:
-              local_api._validated_remote_url("http://127.0.0.1/private")
-          except ValueError:
-              pass
-          else:
-              raise SystemExit("Loopback URL validation did not reject a private target")
-
-          # Smoke-test loopback auth and the Capacitor WebView's CORS preflight without network access.
-          with TestClient(local_api.app) as client:
-              health = client.get("/api/health")
-              assert health.status_code == 200 and health.json()["status"] == "ok"
-              unauthorized = client.get("/spotlight")
-              assert unauthorized.status_code == 403
-              preflight = client.options(
-                  "/spotlight",
-                  headers={
-                      "Origin": "https://localhost",
-                      "Access-Control-Request-Method": "GET",
-                      "Access-Control-Request-Headers": "x-7xanime-token",
-                  },
-              )
-              assert preflight.status_code == 200
-              assert preflight.headers.get("access-control-allow-origin") == "https://localhost"
-          print("Local API health, auth guard, slug parsing, and CORS checks passed.")
-          PY
-
-      - name: Run local API contract tests
-        env:
-          PYTHONPATH: android-local-backend:${{ env.KUHI_SOURCE_DIR }}
-        run: python .github/scripts/test-local-anime-backend.py
+      - name: Install Android backend test dependencies
+        run: python -m pip install --disable-pip-version-check -r android-local-backend/requirements-android.txt
 
       - name: Setup Java 21
         uses: actions/setup-java@v5
@@ -140,6 +96,68 @@ jobs:
         run: |
           python3 .github/scripts/configure-capacitor-android.py
           python3 .github/scripts/configure-local-anime-backend.py
+
+      # Test the exact patched Python tree that Chaquopy packages in the APK,
+      # not the raw upstream checkout that still contains Python 3.12-only syntax.
+      - name: Smoke test packaged Kuhi providers
+        env:
+          PYTHONPATH: android/app/src/main/python:android-local-backend
+        run: |
+          python - <<'PY'
+          import local_api
+          from fastapi.testclient import TestClient
+          from src.providers import _race
+
+          expected = {
+              "anineko", "anizone", "anikoto", "reanime", "aniwaves",
+              "kaa", "anibd", "animegg", "mkissa", "animeonsen",
+          }
+          providers = _race.providers()
+          loaded_names = {name for name, _ in providers}
+          print("Packaged Kuhi providers:", ", ".join(name for name, _ in providers))
+          missing = expected - loaded_names
+          if missing:
+              raise SystemExit(f"Packaged API failed to load required providers: {sorted(missing)}")
+
+          assert local_api._episode_number_from_slug("anineko-12") == 12
+          assert local_api._episode_number_from_slug("episode-3") == 3
+          assert local_api._validated_remote_url("https://example.com/master.m3u8").startswith("https://")
+          try:
+              local_api._validated_remote_url("http://127.0.0.1/private")
+          except ValueError:
+              pass
+          else:
+              raise SystemExit("Loopback URL validation did not reject a private target")
+
+          with TestClient(local_api.app) as client:
+              health = client.get("/api/health")
+              assert health.status_code == 200 and health.json()["status"] == "ok"
+              unauthorized = client.get("/spotlight")
+              assert unauthorized.status_code == 403
+              preflight = client.options(
+                  "/spotlight",
+                  headers={
+                      "Origin": "https://localhost",
+                      "Access-Control-Request-Method": "GET",
+                      "Access-Control-Request-Headers": "x-7xanime-token",
+                  },
+              )
+              assert preflight.status_code == 200
+              assert preflight.headers.get("access-control-allow-origin") == "https://localhost"
+              status = client.get(
+                  "/api/diagnostics/providers",
+                  headers={"X-7xAnime-Token": local_api.get_token()},
+              )
+              assert status.status_code == 200, status.text
+              reported = {item["id"] for item in status.json()["providers"] if item["moduleLoaded"]}
+              assert expected <= reported, f"Diagnostics do not list all packaged providers: {sorted(expected - reported)}"
+          print("Packaged API: all 10 providers loaded; health, auth, diagnostics and CORS passed.")
+          PY
+
+      - name: Run packaged API contract tests
+        env:
+          PYTHONPATH: android/app/src/main/python:android-local-backend
+        run: python .github/scripts/test-local-anime-backend.py
 
       - name: Build Debug APK
         working-directory: android
