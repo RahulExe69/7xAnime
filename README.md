@@ -69,10 +69,12 @@ More details, optional Google OAuth setup, and the Android HTTPS endpoint requir
 ## Android APK with an on-device API
 
 The Android debug build now has an experimental **local-backend** path: the APK bundles
-a Python runtime and a pinned Kuhi API snapshot plus an additional embed-first AnimeNoSub
-adapter, starts the API on `127.0.0.1:8000`, and routes catalog, episode extraction, and
-media proxy requests through that loopback service. The local provider list includes eleven
-modules (ten from Kuhi, plus AnimeNoSub). This path does **not** require the three hosted API/proxy/PocketBase Actions
+a Python runtime and a pinned Kuhi API snapshot plus three independently authored adapters
+(AnimeNoSub, AniXo, and Megavid), starts the API on `127.0.0.1:8000`, and routes catalog,
+episode extraction, and media proxy requests through that loopback service. The local
+provider registry includes thirteen modules (ten from Kuhi, plus those three adapters).
+AniXo and Megavid are manual-only iframe routes and are deliberately excluded from Auto:
+a returned embed URL is not proof that the selected episode actually plays. This path does **not** require the three hosted API/proxy/PocketBase Actions
 secrets or a server we own.
 
 The app still uses the internet to reach AniList, providers, and stream CDNs. The
