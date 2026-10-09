@@ -44,7 +44,13 @@ export default function AnimeShelf({ title, items = [], loading = false, icon, e
           const titleText = anime.title?.english || anime.title?.romaji || anime.title?.native || "Untitled";
           const poster = anime.coverImage?.extraLarge || anime.coverImage?.large || "";
           const nextEpisode = anime.nextAiringEpisode?.episode;
-          const episodeLabel = mode === "new" ? `EP ${anime.episodes || 1}` : nextEpisode ? `EP ${nextEpisode}` : null;
+          // AniList reports the upcoming episode number; the most recently aired
+          // episode is one lower. Only use episode-count as a fallback for titles
+          // with no airing metadata instead of assuming it is the latest episode.
+          const latestEpisode = nextEpisode
+            ? Math.max(1, nextEpisode - 1)
+            : Math.max(1, anime.episodes || 1);
+          const episodeLabel = mode === "new" ? `EP ${latestEpisode}` : nextEpisode ? `EP ${nextEpisode}` : null;
           const statusLabel = anime.seasonYear ? String(anime.seasonYear) : null;
           return <div key={anime.id} className={mode === "new" ? "w-[38%] shrink-0 snap-start sm:w-[28%] md:w-[22%] lg:w-[16%]" : "w-[35%] shrink-0 snap-start sm:w-[28%] md:w-[22%] lg:w-[16%]"}>
             <AnimeCard
@@ -53,12 +59,12 @@ export default function AnimeShelf({ title, items = [], loading = false, icon, e
               poster={poster}
               score={anime.averageScore}
               format={anime.format}
-              episodes={mode === "new" ? anime.episodes : anime.episodes}
+              episodes={anime.episodes}
               episodeCard={false}
               episodeLabel={episodeLabel}
               statusLabel={statusLabel}
               href={ROUTES.animeDetails(anime.id)}
-              quickWatchHref={ROUTES.watchAnime(anime.id, mode === "new" ? anime.episodes || 1 : undefined)}
+              quickWatchHref={ROUTES.watchAnime(anime.id, mode === "new" ? latestEpisode : undefined)}
             />
           </div>;
         })}
