@@ -136,6 +136,7 @@ const VideoPlayerSection = () => {
   const [streamRetryKey, setStreamRetryKey] = useState(0);
   const [providerPlaybackOutcomes, setProviderPlaybackOutcomes] = useState<Record<string, "playing" | "failed">>({});
   const attemptedSourceIdsRef = useRef<Set<string>>(new Set());
+  const blockedPlayerActionAtRef = useRef(0);
   const externalEmbedFrameRef = useRef<HTMLIFrameElement | null>(null);
 
   useEffect(() => {
@@ -694,6 +695,64 @@ const VideoPlayerSection = () => {
       setProviderPlaybackOutcomes((previous) => ({ ...previous, [providerKey]: "playing" }));
     }
   }, [currentProviderName, episodeData?.provider]);
+
+  // Native WebView ad protection emits this event when it cancels a remote
+  // JS dialog, popup window, remote permission request, or top-level redirect.
+  // These are strong signals of a deceptive interstitial; switch servers rather
+  // than leaving the viewer stuck on an empty "robot check" page.
+  useEffect(() => {
+    if (!isLocalBackendEnabled()) return;
+
+    const handleBlockedPlayerAction = (event: Event) => {
+      if (isHindiMode) return;
+      const now = Date.now();
+      if (now - blockedPlayerActionAtRef.current < 900) return;
+      blockedPlayerActionAtRef.current = now;
+
+      const detail = (event as CustomEvent<{ reason?: string; host?: string }>).detail || {};
+      const reason = String(detail.reason || "blocked popup");
+      const host = String(detail.host || "third-party player");
+      const providerKey = useFallback || isFallbackActive ? "megaplay" : currentProviderName;
+
+      if (providerKey && providerKey !== "auto") {
+        setProviderPlaybackOutcomes((previous) => ({ ...previous, [providerKey]: "failed" }));
+      }
+
+      if (useFallback || isFallbackActive) {
+        const next = automaticCandidates.find((candidate) =>
+          !attemptedSourceIdsRef.current.has(candidate.id),
+        ) || automaticCandidates.find((candidate) => candidate.id !== activeEpisodeId)
+          || automaticCandidates[0];
+        if (next) {
+          attemptedSourceIdsRef.current.delete(next.id);
+          setIsHindiMode(false);
+          setUseFallback(false);
+          setPreferredCategory(next.category);
+          setManualProviderPlaybackFailed(false);
+          setPlaybackSourceIndex(0);
+          setLastPlayerError(null);
+          setSelectedEpisode(next.id);
+          updateEpisodeUrl(next.id, currentEpNumber);
+          return;
+        }
+      }
+
+      handlePlayerError(`Blocked ${reason} from ${host}; trying the next server.`);
+    };
+
+    window.addEventListener("7xanime:blocked-player-action", handleBlockedPlayerAction);
+    return () => window.removeEventListener("7xanime:blocked-player-action", handleBlockedPlayerAction);
+  }, [
+    activeEpisodeId,
+    automaticCandidates,
+    currentEpNumber,
+    currentProviderName,
+    handlePlayerError,
+    isFallbackActive,
+    isHindiMode,
+    isLocalBackendEnabled,
+    useFallback,
+  ]);
 
   // Trust player events only from the active iframe and its configured provider origin.
   // Cosmic exposes time/server/complete/error messages for its embedded player.
