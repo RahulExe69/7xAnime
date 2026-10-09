@@ -160,7 +160,7 @@ async def local_health():
     return {"status": "ok", "service": "7xanime-local-api"}
 
 
-@app.get("/providers/status")
+@app.get("/api/diagnostics/providers")
 async def local_provider_status():
     """Expose embedded provider import and recent attempt diagnostics to the app."""
     snapshot = provider_race.providers_status()
