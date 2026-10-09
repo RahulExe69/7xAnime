@@ -10,7 +10,7 @@ from unittest.mock import AsyncMock, patch
 from fastapi.testclient import TestClient
 
 import local_api
-from src.providers import animenosub, anixo, animeparadise, cosmic, megavid
+from src.providers import animenosub, anixo, animeparadise, cinexstream, cosmic, megaflix, megavid, nontongo, tryembed
 
 
 class LocalAnimeApiTests(unittest.TestCase):
@@ -550,6 +550,38 @@ class LocalAnimeApiTests(unittest.TestCase):
 
         asyncio.run(exercise())
 
+    def test_yomi_server_adapters_construct_documented_embed_routes_without_network(self) -> None:
+        context = {
+            "media": {"id": 21, "episodes": 12, "title": {"english": "Test Series"}},
+            "anizip": None,
+        }
+
+        async def exercise() -> None:
+            cases = [
+                (megaflix, "dub", 2, "https://www.megaflix.buzz/stream/ani/21/2/dub", "MegaFlix"),
+                (tryembed, "sub", 3, "https://tryembed.us.cc/embed/anime/21/3/sub", "TryEmbed"),
+                (cinexstream, "dub", 4, "https://cinextream.cc/api/embed/anime/dub/21/4?color=7c6ee0", "CinexStream"),
+                (nontongo, "sub", 5, "https://nontongo.win/anime/21/5/play", "NontonGo"),
+            ]
+            for module, audio, episode, expected_url, label in cases:
+                sources = await module.watch(21, audio, episode, context)
+                self.assertEqual(len(sources), 1, label)
+                self.assertEqual(sources[0]["url"], expected_url, label)
+                self.assertEqual(sources[0]["type"], "embed", label)
+                self.assertEqual(sources[0]["server"], label)
+                self.assertEqual(sources[0]["upstream"], module.NAME)
+                self.assertEqual(sources[0]["referer"], module.BASE + "/")
+                episodes = await module.get_episodes(21, context)
+                self.assertEqual(episodes["episodes"]["sub"][episode - 1]["number"], episode)
+                self.assertEqual(episodes["episodes"]["sub"][episode - 1]["id"], f"watch/{module.NAME}/21/sub/{module.NAME}-{episode}")
+
+            nontongo_episodes = await nontongo.get_episodes(21, context)
+            self.assertEqual(nontongo_episodes["episodes"]["dub"], [])
+            with self.assertRaisesRegex(RuntimeError, "does not support dub"):
+                await nontongo.watch(21, "dub", 1, context)
+
+        asyncio.run(exercise())
+
     def test_auto_race_does_not_call_parked_or_manual_embed_providers(self) -> None:
         attempted = []
 
@@ -562,6 +594,8 @@ class LocalAnimeApiTests(unittest.TestCase):
                 patch.object(local_api.provider_race, "providers", return_value=[
                     ("anineko", object()), ("anixo", anixo), ("megavid", megavid),
                     ("animeparadise", animeparadise), ("cosmic", cosmic),
+                    ("megaflix", megaflix), ("tryembed", tryembed),
+                    ("cinexstream", cinexstream), ("nontongo", nontongo),
                 ]),
                 patch.object(local_api.provider_race, "build_ctx", new=AsyncMock(return_value={
                     "media": {"id": 21, "title": {"english": "Test"}}, "anizip": None,
