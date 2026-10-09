@@ -113,17 +113,20 @@ const getAllEpisodes = async (animeId: string): Promise<IEpisodesData> => {
 
       for (const pName of providerNames) {
         const pData = data.providers[pName]?.episodes;
-        const subMatch = pData?.sub?.find((e) => e.number === epNum);
         const dubMatch = pData?.dub?.find((e) => e.number === epNum);
+        const subMatch = pData?.sub?.find((e) => e.number === epNum);
 
-        if (subMatch) {
-          epDetail = subMatch;
-          fallbackId = subMatch.id;
-          break;
-        }
-        if (dubMatch && !epDetail) {
+        // Prefer an English dub for the episode list's default selection.
+        // Keep a SUB candidate as a fallback while continuing to look for DUB
+        // on other providers before committing to it.
+        if (dubMatch) {
           epDetail = dubMatch;
           fallbackId = dubMatch.id;
+          break;
+        }
+        if (subMatch && !epDetail) {
+          epDetail = subMatch;
+          fallbackId = subMatch.id;
         }
       }
 
