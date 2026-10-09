@@ -617,19 +617,20 @@ const VideoPlayerSection = () => {
     }
   }, [currentProviderName, episodeData?.provider]);
 
-  // AniXo and Megavid expose iframe player events. Treat only a message from
-  // this exact iframe and the provider's own origin as playback evidence. A
-  // route/iframe load alone is not enough to mark the server healthy.
+  // Trust player events only from the active iframe and its configured provider origin.
+  // Cosmic exposes time/server/complete/error messages for its embedded player.
   const observedEmbedProvider = (episodeData?.provider || currentProviderName || "").toLowerCase();
   const observedEmbedSource = episodeData?.sources?.[playbackSourceIndex];
   useEffect(() => {
-    if (
-      !isLocalBackendEnabled() ||
-      observedEmbedSource?.type !== "embed" ||
-      (observedEmbedProvider !== "anixo" && observedEmbedProvider !== "megavid")
-    ) return;
+    if (!isLocalBackendEnabled() || observedEmbedSource?.type !== "embed") return;
 
-    const expectedHost = observedEmbedProvider === "anixo" ? "anixo.buzz" : "megavid.buzz";
+    const expectedHosts: Record<string, string> = {
+      anixo: "anixo.buzz",
+      megavid: "megavid.buzz",
+      cosmic: "cosmic-api-azure.vercel.app",
+    };
+    const expectedHost = expectedHosts[observedEmbedProvider];
+    if (!expectedHost) return;
     const handleEmbedMessage = (event: MessageEvent) => {
       if (event.source !== externalEmbedFrameRef.current?.contentWindow) return;
 
@@ -644,6 +645,11 @@ const VideoPlayerSection = () => {
       if (hostname !== expectedHost && !hostname.endsWith(`.${expectedHost}`)) return;
 
       const payload = raw as Record<string, unknown>;
+      // Cosmic's documented player protocol explicitly namespaces its messages.
+      if (
+        observedEmbedProvider === "cosmic" &&
+        String(payload.channel || "").toLowerCase() !== "cosmic"
+      ) return;
       const eventType = String(payload.event || payload.type || payload.action || "").toLowerCase();
       const status = String(payload.status || "").toLowerCase();
       const failed = eventType.includes("error") || status === "error";
@@ -654,7 +660,7 @@ const VideoPlayerSection = () => {
 
       const playbackObserved =
         ["aniembed:play", "aniembed:ended"].includes(String(payload.type || "").toLowerCase()) ||
-        ["play", "playing", "time", "progress", "timeupdate", "watching-log", "complete"].includes(eventType);
+        ["play", "playing", "time", "progress", "timeupdate", "watching-log", "complete", "server"].includes(eventType);
       if (playbackObserved) {
         setProviderPlaybackOutcomes((previous) =>
           previous[observedEmbedProvider] === "playing"
@@ -970,8 +976,23 @@ const VideoPlayerSection = () => {
           />
         </div>
         <p className="text-xs text-zinc-500">
-          Embedded source: {getProviderDisplayName(embedProvider)}. External top-level navigation is blocked by Android.
+          {embedProvider === "cosmic"
+            ? "Cosmic Player wraps MegaPlay-backed streams. Use this server to compare the player interface; it is not an independent upstream source."
+            : `Embedded source: ${getProviderDisplayName(embedProvider)}. External top-level navigation is blocked by Android.`}
         </p>
+        {embedProvider === "megavid" && (
+          <Alert className="rounded-2xl border-amber-300/15 bg-amber-300/[0.04] text-zinc-200">
+            <AlertCircle className="h-4 w-4 text-amber-300" />
+            <AlertTitle className="font-bold">Megavid safety note</AlertTitle>
+            <AlertDescription className="mt-1 flex flex-col gap-3 text-sm text-zinc-400">
+              Megavid may occasionally show a deceptive “Click Allow” / robot-check overlay inside its own player. Do not tap Allow, grant notification permissions, or install anything. Because this content is inside a third-party iframe, 7xAnime cannot safely remove the overlay from the parent page.
+              <div className="flex flex-wrap gap-2">
+                <Button size="sm" variant="secondary" onClick={() => selectFallbackServer()}>Switch to MegaPlay</Button>
+                <Button size="sm" variant="outline" onClick={() => handleProviderSelect("anixo", activeCategory)}>Try AniXo</Button>
+              </div>
+            </AlertDescription>
+          </Alert>
+        )}
         {playerControls}
       </div>
     );
