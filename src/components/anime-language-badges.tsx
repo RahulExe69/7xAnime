@@ -31,7 +31,7 @@ export default function AnimeLanguageBadges({ animeId, titles, className }: Prop
           observer.disconnect();
         }
       },
-      { rootMargin: "240px" },
+      { rootMargin: "64px" },
     );
     observer.observe(element);
     return () => observer.disconnect();
