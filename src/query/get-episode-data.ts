@@ -15,7 +15,7 @@ const getEpisodeData = async (
   episodeId: string,
 ): Promise<IEpisodeSource> => {
   const endpoint = episodeId.startsWith("/") ? episodeId : `/${episodeId}`;
-  const res = await api.get<WatchSourcesResponse>(endpoint, { timeout: 20000 });
+  const res = await api.get<WatchSourcesResponse>(endpoint, { timeout: 32000 });
   const data = res.data;
 
   // IDs supplied by Kuhi use watch/{provider}/{anilistId}/{audio}/{episode}.

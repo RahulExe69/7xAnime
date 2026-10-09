@@ -35,6 +35,28 @@ _server_lock = threading.Lock()
 # router at / also supplies the paths expected by the existing 7xAnime client.
 app.include_router(router)
 
+# Last per-provider stream-extraction outcome; messages are sanitized before display.
+_LOCAL_PROVIDER_DIAGNOSTICS: dict[str, dict] = {}
+_LOCAL_WATCH_CACHE: dict[tuple, tuple[float, list]] = {}
+LOCAL_WATCH_TIMEOUT = 22.0
+LOCAL_WATCH_CACHE_TTL = 35.0
+
+
+def _safe_provider_error(error: Exception) -> str:
+    message = re.sub(r"https?://\\S+", "<upstream URL>", str(error or "").strip())
+    message = re.sub(r"(?i)(token|key|secret|signature)=([^&\\s]+)", r"\\1=<redacted>", message)
+    return f"{type(error).__name__}: {message[:180]}" if message else type(error).__name__
+
+
+def _record_local_provider_outcome(name: str, outcome: str, message: str | None, seconds: float, *, cached: bool = False) -> None:
+    _LOCAL_PROVIDER_DIAGNOSTICS[name] = {
+        "outcome": outcome,
+        "message": message,
+        "seconds": round(max(0.0, seconds), 3),
+        "at": int(time.time()),
+        "cached": cached,
+    }
+
 # Episode discovery should not hold the watch page hostage while every scraper
 # finishes. Context creation and each provider scraper run in the background so
 # the first request can return a partial catalogue quickly.
@@ -169,6 +191,7 @@ async def local_provider_status():
     providers = []
     for name in snapshot.get("ranking") or []:
         metrics = latency.get(name) or {}
+        attempt = _LOCAL_PROVIDER_DIAGNOSTICS.get(name) or {}
         loaded = name in available
         avg_seconds = metrics.get("avg_seconds")
         failures = int(metrics.get("failures") or 0)
@@ -187,6 +210,11 @@ async def local_provider_status():
             "averageSeconds": avg_seconds,
             "episodesSeconds": metrics.get("episodes_seconds"),
             "failuresSinceLastSuccess": failures,
+            "lastOutcome": attempt.get("outcome"),
+            "lastError": attempt.get("message"),
+            "lastAttemptSeconds": attempt.get("seconds"),
+            "lastAttemptAt": attempt.get("at"),
+            "lastAttemptCached": attempt.get("cached", False),
         })
     return {
         "mode": "embedded",
@@ -231,11 +259,56 @@ def _playable_streams(streams: list | None) -> list:
 
 
 async def _watch_one_for_player(mod, name, anilist_id, ep, audio, ctx):
-    actual_name, streams, seconds, _raw_ok = await provider_race._watch_one(
-        mod, name, anilist_id, ep, audio, ctx
-    )
-    playable = _playable_streams(streams)
-    return actual_name, playable, seconds, bool(playable)
+    """Run one provider with a mobile-safe budget and preserve actionable diagnostics."""
+    key = (name, int(anilist_id), int(ep), str(audio))
+    cached = _LOCAL_WATCH_CACHE.get(key)
+    now = time.time()
+    if cached and cached[0] > now:
+        streams = cached[1]
+        _record_local_provider_outcome(name, "streams_returned", None, 0.0, cached=True)
+        return name, streams, 0.0, bool(streams)
+    if cached:
+        _LOCAL_WATCH_CACHE.pop(key, None)
+
+    started = time.monotonic()
+    try:
+        raw_streams = await asyncio.wait_for(
+            mod.watch(anilist_id, audio, ep, ctx),
+            timeout=LOCAL_WATCH_TIMEOUT,
+        )
+    except asyncio.CancelledError:
+        raise
+    except (asyncio.TimeoutError, httpx.TimeoutException) as error:
+        seconds = time.monotonic() - started
+        message = f"Provider timed out after {LOCAL_WATCH_TIMEOUT:.0f}s"
+        if str(error).strip():
+            message += f" ({type(error).__name__})"
+        _record_local_provider_outcome(name, "timeout", message, seconds)
+        return name, [], seconds, False
+    except Exception as error:
+        seconds = time.monotonic() - started
+        _record_local_provider_outcome(name, "request_error", _safe_provider_error(error), seconds)
+        return name, [], seconds, False
+
+    seconds = time.monotonic() - started
+    raw_streams = raw_streams if isinstance(raw_streams, list) else []
+    playable = _playable_streams(raw_streams)
+    if not raw_streams:
+        _record_local_provider_outcome(
+            name, "no_sources", "Provider returned no stream for this anime, episode and audio.", seconds
+        )
+        return name, [], seconds, False
+    if not playable:
+        _record_local_provider_outcome(
+            name, "unsupported_format",
+            "Provider returned sources, but none are supported (HLS, MP4 or embed; DASH is not enabled).",
+            seconds,
+        )
+        return name, [], seconds, False
+
+    _LOCAL_WATCH_CACHE[key] = (time.time() + LOCAL_WATCH_CACHE_TTL, playable)
+    _record_local_provider_outcome(name, "streams_returned", None, seconds)
+    return name, playable, seconds, True
 
 
 async def _race_watch_for_player(anilist_id: int, episode: int, audio: str) -> dict | None:
@@ -315,6 +388,7 @@ async def legacy_watch_route(provider: str, anilist_id: int, audio: str, episode
                 "requestedProvider": "auto",
                 "defaultProvider": result.get("defaultProvider") or provider_race.default_provider(),
                 "providerStatus": "ok" if streams else "no_stream",
+                "providerError": None if streams else "No supported stream was returned. See per-provider diagnostics for timeout, HTTP, empty-result, or unsupported-format details.",
                 "streams": streams,
                 "subtitles": provider_race.merge_subtitles(streams),
             }
@@ -370,7 +444,7 @@ async def legacy_watch_route(provider: str, anilist_id: int, audio: str, episode
     # Bound provider context creation and extraction together. The direct provider
     # branch uses _watch_one's shorter per-provider timeout; Auto races everyone.
     try:
-        data = await asyncio.wait_for(extract_streams(), timeout=10.0)
+        data = await asyncio.wait_for(extract_streams(), timeout=28.0)
     except asyncio.TimeoutError:
         print(
             f"[7XAnime] stream lookup timed out for provider={provider}, "
@@ -383,7 +457,7 @@ async def legacy_watch_route(provider: str, anilist_id: int, audio: str, episode
             "provider": preferred or ("auto" if is_auto else requested_provider),
             "requestedProvider": preferred or ("auto" if is_auto else requested_provider),
             "providerStatus": "timeout",
-            "providerError": "The selected stream lookup exceeded the 10-second time limit.",
+            "providerError": "The selected stream lookup exceeded the 28-second request budget.",
             "streams": [],
             "subtitles": [],
         }

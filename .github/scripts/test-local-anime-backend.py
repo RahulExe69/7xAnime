@@ -149,6 +149,37 @@ class LocalAnimeApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200, response.text)
         self.assertEqual(response.json()["streams"], [])
 
+    def test_provider_watch_timeout_is_reported_with_actionable_diagnostics(self) -> None:
+        async def slow_watch(anilist_id, audio, episode, ctx):
+            await asyncio.sleep(0.1)
+            return [{"url": "https://cdn.example/master.m3u8", "type": "hls"}]
+
+        async def exercise() -> None:
+            previous_timeout = local_api.LOCAL_WATCH_TIMEOUT
+            try:
+                local_api.LOCAL_WATCH_TIMEOUT = 0.01
+                name, streams, seconds, ok = await local_api._watch_one_for_player(
+                    type("Provider", (), {"watch": staticmethod(slow_watch)}),
+                    "test-provider",
+                    12345,
+                    1,
+                    "sub",
+                    {},
+                )
+                self.assertEqual(name, "test-provider")
+                self.assertFalse(ok)
+                self.assertEqual(streams, [])
+                self.assertGreaterEqual(seconds, 0)
+                diagnostic = local_api._LOCAL_PROVIDER_DIAGNOSTICS["test-provider"]
+                self.assertEqual(diagnostic["outcome"], "timeout")
+                self.assertIn("timed out", diagnostic["message"].lower())
+            finally:
+                local_api.LOCAL_WATCH_TIMEOUT = previous_timeout
+                local_api._LOCAL_WATCH_CACHE.pop(("test-provider", 12345, 1, "sub"), None)
+                local_api._LOCAL_PROVIDER_DIAGNOSTICS.pop("test-provider", None)
+
+        asyncio.run(exercise())
+
     def test_provider_status_reports_loaded_modules_and_recent_attempt_metrics(self) -> None:
         snapshot = {
             "defaultProvider": "anineko",

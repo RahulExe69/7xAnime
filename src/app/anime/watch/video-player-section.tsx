@@ -31,6 +31,11 @@ type LocalProviderDiagnostic = {
   averageSeconds: number | null;
   episodesSeconds: number | null;
   failuresSinceLastSuccess: number;
+  lastOutcome?: "streams_returned" | "no_sources" | "unsupported_format" | "timeout" | "request_error" | string | null;
+  lastError?: string | null;
+  lastAttemptSeconds?: number | null;
+  lastAttemptAt?: number | null;
+  lastAttemptCached?: boolean;
 };
 
 type LocalProviderStatus = {
@@ -653,7 +658,10 @@ const VideoPlayerSection = () => {
           <div className="mt-2 max-h-52 space-y-1.5 overflow-y-auto pr-1">
             {(localProviderStatus?.providers || []).map((item) => (
               <div key={item.id} className="flex items-center justify-between gap-3 rounded-lg bg-white/[0.025] px-2.5 py-2">
-                <span className="min-w-0 truncate font-semibold text-zinc-300">{getProviderDisplayName(item.id)}</span>
+                <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                  <span className="truncate font-semibold text-zinc-300">{getProviderDisplayName(item.id)}</span>
+                  {item.lastError && <span title={item.lastError} className="break-words text-[10px] leading-4 text-rose-300/90">{item.lastError}</span>}
+                </span>
                 <span className="shrink-0 text-right">
                   <span className={
                     providerPlaybackOutcomes[item.id] === "playing"
@@ -671,8 +679,18 @@ const VideoPlayerSection = () => {
                           : item.status === "not_tested_yet"
                             ? "Not tested"
                             : item.status === "recent_attempts_failed"
-                              ? "Stream request failed"
-                              : "Stream found"}
+                              ? item.lastOutcome === "timeout"
+                                ? "Request timed out"
+                                : item.lastOutcome === "no_sources"
+                                  ? "No sources returned"
+                                  : item.lastOutcome === "unsupported_format"
+                                    ? "Unsupported format"
+                                    : item.lastError
+                                      ? "Request error"
+                                      : "Stream request failed"
+                              : item.status === "recent_attempt_succeeded"
+                                ? "Stream found"
+                                : "Not tested"}
                   </span>
                   {typeof item.averageSeconds === "number" && <span className="ml-2 tabular-nums text-zinc-500">{item.averageSeconds.toFixed(1)}s avg</span>}
                 </span>
