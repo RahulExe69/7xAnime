@@ -3,31 +3,30 @@
 import React from "react";
 import { CirclePlay } from "lucide-react";
 import { ROUTES } from "@/constants/routes";
-
-import { usePathname } from "next/navigation";
 import { ButtonLink } from "./common/button-link";
 import { useHasAnimeWatched } from "@/hooks/use-is-anime-watched";
-
 import { useGetLastEpisodeWatched } from "@/hooks/use-get-last-episode-watched";
 
-const WatchButton = () => {
-  const pathName = usePathname();
-  const animeId = pathName.split("/")[2];
+type Props = {
+  animeId: string;
+};
 
+const WatchButton = ({ animeId }: Props) => {
   const { hasWatchedAnime } = useHasAnimeWatched(animeId);
   const latestEpisodeWatched = useGetLastEpisodeWatched(animeId);
 
+  const watchParams = new URLSearchParams({ anime: animeId });
+  if (hasWatchedAnime && latestEpisodeWatched) {
+    watchParams.set("episode", latestEpisodeWatched);
+  }
+
   return (
     <ButtonLink
-      href={
-        !hasWatchedAnime
-          ? `${ROUTES.WATCH}?anime=${animeId}`
-          : `${ROUTES.WATCH}?anime=${animeId}&episode=${latestEpisodeWatched}`
-      }
+      href={`${ROUTES.WATCH}?${watchParams.toString()}`}
       className="max-w-fit text-base"
       LeftIcon={CirclePlay}
     >
-      {hasWatchedAnime ? "Continue Watching" : "Start Watching"}
+      {hasWatchedAnime && latestEpisodeWatched ? "Continue Watching" : "Start Watching"}
     </ButtonLink>
   );
 };
