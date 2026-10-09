@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { GitHubLogoIcon } from "@radix-ui/react-icons";
+import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 
@@ -10,20 +10,14 @@ const Footer = () => {
   if (pathname === "/anime/watch" || pathname === "/anime/watch/") return null;
 
   return (
-    <footer className="mt-10 flex w-full flex-col items-center space-y-5 border-t border-[#e2deee] bg-[#f6f5fc] p-6 text-center dark:border-[#2a2738] dark:bg-[#111019]">
-      <Image src="/brand/7xanime-mark.svg" alt="logo" width="100" height="100" suppressHydrationWarning />
-      <div className="flex space-x-5 items-center">
-        <a href="https://github.com/RahulExe69/7xAnime" target="_blank">
-            <GitHubLogoIcon suppressHydrationWarning width="25" height="25" />
-        </a>
-      </div>
-      <p className="max-w-xl text-xs leading-relaxed text-[#77728f] dark:text-[#9690a9]">
-        7xAnime does not store any files on the server, we only link to the
-        media which is hosted on 3rd party services.
-      </p>
-      <p className="text-xs text-[#77728f] dark:text-[#9690a9]">&copy; 7xAnime</p>
+    <footer className="mt-16 flex w-full flex-col items-center gap-4 border-t border-white/[0.07] bg-[#0d0c14] px-5 py-8 text-center">
+      <Link href="/" aria-label="7xAnime home" className="inline-flex">
+        <Image src="/brand/7xanime-lockup.svg" alt="7xAnime" width={190} height={48} unoptimized className="h-10 w-[170px] object-contain" />
+      </Link>
+      <p className="max-w-xl text-xs leading-relaxed text-[#817991]">7xAnime links to third-party media sources; streaming files are not hosted by this app.</p>
+      <a href="https://github.com/RahulExe69/7xAnime" target="_blank" rel="noreferrer" className="text-xs font-semibold text-[#bdb2f3] transition hover:text-white">Source code</a>
+      <p className="text-[11px] text-[#686176]">© 7xAnime</p>
     </footer>
-  );
-};
+  );};
 
 export default Footer;
