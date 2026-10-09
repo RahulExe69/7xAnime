@@ -36,13 +36,17 @@ const VideoPlayerSection = () => {
     ? allEpisodesData.episodes.find((e) => e.number === Number(epParam))
     : null;
 
-  // Resolve active episode ID prioritizing ?ep= parameter
-  const activeEpisodeId =
-    targetEpByNumber?.episodeId ||
-    selectedEpisode ||
-    episodeIdParam ||
-    allEpisodesData?.episodes?.[0]?.episodeId ||
-    "";
+  // Do not fall back to a stale global selection while a requested episode
+  // number is still resolving. Direct episode IDs (including resume URLs) win
+  // over Zustand state, which can outlive the watch page.
+  const selectedEpisodeBelongsToAnime = !!selectedEpisode &&
+    !!allEpisodesData?.episodes?.some((episode) => episode.episodeId === selectedEpisode);
+  const activeEpisodeId = epParam
+    ? targetEpByNumber?.episodeId || ""
+    : episodeIdParam ||
+      (selectedEpisodeBelongsToAnime ? selectedEpisode : "") ||
+      allEpisodesData?.episodes?.[0]?.episodeId ||
+      "";
 
   // Sync selectedEpisode in store with ?ep= parameter if provided
   useEffect(() => {
@@ -94,8 +98,20 @@ const VideoPlayerSection = () => {
   const providerNames = Object.keys(rawProviders);
 
   // Extract current episode number from activeEpisodeId
-  const currentEpNumber =
-    allEpisodesData?.episodes?.find((e) => e.episodeId === activeEpisodeId)?.number || 1;
+  const activeEpisodeNumberFromList = allEpisodesData?.episodes?.find(
+    (episode) => episode.episodeId === activeEpisodeId,
+  )?.number;
+  const activeEpisodeSlug = activeEpisodeId.split("/").pop() || "";
+  const activeEpisodeNumberFromSlug = Number(activeEpisodeSlug.match(/(\\d+)$/)?.[1]) || 0;
+  const currentEpNumber = activeEpisodeNumberFromList || activeEpisodeNumberFromSlug || 1;
+
+  const updateEpisodeUrl = (episodeId: string) => {
+    if (typeof window === "undefined") return;
+    const url = new URL(window.location.href);
+    url.searchParams.set("episode", episodeId);
+    url.searchParams.delete("ep");
+    window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+  };
 
   // Check sub/dub availability for this episode
   const hasSub = providerNames.some(
@@ -116,6 +132,7 @@ const VideoPlayerSection = () => {
         const targetEp = pData.find((ep: any) => ep.number === currentEpNumber) || pData[0];
         if (targetEp?.id) {
           setSelectedEpisode(targetEp.id);
+          updateEpisodeUrl(targetEp.id);
           break;
         }
       }
@@ -136,6 +153,7 @@ const VideoPlayerSection = () => {
         const targetEp = pData.find((ep: any) => ep.number === currentEpNumber);
         if (targetEp?.id) {
           setSelectedEpisode(targetEp.id);
+          updateEpisodeUrl(targetEp.id);
           break;
         }
       }
