@@ -24,6 +24,8 @@ export function PlayerViewport({
   const rootRef = useRef<HTMLDivElement>(null);
   const gestureStartRef = useRef<GestureStart | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const isFullscreenRef = useRef(false);
+  isFullscreenRef.current = isFullscreen;
 
   const enterFullscreen = useCallback(async () => {
     if (isFullscreen) return;
@@ -105,16 +107,22 @@ export function PlayerViewport({
     };
     document.addEventListener("keydown", handleKeyDown);
 
+    let disposed = false;
     let removeBackListener: (() => void) | null = null;
     void App.addListener("backButton", () => {
       void exitFullscreen();
     }).then((listener) => {
-      removeBackListener = () => { void listener.remove(); };
+      if (disposed) {
+        void listener.remove();
+      } else {
+        removeBackListener = () => { void listener.remove(); };
+      }
     }).catch(() => {
       // Browser preview has no native back-button event.
     });
 
     return () => {
+      disposed = true;
       document.body.style.overflow = previousBodyOverflow;
       document.documentElement.style.overflow = previousDocumentOverflow;
       document.removeEventListener("keydown", handleKeyDown);
@@ -124,9 +132,9 @@ export function PlayerViewport({
 
   useEffect(() => {
     return () => {
-      if (isFullscreen) void exitNativePlayerFullscreen();
+      if (isFullscreenRef.current) void exitNativePlayerFullscreen();
     };
-  }, [isFullscreen]);
+  }, []);
 
   const viewportClasses = isFullscreen
     ? "fixed inset-0 z-[10000] !m-0 !h-[100dvh] !min-h-0 !w-screen !max-h-none !max-w-none !aspect-auto !rounded-none !border-0 !shadow-none bg-black"
