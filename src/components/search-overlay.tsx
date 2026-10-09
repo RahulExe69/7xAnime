@@ -1,10 +1,10 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Search, TrendingUp, X, Clock3 } from "lucide-react";
+import { Search, X } from "lucide-react";
 import useDebounce from "@/hooks/use-debounce";
 import { useSearchAnime } from "@/query/search-anime";
 import { useGetTrendingAnime } from "@/query/get-trending-anime";
@@ -57,23 +57,21 @@ export default function SearchOverlay({ open, onClose }: Props) {
   };
 
   return (
-    <div role="dialog" aria-modal="true" aria-label="Search anime" className="fixed inset-0 z-[220] overflow-y-auto bg-[#f8f7fd] text-[#211e38] dark:bg-[#111019] dark:text-white">
-      <div className="sticky top-0 z-10 border-b border-[#e4e0ef] bg-[#f8f7fd]/95 backdrop-blur-xl dark:border-[#2c2939] dark:bg-[#111019]/95">
+    <div role="dialog" aria-modal="true" aria-label="Search anime" className="fixed inset-0 z-[220] overflow-y-auto bg-[#100e19] text-white">
+      <div className="sticky top-0 z-10 border-b border-white/[0.07] bg-[#100e19]/95 backdrop-blur-xl">
         <div className="mx-auto flex min-h-[74px] max-w-4xl items-center gap-3 px-4 sm:px-6">
           <Search className="h-6 w-6 shrink-0 text-[#ff2f9d] dark:text-[#ff8bc8]" />
           <input ref={inputRef} value={value} onChange={(event) => setValue(event.target.value)} placeholder="Search anime..." aria-label="Search anime" autoComplete="off" onKeyDown={(event) => { if (event.key === "Enter") submitSearch(); }} className="h-14 min-w-0 flex-1 bg-transparent text-lg font-medium outline-none placeholder:text-[#88839c] focus-visible:ring-0 dark:placeholder:text-[#858096] sm:text-xl" />
           {value && <button type="button" onClick={() => { setValue(""); inputRef.current?.focus(); }} aria-label="Clear search" className="rounded-full p-2 text-[#77718d] hover:bg-[#ece9f7] dark:hover:bg-white/10"><X className="h-4 w-4" /></button>}
-          <button type="button" onClick={onClose} className="rounded-xl border border-[#dcd7eb] px-3.5 py-2.5 text-sm font-semibold text-[#716b87] transition hover:bg-[#efedf7] dark:border-[#38344a] dark:text-[#bdb6d2] dark:hover:bg-white/5">Close</button>
+          <button type="button" onClick={onClose} className="rounded-xl border border-white/10 px-3.5 py-2.5 text-sm font-semibold text-[#bdb6d2] transition hover:bg-white/[0.07]">Close</button>
         </div>
       </div>
       <div className="mx-auto max-w-4xl px-4 pb-10 pt-7 sm:px-6 sm:pt-9">
         {!query ? (
-          <section>
-            <h2 className="mb-5 flex items-center gap-2 text-xs font-extrabold uppercase tracking-[0.17em] text-[#77718e] dark:text-[#a39db9]"><TrendingUp className="h-4 w-4" /> Trending anime</h2>
-            <div className="flex flex-wrap gap-2.5">
-              {trending.map((term) => <button key={term} onClick={() => { setValue(term); inputRef.current?.focus(); }} className="rounded-full border border-[#dfdaef] bg-[#f0eef9] px-4 py-2.5 text-sm font-medium text-[#5e587b] transition hover:border-[#8b79e3] hover:bg-[#e8e3fb] hover:text-[#4f3fc0] dark:border-[#373149] dark:bg-[#201d2d] dark:text-[#d0c9e6] dark:hover:bg-[#2e2942]">{term}</button>)}
-            </div>
-            <div className="mt-10 flex items-center gap-2 text-sm text-[#8a849e] dark:text-[#87819a]"><Clock3 className="h-4 w-4" /> Start typing to find a series.</div>
+          <section className="flex min-h-[38vh] flex-col items-center justify-center text-center">
+            <span className="mb-4 grid h-14 w-14 place-items-center rounded-2xl border border-white/[0.08] bg-white/[0.035] text-[#b8a5ff]"><Search className="h-6 w-6" /></span>
+            <h2 className="text-lg font-bold text-white">Find your next series</h2>
+            <p className="mt-2 max-w-sm text-sm text-[#928aa5]">Search the catalogue by anime title. Results are loaded from the live catalogue.</p>
           </section>
         ) : (
           <section>
