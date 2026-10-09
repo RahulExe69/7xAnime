@@ -108,14 +108,15 @@ jobs:
           from fastapi.testclient import TestClient
           from src.providers import _race
 
-          expected = {
+          expected_modules = {
               "anineko", "anizone", "anikoto", "reanime", "aniwaves",
               "kaa", "anibd", "animegg", "mkissa", "animeonsen", "animenosub",
+              "anixo", "megavid", "animeparadise", "cosmic",
           }
           providers = _race.providers()
           loaded_names = {name for name, _ in providers}
           print("Packaged Kuhi providers:", ", ".join(name for name, _ in providers))
-          missing = expected - loaded_names
+          missing = expected_modules - loaded_names
           if missing:
               raise SystemExit(f"Packaged API failed to load required providers: {sorted(missing)}")
 
@@ -150,8 +151,19 @@ jobs:
               )
               assert status.status_code == 200, status.text
               reported = {item["id"] for item in status.json()["providers"] if item["moduleLoaded"]}
-              assert expected <= reported, f"Diagnostics do not list all packaged providers: {sorted(expected - reported)}"
-          print("Packaged API: all 11 providers loaded; health, auth, diagnostics and CORS passed.")
+              active_manual = {"anixo", "megavid", "animeparadise", "cosmic"}
+              assert active_manual <= reported, (
+                  "Diagnostics do not list all approved manual providers: "
+                  f"{sorted(active_manual - reported)}"
+              )
+              assert reported <= active_manual, (
+                  "Parked providers leaked into active diagnostics: "
+                  f"{sorted(reported - active_manual)}"
+              )
+          print(
+              "Packaged API: all 15 adapter modules imported; only the four approved "
+              "manual choices are exposed; health, auth, diagnostics and CORS passed."
+          )
           PY
 
       - name: Run packaged API contract tests
