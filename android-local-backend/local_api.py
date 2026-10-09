@@ -19,7 +19,7 @@ from fastapi import Request
 from fastapi.responses import JSONResponse, Response
 
 from src.config import HEADERS
-from src.endpoints import extract_simple, router
+from src.endpoints import router
 from src.main import app
 from src.providers import _race as provider_race
 
@@ -175,15 +175,47 @@ async def legacy_watch_route(provider: str, anilist_id: int, audio: str, episode
     if audio not in {"sub", "dub"}:
         audio = "sub"
 
-    from src.providers import _race as provider_race
-
     preferred = provider.lower() if provider.lower() in provider_race.RANKING else None
-    data = await extract_simple(
-        query=str(anilist_id),
-        episode=episode_number,
-        audio=audio,
-        provider=preferred,
-    )
+
+    # Call the already-parallel provider race directly. Kuhi's extract_simple
+    # wrapper performs an extra AniList format lookup first and may then run a
+    # legacy sequential fallback, which adds long delays to every tap on mobile.
+    # Bound the entire operation so a stalled context lookup cannot leave the UI
+    # in "Finding a playable stream…" indefinitely.
+    try:
+        raced = await asyncio.wait_for(
+            provider_race.race_watch(
+                anilist_id,
+                episode_number,
+                audio,
+                preferred=preferred,
+            ),
+            timeout=14.0,
+        )
+        streams = (raced or {}).get("streams") or []
+        data = {
+            "anilistId": anilist_id,
+            "episode": episode_number,
+            "type": audio,
+            "provider": (raced or {}).get("provider") or preferred,
+            "defaultProvider": (raced or {}).get("defaultProvider"),
+            "requestedProvider": (raced or {}).get("requestedProvider"),
+            "streams": streams,
+            "subtitles": provider_race.merge_subtitles(streams),
+        }
+    except Exception as error:
+        print(
+            f"[7XAnime] stream lookup failed for provider={provider}, "
+            f"anime={anilist_id}, episode={episode_number}: {str(error)[:160]}"
+        )
+        data = {
+            "anilistId": anilist_id,
+            "episode": episode_number,
+            "type": audio,
+            "provider": preferred,
+            "streams": [],
+            "subtitles": [],
+        }
 
     # Normalize subtitle fields to the names consumed by the current frontend.
     normalized_subtitles = []
