@@ -291,4 +291,10 @@ export interface WatchSourcesResponse {
   subtitles: SubtitleItem[];
   intro: SkipInterval;
   outro: SkipInterval;
+  provider?: string;
+  requestedProvider?: string;
+  defaultProvider?: string;
+  providerStatus?: "ok" | "no_stream" | "provider_unavailable" | "unsupported_provider" | "timeout" | "error";
+  providerError?: string | null;
+  timings?: Record<string, { seconds: number; ok: boolean }>;
 }
