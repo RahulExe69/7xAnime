@@ -22,6 +22,12 @@ export interface IEpisodeSource {
   sources: Source[];
   anilistID: number;
   malID: number;
+  /** The actual embedded provider that supplied these streams, when known. */
+  provider?: string;
+  requestedProvider?: string;
+  defaultProvider?: string;
+  providerStatus?: "ok" | "no_stream" | "provider_unavailable" | "unsupported_provider" | "timeout" | "error";
+  providerError?: string | null;
 }
 
 export interface IEpisodeServers {
