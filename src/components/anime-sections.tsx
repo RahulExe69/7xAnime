@@ -41,7 +41,7 @@ const AnimeSections = ({
     );
   }
   return (
-    <Container className="flex flex-col gap-4 py-7 items-center lg:items-start sm:gap-5 sm:py-9">
+    <Container id={sectionTitle.toLowerCase().includes("trending") ? "trending" : undefined} className="scroll-mt-24 flex flex-col items-center gap-4 py-7 sm:gap-5 sm:py-9 lg:items-start">
       <SectionHeading eyebrow="Explore the archive" title={sectionTitle} />
       <div className="grid w-full grid-cols-2 content-start gap-x-3 gap-y-5 sm:grid-cols-3 sm:gap-4 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7">
         {animeList.map((anime, idx) => {
@@ -58,7 +58,8 @@ const AnimeSections = ({
                 score={anime.averageScore}
                 poster={poster}
                 className="self-center justify-self-center"
-                href={`${ROUTES.ANIME_DETAILS}/${anime.id}`}
+                href={ROUTES.animeDetails(anime.id)}
+                quickWatchHref={ROUTES.watchAnime(anime.id)}
               />
             </BlurFade>
           );

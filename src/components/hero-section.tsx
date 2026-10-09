@@ -11,7 +11,7 @@ import Container from "./container";
 import { Button } from "./ui/button";
 
 import React from "react";
-import { ArrowLeft, ArrowRight } from "lucide-react";
+import { ArrowLeft, ArrowRight, Play } from "lucide-react";
 
 import { ROUTES } from "@/constants/routes";
 import { ButtonLink } from "./common/button-link";
@@ -109,10 +109,17 @@ const HeroCarouselItem = ({ anime }: { anime: MediaList }) => {
               ))}
             </div>
 
-            <div className="flex items-center gap-5 !mt-6">
+            <div className="!mt-6 flex flex-wrap items-center gap-3">
+              <ButtonLink
+                href={ROUTES.watchAnime(anime.id)}
+                LeftIcon={Play}
+                className="h-11 rounded-xl bg-[#ff2f9d] px-5 text-sm font-bold text-white shadow-lg shadow-[#ff2f9d]/20 transition hover:bg-[#ff56ad]"
+              >
+                Watch Now
+              </ButtonLink>
               <ButtonLink
                 href={ROUTES.animeDetails(anime.id)}
-                className="h-10 rounded-xl bg-violet-500 px-5 text-sm font-semibold text-white shadow-lg shadow-violet-950/30 transition-colors hover:bg-violet-400"
+                className="h-11 rounded-xl border border-white/20 bg-white/[0.06] px-5 text-sm font-semibold text-white backdrop-blur transition hover:bg-white/[0.12]"
               >
                 View Details
               </ButtonLink>

@@ -33,6 +33,7 @@ const FeaturedCollectionCard = (props: Props) => {
               className={classNames[index]}
               poster={poster}
               href={ROUTES.animeDetails(item.id)}
+              quickWatchHref={ROUTES.watchAnime(item.id)}
             />
           );
         })}

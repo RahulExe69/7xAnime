@@ -58,6 +58,7 @@ const AnimeCarousel = (props: Props) => {
                   title={ani.name}
                   format={ani.type}
                   href={ROUTES.animeDetails(ani.id)}
+                  quickWatchHref={ROUTES.watchAnime(ani.id)}
                   poster={ani.poster}
                   className="self-center justify-self-center min-w-[12rem]"
                 />
