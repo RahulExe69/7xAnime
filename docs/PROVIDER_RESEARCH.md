@@ -186,3 +186,11 @@ The eight researched, not-yet-integrated candidates remain **research only** and
 8. [Anivault-Scraper](https://github.com/SH0MIK/Anivault-Scraper)
 
 No requests have been made to those eight candidates as part of this pause. Revisit them only after the user specifies the next step. Do not start probing them in the background.
+
+
+### Implementation follow-up: AnimeParadise and Cosmic
+
+- **AnimeParadise** is implemented as a small Python adapter around the documented `api.animeparadise.moe` search, episode, and signed-stream endpoints. It returns HLS plus external subtitle tracks. Resolution is triggered only on explicit provider selection and is held out of Auto while signed-link expiry/IP binding and actual Android playback are validated.
+- **Cosmic Player** is implemented as an iframe adapter to the documented Cosmic embed page. Cosmic's example response labels its source `megaplay` (server `zen-1`), so it is a custom player comparison—not a separate upstream. Player messages are accepted only from the exact iframe window and the configured Cosmic origin/channel.
+- **Megavid fake “Allow” overlay:** the card in the user's screenshot is rendered inside the cross-origin Megavid player iframe. The app warns viewers not to grant permissions and offers a quick switch to MegaPlay/AniXo. The overlay cannot be safely removed by styling the parent document; any sandbox or network filter requires provider-specific verification to avoid breaking playback.
+- Both new adapters are deliberately manual-only and have mocked contract tests. Build success will prove packaging only; a phone playback check is still required before enabling Auto or merging PR #2.
