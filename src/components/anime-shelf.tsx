@@ -40,7 +40,7 @@ export default function AnimeShelf({ title, items = [], loading = false, icon, e
         </div>
       </div>
       <div ref={scrollRef} className="anime-shelf-scroll flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-2 sm:gap-4 sm:px-6 lg:gap-5 lg:px-8">
-        {loading ? Array.from({ length: 6 }, (_, i) => <div key={i} className="w-[44%] shrink-0 snap-start animate-pulse overflow-hidden rounded-2xl border border-[#e3e0ee] bg-white dark:border-[#302c40] dark:bg-[#191724] sm:w-[28%] md:w-[22%] lg:w-[16%]"><div className="aspect-[2/3] bg-[#e9e7f2] dark:bg-[#2b273b]" /><div className="space-y-3 p-3"><div className="h-4 rounded bg-[#e9e7f2]" /><div className="h-3 w-2/3 rounded bg-[#e9e7f2]" /></div></div>) : items.map((anime) => {
+        {loading ? Array.from({ length: 6 }, (_, i) => <div key={i} className="w-[42vw] max-w-[11.5rem] shrink-0 snap-start overflow-hidden rounded-xl border border-white/[0.07] bg-[#17131f] sm:w-[28vw] md:w-[22vw] lg:w-[16vw]"><div className="aspect-[2/3] animate-pulse bg-[#24202d]" /></div>) : items.map((anime) => {
           const titleText = anime.title?.english || anime.title?.romaji || anime.title?.native || "Untitled";
           const poster = anime.coverImage?.extraLarge || anime.coverImage?.large || "";
           const nextEpisode = anime.nextAiringEpisode?.episode;

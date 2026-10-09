@@ -19,10 +19,10 @@ export default function Home() {
 
   return (
     <main className="min-h-screen overflow-x-clip bg-[#0c0b12] pb-10 text-white">
-      <HeroSection spotlightAnime={spotlightList} isDataLoading={loadingSpotlight} />
       <div id="continue-watching" className="scroll-mt-20">
         <ContinueWatching loading={false} />
       </div>
+      <HeroSection spotlightAnime={spotlightList} isDataLoading={loadingSpotlight} />
       <AnimeShelf title="New Today" eyebrow="Recently updated" mode="new" viewAllHref="/search?collection=new" items={recentRes?.results || []} loading={loadingRecent} />
       <DeferredAnimeShelf collection="currently-airing" title="Currently Airing" eyebrow="On the air" viewAllHref="/search?collection=currently-airing" />
       <DeferredAnimeShelf collection="trending" title="Trending Now" eyebrow="Popular this week" viewAllHref="/search?collection=trending" />
