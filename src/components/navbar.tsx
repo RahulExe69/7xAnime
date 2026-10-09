@@ -94,7 +94,7 @@ export default function NavBar() {
           </div>
         </Container>
       </header>
-      <SearchOverlay open={searchOpen} onClose={() => setSearchOpen(false)} />
+      {searchOpen && <SearchOverlay open={searchOpen} onClose={() => setSearchOpen(false)} />}
     </>
   );
 }
