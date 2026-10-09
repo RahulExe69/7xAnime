@@ -105,7 +105,7 @@ export default function ContinueWatching({ loading = false }: { loading: boolean
           return (
             <Link key={`${item.id}-${index}`} href={ROUTES.watchAnime(item.id, episodeNumber)} className="group flex w-[68%] max-w-[360px] shrink-0 snap-start items-center gap-3 rounded-2xl border border-white/[0.07] bg-[#15121d] p-2.5 transition-colors duration-150 hover:border-[#ff2f9d]/65 dark:border-white/[0.07] dark:bg-[#15121d] dark:hover:border-[#ff2f9d] sm:w-[48%] md:w-[38%] lg:w-[30%]">
               <div className="relative h-[70px] w-[50px] shrink-0 overflow-hidden rounded-xl bg-[#ebe9f4] dark:bg-[#2b273b]">
-                <Image src={item.poster || "/brand/7xanime-mark.svg"} alt={item.name} fill sizes="72px" className="object-cover" unoptimized />
+                <Image src={item.poster || "/brand/7xanime-mark.svg"} alt={item.name} fill sizes="72px" className="object-cover" />
                 <AnimeLanguageBadges animeId={String(item.id)} titles={[item.name, item.jname || ""]} />
                 <span className="absolute inset-0 grid place-items-center bg-black/0 text-white transition group-hover:bg-black/25"><Play className="h-6 w-6 opacity-0 drop-shadow group-hover:opacity-100" /></span>
               </div>
