@@ -443,7 +443,7 @@ function VideoPlayer({
         },
       },
       plugins: [
-        artplayerPluginHlsControl({
+        ...(isHlsSource ? [artplayerPluginHlsControl({
           // Configure HLS controls
           quality: {
             control: true,
@@ -460,7 +460,7 @@ function VideoPlayer({
             title: "Audio",
             auto: "Auto",
           },
-        }),
+        })] : []),
         artplayerPluginAmbilight({
           // Configure Ambilight
           blur: "30", // Use numbers
