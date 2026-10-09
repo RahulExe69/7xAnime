@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import unittest
 from unittest.mock import AsyncMock, patch
 
 from fastapi.testclient import TestClient
 
 import local_api
+from src.providers import animenosub
 
 
 class LocalAnimeApiTests(unittest.TestCase):
@@ -309,6 +311,35 @@ class LocalAnimeApiTests(unittest.TestCase):
         playable = local_api._playable_streams(streams)
         self.assertEqual([item["type"] for item in playable], ["m3u8", "mp4", "embed"])
         self.assertNotIn("dash", [item["type"] for item in playable])
+
+    def test_animenosub_adapter_parses_audio_flags_and_embedded_servers(self) -> None:
+        snippet = '<iframe src="https://vidmoly.to/embed/abc123"></iframe>'
+        encoded = base64.b64encode(snippet.encode("utf-8")).decode("ascii")
+        series_html = (
+            '<ul><li data-index="0"><a href="https://animenosub.to/attack-on-titan-dub/episode-1">'
+            '<div class="epl-num">1</div><i class="anititle">Episode 1</i>'
+            '<span class="btn-dubbed">Dubbed</span></a></li></ul>'
+        )
+        embeds_html = f'<select><option value="{encoded}" data-index="0">VidMoly</option></select>'
+
+        async def exercise() -> None:
+            with patch.object(animenosub, "fetch_text", new=AsyncMock(return_value=series_html)):
+                episodes = await animenosub.scrape_series("attack-on-titan-dub")
+            self.assertEqual(len(episodes), 1)
+            self.assertTrue(episodes[0]["hasDub"])
+            self.assertFalse(episodes[0]["hasSub"])
+            self.assertEqual(episodes[0]["number"], 1)
+
+            with patch.object(animenosub, "fetch_text", new=AsyncMock(return_value=embeds_html)):
+                streams = await animenosub.scrape_embeds(
+                    "https://animenosub.to/attack-on-titan-dub/episode-1"
+                )
+            self.assertEqual(len(streams), 1)
+            self.assertEqual(streams[0]["type"], "embed")
+            self.assertEqual(streams[0]["url"], "https://vidmoly.to/embed/abc123")
+            self.assertEqual(streams[0]["referer"], "https://vidmoly.to/")
+
+        asyncio.run(exercise())
 
     def test_proxy_rejects_loopback_targets(self) -> None:
         response = self.client.get(
