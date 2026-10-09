@@ -89,7 +89,7 @@ const HeroCarouselItem = ({ anime }: { anime: MediaList }) => {
 
   return (
     <div
-      className="relative h-[64svh] min-h-[430px] max-h-[700px] w-full bg-cover bg-center bg-no-repeat h-[68svh] min-h-[500px] max-h-[700px] md:h-[78vh] md:min-h-[600px] md:max-h-[780px]"
+      className="relative h-[68svh] min-h-[500px] max-h-[700px] w-full bg-cover bg-center bg-no-repeat md:h-[78vh] md:min-h-[600px] md:max-h-[780px]"
       style={{ backgroundImage: `url(${bgImage})` }}
     >
       {/* Gradient Overlay */}
