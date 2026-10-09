@@ -15,11 +15,20 @@ export const useGetLastEpisodeWatched = (animeId: string) => {
       return;
     }
 
-    const watchedDetails: Array<IWatchedAnime> =
-      JSON.parse(localStorage.getItem("watched") as string) || [];
+    let watchedDetails: Array<IWatchedAnime> = [];
+    try {
+      const parsed = JSON.parse(localStorage.getItem("watched") ?? "[]");
+      if (Array.isArray(parsed)) {
+        watchedDetails = parsed;
+      } else {
+        localStorage.removeItem("watched");
+      }
+    } catch {
+      localStorage.removeItem("watched");
+    }
 
     const anime = watchedDetails.find(
-      (watchedAnime) => watchedAnime.anime.id === animeId,
+      (watchedAnime) => watchedAnime?.anime?.id === animeId,
     );
 
     if (anime && anime.episodes.length > 0) {
