@@ -7,10 +7,11 @@ export type ProviderInfo = {
   formats: readonly ("hls" | "mp4" | "embed" | "dash")[];
 };
 
-/** Only independently verified manual embed servers remain enabled in the app.
- * Kuhi and the other researched candidates are parked, not queried or exposed.
+/** Explicitly selectable manual sources. AnimeParadise is a direct HLS
+ * candidate awaiting device verification; Cosmic is a MegaPlay-backed player
+ * wrapper for UI comparison, not an independent streaming source.
  */
-export const KUHI_PROVIDER_ORDER = ["anixo", "megavid"] as const;
+export const KUHI_PROVIDER_ORDER = ["anixo", "megavid", "animeparadise", "cosmic"] as const;
 
 /**
  * Embedded Kuhi provider capabilities from the pinned adapters/documentation.
@@ -20,6 +21,8 @@ export const KUHI_PROVIDER_ORDER = ["anixo", "megavid"] as const;
 export const PROVIDER_INFO: Record<string, ProviderInfo> = {
   anixo: { name: "AniXo", site: "https://anixo.buzz", audio: ["sub", "dub"], formats: ["embed"] },
   megavid: { name: "Megavid", site: "https://megavid.buzz", audio: ["sub", "dub"], formats: ["embed"] },
+  animeparadise: { name: "AnimeParadise", site: "https://animeparadise.moe", audio: ["sub"], formats: ["hls"] },
+  cosmic: { name: "Cosmic Player", site: "https://cosmic-api-azure.vercel.app", audio: ["sub", "dub"], formats: ["embed"] },
 };
 
 export const isProviderSelectable = (providerName: string, category: ProviderAudio): boolean => {
