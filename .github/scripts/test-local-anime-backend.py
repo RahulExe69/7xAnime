@@ -147,6 +147,27 @@ class LocalAnimeApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200, response.text)
         self.assertEqual(response.json()["streams"], [])
 
+    def test_provider_status_reports_loaded_modules_and_recent_attempt_metrics(self) -> None:
+        snapshot = {
+            "defaultProvider": "anineko",
+            "ranking": ["anineko", "anizone"],
+            "available": ["anineko"],
+            "latency": {
+                "anineko": {"avg_seconds": 0.8, "episodes_seconds": 1.2, "failures": 0},
+                "anizone": {"avg_seconds": None, "episodes_seconds": None, "failures": 2},
+            },
+        }
+        with patch.object(local_api.provider_race, "providers_status", return_value=snapshot):
+            response = self.client.get("/providers/status", headers=self.auth)
+
+        self.assertEqual(response.status_code, 200, response.text)
+        payload = response.json()
+        self.assertEqual(payload["loadedCount"], 1)
+        self.assertEqual(payload["providerCount"], 2)
+        self.assertEqual(payload["providers"][0]["status"], "recent_attempt_succeeded")
+        self.assertEqual(payload["providers"][1]["status"], "module_unavailable")
+        self.assertIn("not a live guarantee", payload["note"])
+
     def test_hindi_search_route_proxies_only_the_fixed_catalogue_endpoint(self) -> None:
         fake_response = type(
             "FakeResponse",
