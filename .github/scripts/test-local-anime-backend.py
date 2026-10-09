@@ -48,12 +48,12 @@ class LocalAnimeApiTests(unittest.TestCase):
 
         async def fake_watch_one(mod, name, anilist_id, episode, audio, ctx):
             self.assertIs(mod, selected_module)
-            self.assertEqual(name, "anineko")
+            self.assertEqual(name, "animeparadise")
             self.assertEqual(anilist_id, 12345)
             self.assertEqual(episode, 12)
             self.assertEqual(audio, "sub")
             self.assertEqual(ctx, {"media": {"id": 12345, "title": {"english": "Test"}}, "anizip": None})
-            return "anineko", [{
+            return "animeparadise", [{
                 "url": "https://cdn.example/master.m3u8",
                 "type": "hls",
                 "subtitles": [{"url": "https://cdn.example/sub.vtt", "lang": "en"}],
@@ -61,14 +61,14 @@ class LocalAnimeApiTests(unittest.TestCase):
 
         with (
             patch.object(local_api.provider_race, "providers", return_value=[
-                ("anineko", selected_module), ("anizone", other_module),
+                ("animeparadise", selected_module), ("megaflix", other_module),
             ]),
             patch.object(local_api.provider_race, "build_ctx", new=AsyncMock(return_value={"media": {"id": 12345, "title": {"english": "Test"}}, "anizip": None})),
             patch.object(local_api, "_watch_one_for_player", new=AsyncMock(side_effect=fake_watch_one)),
             patch.object(local_api.provider_race, "race_watch", new=AsyncMock(side_effect=AssertionError("manual pick must not race other providers"))),
         ):
             response = self.client.get(
-                "/watch/anineko/12345/sub/anineko-12",
+                "/watch/animeparadise/12345/sub/animeparadise-12",
                 headers=self.auth,
             )
 
@@ -77,8 +77,8 @@ class LocalAnimeApiTests(unittest.TestCase):
         self.assertEqual(payload["streams"][0]["url"], "https://cdn.example/master.m3u8")
         self.assertEqual(payload["subtitles"][0]["file"], "https://cdn.example/sub.vtt")
         self.assertEqual(payload["subtitles"][0]["label"], "en")
-        self.assertEqual(payload["provider"], "anineko")
-        self.assertEqual(payload["requestedProvider"], "anineko")
+        self.assertEqual(payload["provider"], "animeparadise")
+        self.assertEqual(payload["requestedProvider"], "animeparadise")
         self.assertEqual(payload["providerStatus"], "ok")
 
     def test_selected_provider_failure_does_not_silently_return_another_provider(self) -> None:
@@ -87,10 +87,10 @@ class LocalAnimeApiTests(unittest.TestCase):
 
         with (
             patch.object(local_api.provider_race, "providers", return_value=[
-                ("anineko", selected_module), ("anizone", other_module),
+                ("animeparadise", selected_module), ("megaflix", other_module),
             ]),
             patch.object(local_api.provider_race, "build_ctx", new=AsyncMock(return_value={"media": {"id": 12345, "title": {"english": "Test"}}, "anizip": None})),
-            patch.object(local_api, "_watch_one_for_player", new=AsyncMock(return_value=("anineko", [], 8.0, False))),
+            patch.object(local_api, "_watch_one_for_player", new=AsyncMock(return_value=("animeparadise", [], 8.0, False))),
             patch.object(local_api.provider_race, "record_latency"),
             patch.object(local_api.provider_race, "race_watch", new=AsyncMock(side_effect=AssertionError("must not silently switch providers"))),
         ):
@@ -101,8 +101,8 @@ class LocalAnimeApiTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200, response.text)
         payload = response.json()
-        self.assertEqual(payload["provider"], "anineko")
-        self.assertEqual(payload["requestedProvider"], "anineko")
+        self.assertEqual(payload["provider"], "animeparadise")
+        self.assertEqual(payload["requestedProvider"], "animeparadise")
         self.assertEqual(payload["providerStatus"], "no_stream")
         self.assertEqual(payload["streams"], [])
 
@@ -223,12 +223,12 @@ class LocalAnimeApiTests(unittest.TestCase):
 
     def test_provider_status_reports_loaded_modules_and_recent_attempt_metrics(self) -> None:
         snapshot = {
-            "defaultProvider": "anineko",
-            "ranking": ["anineko", "anizone"],
-            "available": ["anineko"],
+            "defaultProvider": "anixo",
+            "ranking": ["anixo", "megavid"],
+            "available": ["anixo"],
             "latency": {
-                "anineko": {"avg_seconds": 0.8, "episodes_seconds": 1.2, "failures": 0},
-                "anizone": {"avg_seconds": None, "episodes_seconds": None, "failures": 2},
+                "anixo": {"avg_seconds": 0.8, "episodes_seconds": 1.2, "failures": 0},
+                "megavid": {"avg_seconds": None, "episodes_seconds": None, "failures": 2},
             },
         }
         with patch.object(local_api.provider_race, "providers_status", return_value=snapshot):
@@ -237,7 +237,7 @@ class LocalAnimeApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200, response.text)
         payload = response.json()
         self.assertEqual(payload["loadedCount"], 1)
-        self.assertEqual(payload["providerCount"], 2)
+        self.assertEqual(payload["providerCount"], 8)
         self.assertEqual(payload["providers"][0]["status"], "recent_attempt_succeeded")
         self.assertEqual(payload["providers"][1]["status"], "module_unavailable")
         self.assertIn("not a live guarantee", payload["note"])
@@ -308,11 +308,11 @@ class LocalAnimeApiTests(unittest.TestCase):
             local_api._LOCAL_CONTEXT_TASKS.pop(loop_task_key, None)
 
             async def fake_provider_episodes(mod, name, requested_id, ctx):
-                if name == "slow":
+                if name == "megavid":
                     await asyncio.sleep(1.2)
                 return name, {"episodes": {"sub": [{"number": 1, "id": f"{name}-1"}], "dub": []}}
 
-            fake_modules = [("fast", object()), ("slow", object())]
+            fake_modules = [("anixo", object()), ("megavid", object())]
             with (
                 patch.object(local_api.provider_race, "providers", return_value=fake_modules),
                 patch.object(local_api.provider_race, "build_ctx", new=AsyncMock(return_value={"media": {"id": 87654321, "title": {"english": "Test"}}, "anizip": None})),
@@ -320,20 +320,20 @@ class LocalAnimeApiTests(unittest.TestCase):
             ):
                 first = await local_api._progressive_merged_episodes(anime_id)
                 self.assertIsNotNone(first)
-                self.assertIn("fast", first["providers"])
-                self.assertNotIn("slow", first["providers"])
+                self.assertIn("anixo", first["providers"])
+                self.assertNotIn("megavid", first["providers"])
                 self.assertFalse(first["complete"])
 
                 await asyncio.sleep(0.6)
                 second = await local_api._progressive_merged_episodes(anime_id)
-                self.assertIn("fast", second["providers"])
-                self.assertNotIn("slow", second["providers"])
+                self.assertIn("anixo", second["providers"])
+                self.assertNotIn("megavid", second["providers"])
                 self.assertFalse(second["complete"])
 
                 await asyncio.sleep(0.7)
                 third = await local_api._progressive_merged_episodes(anime_id)
-                self.assertIn("fast", third["providers"])
-                self.assertIn("slow", third["providers"])
+                self.assertIn("anixo", third["providers"])
+                self.assertIn("megavid", third["providers"])
                 self.assertTrue(third["complete"])
 
             local_api._episode_discovery_cache.pop(anime_id, None)
