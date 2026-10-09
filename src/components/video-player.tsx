@@ -4,7 +4,6 @@ import React, {
   useEffect,
   useRef,
   useMemo,
-  useState,
   HTMLAttributes,
 } from "react";
 import Artplayer from "artplayer";
@@ -74,7 +73,7 @@ function VideoPlayer({
   const hlsInstanceRef = useRef<Hls | null>(null); // Ref for the Hls.js instance
 
   // State only needed for the current auto-skip setting
-  const [isAutoSkipEnabled, setIsAutoSkipEnabled] = useState(autoSkip);
+  const isAutoSkipEnabledRef = useRef(autoSkip);
 
   const bookmarkIdRef = useRef<string | null>(null);
   const watchHistoryIdsRef = useRef<string[]>([]); // Store initial list
@@ -116,16 +115,29 @@ function VideoPlayer({
   };
 
   useEffect(() => {
-    setIsAutoSkipEnabled(autoSkip);
+    isAutoSkipEnabledRef.current = autoSkip;
   }, [autoSkip]);
 
   // --- Construct Stream URI via Next.js internal /api/proxy ---
+  const firstSourceUrl = episodeInfo?.sources?.[0]?.url;
+  const sourceReferer = episodeInfo?.headers?.Referer;
   const uri = useMemo(() => {
-    const firstSourceUrl = episodeInfo?.sources?.[0]?.url;
     if (!firstSourceUrl) return null;
-    const referer = episodeInfo?.headers?.Referer;
-    return getProxyUrl(firstSourceUrl, referer);
-  }, [episodeInfo]);
+    return getProxyUrl(firstSourceUrl, sourceReferer);
+  }, [firstSourceUrl, sourceReferer]);
+
+  // Use a value signature instead of the episode object identity: React Query
+  // can return an equivalent new object after lifecycle/network events. Rebuilding
+  // ArtPlayer for identical stream data resets playback when the app resumes.
+  const episodeInfoSignature = useMemo(
+    () => JSON.stringify({
+      sources: episodeInfo?.sources?.map(({ url, type }) => ({ url, type })) ?? [],
+      subtitles: episodeInfo?.subtitles?.map(({ lang, url }) => ({ lang, url })) ?? [],
+      intro: episodeInfo?.intro,
+      outro: episodeInfo?.outro,
+    }),
+    [episodeInfo],
+  );
 
   const skipTimesRef = useRef<{
     introStart?: number;
@@ -564,7 +576,7 @@ function VideoPlayer({
       // Get the manual skip control instance *once* per update
       const manualSkip = art.controls["manual-skip"]; // Access by name
 
-      if (isAutoSkipEnabled) {
+      if (isAutoSkipEnabledRef.current) {
         // Auto Skip Logic
         if (manualSkip?.style?.display !== "none") {
           // Ensure manual button is hidden
@@ -796,7 +808,7 @@ function VideoPlayer({
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [uri, episodeInfo, animeInfo, subOrDub, getInstance, autoSkip]);
+  }, [uri, episodeInfoSignature, animeInfo.id, animeInfo.title, animeInfo.image, subOrDub, getInstance]);
 
   // --- Render ---
   return (
