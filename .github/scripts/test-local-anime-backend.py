@@ -41,20 +41,23 @@ class LocalAnimeApiTests(unittest.TestCase):
         )
 
     def test_watch_route_translates_episode_slug_and_normalizes_subtitles(self) -> None:
-        async def fake_extract(query, episode=1, audio="sub", provider=None):
-            self.assertEqual(query, "12345")
+        async def fake_race(anilist_id, episode, audio="sub", preferred=None):
+            self.assertEqual(anilist_id, 12345)
             self.assertEqual(episode, 12)
             self.assertEqual(audio, "sub")
-            self.assertEqual(provider, "anineko")
+            self.assertEqual(preferred, "anineko")
             return {
                 "provider": "anineko",
-                "streams": [{"url": "https://cdn.example/master.m3u8", "type": "hls"}],
-                "subtitles": [{"url": "https://cdn.example/sub.vtt", "lang": "en"}],
-                "intro": {"start": 0, "end": 10},
-                "outro": {"start": 100, "end": 110},
+                "streams": [{
+                    "url": "https://cdn.example/master.m3u8",
+                    "type": "hls",
+                    "subtitles": [{"url": "https://cdn.example/sub.vtt", "lang": "en"}],
+                }],
+                "defaultProvider": "anineko",
+                "requestedProvider": "anineko",
             }
 
-        with patch.object(local_api, "extract_simple", new=AsyncMock(side_effect=fake_extract)):
+        with patch.object(local_api.provider_race, "race_watch", new=AsyncMock(side_effect=fake_race)):
             response = self.client.get(
                 "/watch/anineko/12345/sub/anineko-12",
                 headers=self.auth,
@@ -65,21 +68,36 @@ class LocalAnimeApiTests(unittest.TestCase):
         self.assertEqual(payload["streams"][0]["url"], "https://cdn.example/master.m3u8")
         self.assertEqual(payload["subtitles"][0]["file"], "https://cdn.example/sub.vtt")
         self.assertEqual(payload["subtitles"][0]["label"], "en")
-        self.assertEqual(payload["intro"]["end"], 10)
+        self.assertEqual(payload["provider"], "anineko")
 
-    def test_auto_watch_route_does_not_force_an_unknown_provider(self) -> None:
-        async def fake_extract(query, episode=1, audio="sub", provider=None):
-            self.assertEqual(query, "12345")
+    def test_auto_watch_route_returns_an_empty_result_quickly_when_no_provider_wins(self) -> None:
+        async def fake_race(anilist_id, episode, audio="sub", preferred=None):
+            self.assertEqual(anilist_id, 12345)
             self.assertEqual(episode, 1)
-            self.assertIsNone(provider)
-            return {"streams": [], "subtitles": []}
+            self.assertEqual(audio, "sub")
+            self.assertIsNone(preferred)
+            return None
 
-        with patch.object(local_api, "extract_simple", new=AsyncMock(side_effect=fake_extract)):
+        with patch.object(local_api.provider_race, "race_watch", new=AsyncMock(side_effect=fake_race)):
             response = self.client.get(
                 "/watch/auto/12345/sub/episode-1",
                 headers=self.auth,
             )
         self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.json()["streams"], [])
+
+    def test_auto_watch_route_converts_provider_exception_to_empty_stream_result(self) -> None:
+        with patch.object(
+            local_api.provider_race,
+            "race_watch",
+            new=AsyncMock(side_effect=RuntimeError("providers unavailable")),
+        ):
+            response = self.client.get(
+                "/watch/auto/12345/dub/episode-1",
+                headers=self.auth,
+            )
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.json()["streams"], [])
 
     def test_hindi_search_route_proxies_only_the_fixed_catalogue_endpoint(self) -> None:
         fake_response = type(
