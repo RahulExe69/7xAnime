@@ -545,8 +545,8 @@ const VideoPlayerSection = () => {
     <div className="space-y-3">
       {playerHeader}
       <VideoPlayer
-        key={episodeData.sources?.[0]?.url}
-        episodeInfo={episodeData}
+        key={episodeData?.sources?.[0]?.url}
+        episodeInfo={episodeData!}
         serversData={{
           episodeId: activeEpisodeId,
           episodeNo: String(currentEpNumber),
