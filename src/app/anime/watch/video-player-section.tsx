@@ -522,9 +522,24 @@ const VideoPlayerSection = () => {
       ? `watch/${pName}/${animeIdParam}/${resolvedCategory}/${pName}-${currentEpNumber}`
       : "");
     if (targetId) {
+      const retryCurrentServer = activeEpisodeId === targetId;
       attemptedSourceIdsRef.current.delete(targetId);
+      setProviderPlaybackOutcomes((previous) => {
+        if (!(pName in previous)) return previous;
+        const updated = { ...previous };
+        delete updated[pName];
+        return updated;
+      });
+      setManualProviderPlaybackFailed(false);
+      setPlaybackSourceIndex(0);
+      setLastPlayerError(null);
+      setStreamResolutionTimedOut(false);
       setSelectedEpisode(targetId);
       updateEpisodeUrl(targetId, currentEpNumber);
+      if (retryCurrentServer) {
+        setStreamRetryKey((previous) => previous + 1);
+        void retryEpisodeData();
+      }
     }
   };
 
