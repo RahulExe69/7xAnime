@@ -653,8 +653,8 @@ const VideoPlayerSection = () => {
       }
 
       const playbackObserved =
-        payload.type === "aniembed:play" ||
-        ["play", "playing", "time", "timeupdate", "watching-log"].includes(eventType);
+        ["aniembed:play", "aniembed:ended"].includes(String(payload.type || "").toLowerCase()) ||
+        ["play", "playing", "time", "progress", "timeupdate", "watching-log", "complete"].includes(eventType);
       if (playbackObserved) {
         setProviderPlaybackOutcomes((previous) =>
           previous[observedEmbedProvider] === "playing"
