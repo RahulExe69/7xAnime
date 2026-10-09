@@ -175,7 +175,7 @@ colors_file.parent.mkdir(parents=True, exist_ok=True)
 if colors_file.is_file():
     colors_text = colors_file.read_text(encoding="utf-8")
 else:
-    colors_text = '<?xml version="1.0" encoding="utf-8"?>\\n<resources>\\n</resources>\\n'
+    colors_text = '<?xml version="1.0" encoding="utf-8"?>\n<resources>\n</resources>\n'
 if re.search(r'<color name="brand_background">.*?</color>', colors_text):
     colors_text = re.sub(
         r'<color name="brand_background">.*?</color>',
@@ -186,7 +186,7 @@ if re.search(r'<color name="brand_background">.*?</color>', colors_text):
 else:
     colors_text = colors_text.replace(
         "</resources>",
-        '    <color name="brand_background">#09090F</color>\\n</resources>',
+        '    <color name="brand_background">#09090F</color>\n</resources>',
         1,
     )
 colors_file.write_text(colors_text, encoding="utf-8")
