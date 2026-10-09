@@ -25,5 +25,5 @@ The library downloads and installs these filter lists asynchronously. This proof
 ## Dependency and license
 
 - Project: [Edsuns/AdblockAndroid](https://github.com/Edsuns/AdblockAndroid)
-- Maven coordinate: `com.github.Edsuns.AdblockAndroid:ad-filter:1.0` via JitPack.
+- Maven coordinate: `com.github.Edsuns.AdblockAndroid:ad-filter:a585487eb1` via JitPack, pinned to a specific upstream revision.
 - License: LGPL-2.1. The complete upstream license is in `third_party/AdblockAndroid-LICENSE.txt`, and the build copies it into `assets/THIRD_PARTY_LICENSES/` in the APK.
