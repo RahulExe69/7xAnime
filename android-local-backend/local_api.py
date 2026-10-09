@@ -46,6 +46,10 @@ LOCAL_ROUTE_TIMEOUT = 80.0
 # These providers construct documented third-party iframe routes rather than
 # resolving a media stream. Keep them available for manual selection, but out of
 # Auto's extraction race: returning a URL is not proof that playback works.
+# Only providers observed working on the user's device remain active. Kuhi's
+# adapters and all other researched candidates are parked: do not invoke their
+# episode scrapers or watch extractors until explicitly re-enabled.
+ACTIVE_PROVIDER_ALLOWLIST = {"anixo", "megavid"}
 MANUAL_EMBED_ONLY_PROVIDERS = {"anixo", "megavid"}
 _LOCAL_CONTEXT_CACHE: dict[int, tuple[float, dict]] = {}
 # Asyncio primitives are event-loop-bound. Keep in-flight work and locks scoped
@@ -167,7 +171,11 @@ async def _collect_episode_provider(anilist_id: int, name: str, mod, ctx: dict, 
 
 async def _start_episode_provider_discovery(anilist_id: int, state: dict) -> None:
     try:
-        mods = provider_race.providers()
+        mods = [
+            (name, mod)
+            for name, mod in provider_race.providers()
+            if name in ACTIVE_PROVIDER_ALLOWLIST
+        ]
         state["provider_names"] = [name for name, _ in mods]
         if not mods:
             state["initialized"] = True
@@ -271,10 +279,10 @@ async def local_health():
 async def local_provider_status():
     """Expose embedded provider import and recent attempt diagnostics to the app."""
     snapshot = provider_race.providers_status()
-    available = set(snapshot.get("available") or [])
+    available = set(snapshot.get("available") or []) & ACTIVE_PROVIDER_ALLOWLIST
     latency = snapshot.get("latency") or {}
     providers = []
-    for name in snapshot.get("ranking") or []:
+    for name in ACTIVE_PROVIDER_ALLOWLIST:
         metrics = latency.get(name) or {}
         attempt = _LOCAL_PROVIDER_DIAGNOSTICS.get(name) or {}
         loaded = name in available
@@ -308,7 +316,7 @@ async def local_provider_status():
         "mode": "embedded",
         "defaultProvider": snapshot.get("defaultProvider"),
         "loadedCount": len(available),
-        "providerCount": len(snapshot.get("ranking") or []),
+        "providerCount": len(ACTIVE_PROVIDER_ALLOWLIST),
         "providers": providers,
         "note": "Module-loaded status is not a live guarantee for every anime or episode. Attempt metrics are collected as you select or play providers. AniXo and Megavid are manual-only embed routes and are excluded from Auto until playback is verified. HLS, MP4, and embed URLs are supported; DASH-only results are skipped until a DASH engine is available.",
     }
@@ -409,7 +417,7 @@ async def _race_watch_for_player(anilist_id: int, episode: int, audio: str) -> d
     mods = [
         (name, mod)
         for name, mod in provider_race.providers()
-        if name not in MANUAL_EMBED_ONLY_PROVIDERS
+        if name in ACTIVE_PROVIDER_ALLOWLIST and name not in MANUAL_EMBED_ONLY_PROVIDERS
     ]
     if not mods:
         return None
@@ -471,7 +479,7 @@ async def legacy_watch_route(provider: str, anilist_id: int, audio: str, episode
 
     requested_provider = (provider or "").strip().lower()
     is_auto = requested_provider == "auto"
-    preferred = requested_provider if requested_provider in provider_race.RANKING else None
+    preferred = requested_provider if requested_provider in ACTIVE_PROVIDER_ALLOWLIST else None
 
     async def extract_streams() -> dict:
         # Auto is the only mode allowed to race across providers. A manually
@@ -511,7 +519,10 @@ async def legacy_watch_route(provider: str, anilist_id: int, audio: str, episode
                 "subtitles": [],
             }
 
-        provider_modules = dict(provider_race.providers())
+        provider_modules = {
+            name: mod for name, mod in provider_race.providers()
+            if name in ACTIVE_PROVIDER_ALLOWLIST
+        }
         module = provider_modules.get(preferred)
         if module is None:
             return {
