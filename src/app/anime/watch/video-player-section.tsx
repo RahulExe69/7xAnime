@@ -714,10 +714,10 @@ const VideoPlayerSection = () => {
                       ? "Playback OK"
                       : providerPlaybackOutcomes[item.id] === "failed"
                         ? "Playback failed"
-                        : !isProviderDiagnosticForSelection(item, animeIdParam, currentEpNumber, activeCategory)
-                          ? "Not tested for this episode"
-                          : item.status === "module_unavailable"
+                        : item.status === "module_unavailable"
                           ? "Module missing"
+                          : !isProviderDiagnosticForSelection(item, animeIdParam, currentEpNumber, activeCategory)
+                            ? "Not tested for this episode"
                           : item.status === "not_tested_yet"
                             ? "Not tested"
                             : item.status === "recent_attempts_failed"
