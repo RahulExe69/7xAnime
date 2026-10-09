@@ -40,24 +40,31 @@ class LocalAnimeApiTests(unittest.TestCase):
             "https://localhost",
         )
 
-    def test_watch_route_translates_episode_slug_and_normalizes_subtitles(self) -> None:
-        async def fake_race(anilist_id, episode, audio="sub", preferred=None):
+    def test_watch_route_uses_only_the_selected_provider_and_normalizes_subtitles(self) -> None:
+        selected_module = object()
+        other_module = object()
+
+        async def fake_watch_one(mod, name, anilist_id, episode, audio, ctx):
+            self.assertIs(mod, selected_module)
+            self.assertEqual(name, "anineko")
             self.assertEqual(anilist_id, 12345)
             self.assertEqual(episode, 12)
             self.assertEqual(audio, "sub")
-            self.assertEqual(preferred, "anineko")
-            return {
-                "provider": "anineko",
-                "streams": [{
-                    "url": "https://cdn.example/master.m3u8",
-                    "type": "hls",
-                    "subtitles": [{"url": "https://cdn.example/sub.vtt", "lang": "en"}],
-                }],
-                "defaultProvider": "anineko",
-                "requestedProvider": "anineko",
-            }
+            self.assertEqual(ctx, {"anilistId": 12345})
+            return "anineko", [{
+                "url": "https://cdn.example/master.m3u8",
+                "type": "hls",
+                "subtitles": [{"url": "https://cdn.example/sub.vtt", "lang": "en"}],
+            }], 0.25, True
 
-        with patch.object(local_api.provider_race, "race_watch", new=AsyncMock(side_effect=fake_race)):
+        with (
+            patch.object(local_api.provider_race, "providers", return_value=[
+                ("anineko", selected_module), ("anizone", other_module),
+            ]),
+            patch.object(local_api.provider_race, "build_ctx", new=AsyncMock(return_value={"anilistId": 12345})),
+            patch.object(local_api.provider_race, "_watch_one", new=AsyncMock(side_effect=fake_watch_one)),
+            patch.object(local_api.provider_race, "race_watch", new=AsyncMock(side_effect=AssertionError("manual pick must not race other providers"))),
+        ):
             response = self.client.get(
                 "/watch/anineko/12345/sub/anineko-12",
                 headers=self.auth,
@@ -69,6 +76,47 @@ class LocalAnimeApiTests(unittest.TestCase):
         self.assertEqual(payload["subtitles"][0]["file"], "https://cdn.example/sub.vtt")
         self.assertEqual(payload["subtitles"][0]["label"], "en")
         self.assertEqual(payload["provider"], "anineko")
+        self.assertEqual(payload["requestedProvider"], "anineko")
+        self.assertEqual(payload["providerStatus"], "ok")
+
+    def test_selected_provider_failure_does_not_silently_return_another_provider(self) -> None:
+        selected_module = object()
+        other_module = object()
+
+        with (
+            patch.object(local_api.provider_race, "providers", return_value=[
+                ("anineko", selected_module), ("anizone", other_module),
+            ]),
+            patch.object(local_api.provider_race, "build_ctx", new=AsyncMock(return_value={})),
+            patch.object(local_api.provider_race, "_watch_one", new=AsyncMock(return_value=("anineko", None, 8.0, False))),
+            patch.object(local_api.provider_race, "record_latency"),
+            patch.object(local_api.provider_race, "race_watch", new=AsyncMock(side_effect=AssertionError("must not silently switch providers"))),
+        ):
+            response = self.client.get(
+                "/watch/anineko/12345/sub/anineko-12",
+                headers=self.auth,
+            )
+
+        self.assertEqual(response.status_code, 200, response.text)
+        payload = response.json()
+        self.assertEqual(payload["provider"], "anineko")
+        self.assertEqual(payload["requestedProvider"], "anineko")
+        self.assertEqual(payload["providerStatus"], "no_stream")
+        self.assertEqual(payload["streams"], [])
+
+    def test_unknown_provider_does_not_fall_back_to_the_auto_race(self) -> None:
+        with patch.object(
+            local_api.provider_race,
+            "race_watch",
+            new=AsyncMock(side_effect=AssertionError("unknown provider must not race all providers")),
+        ):
+            response = self.client.get(
+                "/watch/not-a-provider/12345/sub/not-a-provider-1",
+                headers=self.auth,
+            )
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.json()["providerStatus"], "unsupported_provider")
+        self.assertEqual(response.json()["streams"], [])
 
     def test_auto_watch_route_returns_an_empty_result_quickly_when_no_provider_wins(self) -> None:
         async def fake_race(anilist_id, episode, audio="sub", preferred=None):
