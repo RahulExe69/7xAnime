@@ -47,9 +47,14 @@ LOCAL_ROUTE_TIMEOUT = 80.0
 # Newly added sources remain manual-only until real-device playback is verified.
 # Cosmic is a player wrapper backed by MegaPlay, not a separate upstream source.
 # Keep unapproved Kuhi adapters parked to avoid unnecessary third-party requests.
-ACTIVE_PROVIDER_ORDER = ("anixo", "megavid", "animeparadise", "cosmic")
+ACTIVE_PROVIDER_ORDER = (
+    "anixo", "megavid", "animeparadise", "cosmic",
+    "megaflix", "tryembed", "cinexstream", "nontongo",
+)
 ACTIVE_PROVIDER_ALLOWLIST = set(ACTIVE_PROVIDER_ORDER)
-MANUAL_EMBED_ONLY_PROVIDERS = {"anixo", "megavid", "cosmic"}
+MANUAL_EMBED_ONLY_PROVIDERS = {
+    "anixo", "megavid", "cosmic", "megaflix", "tryembed", "cinexstream", "nontongo",
+}
 MANUAL_SELECTION_ONLY_PROVIDERS = {"animeparadise"}
 _LOCAL_CONTEXT_CACHE: dict[int, tuple[float, dict]] = {}
 # Asyncio primitives are event-loop-bound. Keep in-flight work and locks scoped
@@ -318,7 +323,7 @@ async def local_provider_status():
         "loadedCount": len(available),
         "providerCount": len(ACTIVE_PROVIDER_ALLOWLIST),
         "providers": providers,
-        "note": "Module-loaded status is not a live guarantee for every anime or episode. Attempt metrics are collected as you select or play providers. AniXo, Megavid, Cosmic, and AnimeParadise are manual-only until device playback is verified; AnimeParadise catalogue lookup is triggered only when selected. Cosmic wraps MegaPlay. HLS, MP4, and embed URLs are supported; DASH-only results are skipped until a DASH engine is available.",
+        "note": "Module-loaded status is not a live guarantee for every anime or episode. Attempt metrics are collected as you select or play providers. AniXo, Megavid, Cosmic, MegaFlix, TryEmbed, CinexStream, NontonGo, and AnimeParadise are manual-only until device playback is verified; AnimeParadise catalogue lookup is triggered only when selected. Cosmic wraps MegaPlay. NontonGo is sub-only. HLS, MP4, and embed URLs are supported; DASH-only results are skipped until a DASH engine is available.",
     }
 
 
