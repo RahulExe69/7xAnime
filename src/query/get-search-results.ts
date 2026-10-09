@@ -56,7 +56,8 @@ const searchAnime = async (params: SearchAnimeParams): Promise<IAnimeSearch> => 
       poster: m.coverImage?.extraLarge || m.coverImage?.large || "",
       episodes: {
         sub: m.episodes || 0,
-        dub: m.episodes || 0,
+        // The catalogue's episode count does not establish English-dub availability.
+        dub: 0,
       },
       type: m.format as any,
     })),
