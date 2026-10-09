@@ -1,10 +1,12 @@
 import "./globals.css";
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import localFont from "next/font/local";
 
 import NavBar from "@/components/navbar";
 import Footer from "@/components/footer";
 import BottomNav from "@/components/bottom-nav";
+import NativeBackHandler from "@/components/native-back-handler";
 import Script from "next/script";
 import QueryProvider from "@/providers/query-provider";
 import { ThemeProvider } from "@/components/theme-provider";
@@ -84,6 +86,9 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <QueryProvider>
+            <Suspense fallback={null}>
+              <NativeBackHandler />
+            </Suspense>
             <NavBar />
             {children}
             <Footer />
