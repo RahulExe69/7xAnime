@@ -6,6 +6,7 @@ import android.graphics.Color;
 import android.util.Log;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.MotionEvent;
 import android.view.Window;
 import android.view.WindowManager;
 import android.webkit.ConsoleMessage;
@@ -35,6 +36,8 @@ public final class StreamingWebChromeClient extends BridgeWebChromeClient {
     private int previousOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED;
     private int previousSystemUiVisibility = 0;
     private boolean previousFullscreenFlag = false;
+    private float swipeStartX = 0;
+    private float swipeStartY = 0;
 
     private final Bridge bridgeRef;
 
@@ -124,6 +127,7 @@ public final class StreamingWebChromeClient extends BridgeWebChromeClient {
 
         if (webView != null) webView.setVisibility(View.GONE);
         if (contentContainer != null) {
+            customView.setBackgroundColor(Color.BLACK);
             contentContainer.addView(
                 customView,
                 new FrameLayout.LayoutParams(
@@ -132,6 +136,7 @@ public final class StreamingWebChromeClient extends BridgeWebChromeClient {
                 )
             );
         }
+        installSwipeToClose(customView);
 
         activity.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
         window.addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
@@ -144,6 +149,33 @@ public final class StreamingWebChromeClient extends BridgeWebChromeClient {
                 | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
         );
         Log.d(TAG, "Entered native video fullscreen");
+    }
+
+    private void installSwipeToClose(View view) {
+        view.setOnTouchListener((touchedView, event) -> {
+            if (event.getAction() == MotionEvent.ACTION_DOWN) {
+                swipeStartX = event.getX();
+                swipeStartY = event.getY();
+                return false;
+            }
+            if (event.getAction() == MotionEvent.ACTION_UP) {
+                float dx = event.getX() - swipeStartX;
+                float dy = event.getY() - swipeStartY;
+                if (dy > 96f && Math.abs(dx) < 120f) {
+                    // YouTube-style swipe down exits native fullscreen.
+                    onHideCustomView();
+                    return true;
+                }
+            }
+            return false;
+        });
+    }
+
+    /** Let MainActivity consume Back before leaving the episode while fullscreen. */
+    public boolean handleBackPressed() {
+        if (customView == null) return false;
+        onHideCustomView();
+        return true;
     }
 
     @Override
