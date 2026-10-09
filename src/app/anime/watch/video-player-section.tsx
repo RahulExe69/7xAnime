@@ -12,7 +12,7 @@ import { useQuery } from "react-query";
 import { getHindiDubStreams } from "@/lib/hindi-dub";
 import { ArrowLeft, Captions, Mic, AlertCircle } from "lucide-react";
 import Link from "next/link";
-import { getServerProviderTitle } from "@/lib/server-map";
+import { getProviderDisplayName, getServerProviderTitle } from "@/lib/server-map";
 import { Switch } from "@/components/ui/switch";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -538,6 +538,7 @@ const VideoPlayerSection = () => {
               height="100%"
               allow="autoplay; fullscreen; picture-in-picture; encrypted-media"
               allowFullScreen
+              sandbox="allow-scripts allow-same-origin allow-forms allow-presentation"
               referrerPolicy="strict-origin-when-cross-origin"
               className="absolute inset-0 h-full w-full border-0"
             />
@@ -582,7 +583,18 @@ const VideoPlayerSection = () => {
       <div className="flex w-full flex-col gap-3">
         {playerHeader}
         <div className="relative aspect-video w-full overflow-hidden rounded-2xl border border-white/10 bg-black shadow-2xl shadow-black/40">
-          <iframe key={`${fallbackAnimeId}-${fallbackEpId}-${activeCategory}`} src={fallbackSrc} title={`${anime?.anime?.info?.name || "Anime"} episode ${currentEpNumber}`} width="100%" height="100%" allowFullScreen className="absolute inset-0 h-full w-full border-0" />
+          <iframe
+            key={`${fallbackAnimeId}-${fallbackEpId}-${activeCategory}`}
+            src={fallbackSrc}
+            title={`${anime?.anime?.info?.name || "Anime"} episode ${currentEpNumber} via MegaPlay`}
+            width="100%"
+            height="100%"
+            allow="autoplay; fullscreen; picture-in-picture; encrypted-media"
+            allowFullScreen
+            sandbox="allow-scripts allow-same-origin allow-forms allow-presentation"
+            referrerPolicy="strict-origin-when-cross-origin"
+            className="absolute inset-0 h-full w-full border-0"
+          />
         </div>
         {playerControls}
       </div>
