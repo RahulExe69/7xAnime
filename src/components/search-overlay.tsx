@@ -5,7 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Search, TrendingUp, X, Clock3 } from "lucide-react";
-import { useDebounce } from "@/hooks/use-debounce";
+import useDebounce from "@/hooks/use-debounce";
 import { useSearchAnime } from "@/query/search-anime";
 import { ROUTES } from "@/constants/routes";
 
@@ -31,11 +31,6 @@ export default function SearchOverlay({ open, onClose }: Props) {
     const timer = window.setTimeout(() => inputRef.current?.focus(), 60);
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") onClose();
-      if (event.key === "Enter" && value.trim()) {
-        event.preventDefault();
-        router.push(`${ROUTES.SEARCH}?q=${encodeURIComponent(value.trim())}`);
-        onClose();
-      }
     };
     const onNativeBack = (event: Event) => { event.preventDefault(); onClose(); };
     window.addEventListener("keydown", onKeyDown);

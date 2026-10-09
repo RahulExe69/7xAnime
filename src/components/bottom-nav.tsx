@@ -9,7 +9,7 @@ import { ROUTES } from "@/constants/routes";
 const items = [
   { label: "Home", icon: House, href: ROUTES.HOME, active: (path: string) => path === ROUTES.HOME },
   { label: "Browse", icon: LayoutGrid, href: ROUTES.SEARCH, active: (path: string) => path.startsWith(ROUTES.SEARCH) },
-  { label: "Top", icon: Trophy, href: "/#trending", active: (_path: string) => false },
+  { label: "Top", icon: Trophy, href: "/#trending", active: () => false },
   { label: "Schedule", icon: CalendarDays, href: "/#schedule", active: (path: string) => path.startsWith("/schedule") },
   { label: "My List", icon: Bookmark, href: "/library", active: (path: string) => path.startsWith("/library") },
 ];
