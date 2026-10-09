@@ -136,7 +136,7 @@ const PageContent = () => {
               {anime.anime.info.name}
             </h1>
             <div className="flex flex-wrap items-center gap-3">
-              <WatchButton />
+              <WatchButton animeId={anime.anime.info.id} />
               {auth && (
                 <Select
                   placeholder="Add to list"
