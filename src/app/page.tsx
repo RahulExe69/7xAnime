@@ -1,109 +1,46 @@
 "use client";
 
-import ContinueWatching from "@/components/continue-watching";
-import FeaturedCollection from "@/components/featured-collection";
+import React from "react";
 import { useGetSpotlightAnime } from "@/query/get-spotlight-anime";
 import { useGetRecentAnime } from "@/query/get-recent-anime";
 import { useGetPopularAnime } from "@/query/get-popular-anime";
 import { useGetTrendingAnime } from "@/query/get-trending-anime";
 import { useGetUpcomingAnime } from "@/query/get-upcoming-anime";
+import { useGetFilteredAnime } from "@/query/get-filtered-anime";
+import { Flame, Star, Trophy, CheckCircle2, CalendarClock } from "lucide-react";
 import dynamic from "next/dynamic";
+import AnimeShelf from "@/components/anime-shelf";
+import ContinueWatching from "@/components/continue-watching";
 
-// Dynamically import components
 const HeroSection = dynamic(() => import("@/components/hero-section"));
-const LatestEpisodesAnime = dynamic(
-  () => import("@/components/latest-episodes-section"),
-);
 const AnimeSchedule = dynamic(() => import("@/components/anime-schedule"));
-const AnimeSections = dynamic(() => import("@/components/anime-sections"));
-
-import React, { useState, useMemo } from "react";
-
-import RecentCommentsSection from "@/components/recent-comments-section";
+const RecentCommentsSection = dynamic(() => import("@/components/recent-comments-section"));
 
 export default function Home() {
-  const [trendingPage, setTrendingPage] = useState(1);
-  const [upcomingPage, setUpcomingPage] = useState(1);
-
-  const { data: spotlightList = [], isLoading: isLoadingSpotlight } =
-    useGetSpotlightAnime();
-  const { data: recentRes, isLoading: isLoadingRecent } = useGetRecentAnime();
-  const { data: popularRes, isLoading: isLoadingPopular } =
-    useGetPopularAnime();
-  const { data: trendingRes, isLoading: isLoadingTrending } =
-    useGetTrendingAnime(trendingPage, 14);
-  const { data: upcomingRes, isLoading: isLoadingUpcoming } =
-    useGetUpcomingAnime(upcomingPage, 14);
-
-  const recentList = recentRes?.results || [];
-  const popularList = popularRes?.results || [];
-  const trendingList = trendingRes?.results || [];
-  const upcomingList = upcomingRes?.results || [];
-
-  // Store first 3 records into dedicated variables so pagination page changes in other sections don't re-trigger FeaturedCollection
-  const featuredFavoriteList = useMemo(
-    () => popularList.slice(0, 3),
-    [popularList.length > 0 ? popularList[0]?.id : null],
-  );
-  const featuredPopularList = useMemo(
-    () => popularList.slice(3, 6),
-    [popularList.length > 0 ? popularList[0]?.id : null],
-  );
-  const featuredRecentList = useMemo(
-    () => recentList.slice(0, 3),
-    [recentList.length > 0 ? recentList[0]?.id : null],
-  );
+  const { data: spotlightList = [], isLoading: loadingSpotlight } = useGetSpotlightAnime();
+  const { data: recentRes, isLoading: loadingRecent } = useGetRecentAnime(1, 18);
+  const { data: trendingRes, isLoading: loadingTrending } = useGetTrendingAnime(1, 18);
+  const { data: popularRes, isLoading: loadingPopular } = useGetPopularAnime(1, 18);
+  const { data: upcomingRes, isLoading: loadingUpcoming } = useGetUpcomingAnime(1, 18);
+  const { data: airingRes, isLoading: loadingAiring } = useGetFilteredAnime("RELEASING", "START_DATE_DESC", 18);
+  const { data: topAiringRes, isLoading: loadingTopAiring } = useGetFilteredAnime("RELEASING", "SCORE_DESC", 18);
+  const { data: completedRes, isLoading: loadingCompleted } = useGetFilteredAnime("FINISHED", "SCORE_DESC", 18);
 
   return (
-    <div className="flex min-h-screen flex-col overflow-hidden bg-[#09090f] text-zinc-100">
-      <HeroSection
-        spotlightAnime={spotlightList}
-        isDataLoading={isLoadingSpotlight}
-      />
-
-      <LatestEpisodesAnime loading={isLoadingRecent} />
-
-      <ContinueWatching loading={false} />
-
-      <FeaturedCollection
-        loading={isLoadingPopular || isLoadingRecent}
-        featuredAnime={[
-          {
-            title: "Most Favorite Anime",
-            anime: featuredFavoriteList,
-          },
-          {
-            title: "Most Popular Anime",
-            anime: featuredPopularList,
-          },
-          {
-            title: "Recent Completed Anime",
-            anime: featuredRecentList,
-          },
-        ]}
-      />
-
-      <AnimeSections
-        title="Trending Anime"
-        animeList={trendingList}
-        loading={isLoadingTrending}
-        page={trendingPage}
-        hasNextPage={trendingRes?.hasNextPage}
-        onPageChange={(p) => setTrendingPage(p)}
-      />
-
-      <AnimeSchedule />
-
+    <main className="min-h-screen overflow-hidden bg-[#f6f5fc] pb-10 text-[#1a1830]">
+      <HeroSection spotlightAnime={spotlightList} isDataLoading={loadingSpotlight} />
+      <div id="continue-watching" className="scroll-mt-20">
+        <ContinueWatching loading={false} />
+      </div>
+      <AnimeShelf title="New Today" eyebrow="Freshly updated" mode="new" items={recentRes?.results || []} loading={loadingRecent} />
+      <AnimeShelf title="Currently Airing" eyebrow="On the air" icon={<Flame className="h-5 w-5 fill-current text-orange-500" />} items={airingRes?.results || []} loading={loadingAiring} />
+      <AnimeShelf title="Trending Now" eyebrow="Popular this week" icon={<span className="text-[#604bd3]">↗</span>} items={trendingRes?.results || []} loading={loadingTrending} />
+      <AnimeShelf title="All-Time Popular" eyebrow="Fan favourites" icon={<Star className="h-5 w-5 fill-current text-amber-400" />} items={popularRes?.results || []} loading={loadingPopular} />
+      <AnimeShelf title="Coming Next Season" eyebrow="Up next" icon={<CalendarClock className="h-5 w-5 text-[#604bd3]" />} items={upcomingRes?.results || []} loading={loadingUpcoming} />
+      <AnimeShelf title="Top Rated Airing Now" eyebrow="Highest rated this season" icon={<Trophy className="h-5 w-5 text-amber-500" />} items={topAiringRes?.results || []} loading={loadingTopAiring} />
+      <AnimeShelf title="Top Completed Series" eyebrow="Worth catching up on" icon={<CheckCircle2 className="h-5 w-5 text-emerald-500" />} items={completedRes?.results || []} loading={loadingCompleted} />
+      <div className="mt-4"><AnimeSchedule /></div>
       <RecentCommentsSection />
-
-      <AnimeSections
-        title="Upcoming Animes"
-        animeList={upcomingList}
-        loading={isLoadingUpcoming}
-        page={upcomingPage}
-        hasNextPage={upcomingRes?.hasNextPage}
-        onPageChange={(p) => setUpcomingPage(p)}
-      />
-    </div>
+    </main>
   );
 }
