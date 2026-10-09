@@ -3,14 +3,11 @@
 import React from "react";
 import { useGetSpotlightAnime } from "@/query/get-spotlight-anime";
 import { useGetRecentAnime } from "@/query/get-recent-anime";
-import { useGetPopularAnime } from "@/query/get-popular-anime";
-import { useGetTrendingAnime } from "@/query/get-trending-anime";
-import { useGetUpcomingAnime } from "@/query/get-upcoming-anime";
-import { useGetFilteredAnime } from "@/query/get-filtered-anime";
-import { Flame, Star, Trophy, CheckCircle2, CalendarClock, TrendingUp } from "lucide-react";
 import dynamic from "next/dynamic";
 import AnimeShelf from "@/components/anime-shelf";
 import ContinueWatching from "@/components/continue-watching";
+import DeferredAnimeShelf from "@/components/deferred-anime-shelf";
+import DeferredMount from "@/components/deferred-mount";
 
 const HeroSection = dynamic(() => import("@/components/hero-section"));
 const AnimeSchedule = dynamic(() => import("@/components/anime-schedule"));
@@ -19,28 +16,22 @@ const RecentCommentsSection = dynamic(() => import("@/components/recent-comments
 export default function Home() {
   const { data: spotlightList = [], isLoading: loadingSpotlight } = useGetSpotlightAnime();
   const { data: recentRes, isLoading: loadingRecent } = useGetRecentAnime(1, 18);
-  const { data: trendingRes, isLoading: loadingTrending } = useGetTrendingAnime(1, 18);
-  const { data: popularRes, isLoading: loadingPopular } = useGetPopularAnime(1, 18);
-  const { data: upcomingRes, isLoading: loadingUpcoming } = useGetUpcomingAnime(1, 18);
-  const { data: airingRes, isLoading: loadingAiring } = useGetFilteredAnime("RELEASING", "START_DATE_DESC", 18);
-  const { data: topAiringRes, isLoading: loadingTopAiring } = useGetFilteredAnime("RELEASING", "SCORE_DESC", 18);
-  const { data: completedRes, isLoading: loadingCompleted } = useGetFilteredAnime("FINISHED", "SCORE_DESC", 18);
 
   return (
-    <main className="min-h-screen overflow-hidden bg-[#0b0a10] pb-10 text-zinc-100">
+    <main className="min-h-screen overflow-x-clip bg-[#0c0b12] pb-10 text-white">
+      <HeroSection spotlightAnime={spotlightList} isDataLoading={loadingSpotlight} />
       <div id="continue-watching" className="scroll-mt-20">
         <ContinueWatching loading={false} />
       </div>
-      <HeroSection spotlightAnime={spotlightList} isDataLoading={loadingSpotlight} />
-      <AnimeShelf title="New Today" eyebrow="Freshly updated" mode="new" viewAllHref="/search?collection=new" items={recentRes?.results || []} loading={loadingRecent} />
-      <AnimeShelf title="Currently Airing" eyebrow="On the air" icon={<Flame className="h-5 w-5 fill-current text-orange-500" />} viewAllHref="/search?collection=currently-airing" items={airingRes?.results || []} loading={loadingAiring} />
-      <AnimeShelf title="Trending Now" eyebrow="Popular this week" icon={<TrendingUp className="h-5 w-5" />} viewAllHref="/search?collection=trending" items={trendingRes?.results || []} loading={loadingTrending} />
-      <AnimeShelf title="All-Time Popular" eyebrow="Fan favourites" icon={<Star className="h-5 w-5 fill-current text-amber-400" />} viewAllHref="/search?collection=popular" items={popularRes?.results || []} loading={loadingPopular} />
-      <AnimeShelf title="Coming Next Season" eyebrow="Up next" icon={<CalendarClock className="h-5 w-5 text-[#ff2f9d]" />} viewAllHref="/search?collection=upcoming" items={upcomingRes?.results || []} loading={loadingUpcoming} />
-      <AnimeShelf title="Top Rated Airing Now" eyebrow="Highest rated this season" icon={<Trophy className="h-5 w-5 text-amber-500" />} viewAllHref="/search?collection=top-airing" items={topAiringRes?.results || []} loading={loadingTopAiring} />
-      <AnimeShelf title="Top Completed Series" eyebrow="Worth catching up on" icon={<CheckCircle2 className="h-5 w-5 text-emerald-500" />} viewAllHref="/search?collection=completed" items={completedRes?.results || []} loading={loadingCompleted} />
-      <div className="mt-4"><AnimeSchedule /></div>
-      <RecentCommentsSection />
+      <AnimeShelf title="New Today" eyebrow="Recently updated" mode="new" viewAllHref="/search?collection=new" items={recentRes?.results || []} loading={loadingRecent} />
+      <DeferredAnimeShelf collection="currently-airing" title="Currently Airing" eyebrow="On the air" viewAllHref="/search?collection=currently-airing" />
+      <DeferredAnimeShelf collection="trending" title="Trending Now" eyebrow="Popular this week" viewAllHref="/search?collection=trending" />
+      <DeferredAnimeShelf collection="popular" title="All-Time Popular" eyebrow="Fan favourites" viewAllHref="/search?collection=popular" />
+      <DeferredAnimeShelf collection="upcoming" title="Coming Next Season" eyebrow="Up next" viewAllHref="/search?collection=upcoming" />
+      <DeferredAnimeShelf collection="top-airing" title="Top Rated Airing Now" eyebrow="Highest rated this season" viewAllHref="/search?collection=top-airing" />
+      <DeferredAnimeShelf collection="completed" title="Top Completed Series" eyebrow="Worth catching up on" viewAllHref="/search?collection=completed" />
+      <DeferredMount minHeight="480px"><div className="mt-4"><AnimeSchedule /></div></DeferredMount>
+      <DeferredMount minHeight="240px"><RecentCommentsSection /></DeferredMount>
     </main>
   );
 }
