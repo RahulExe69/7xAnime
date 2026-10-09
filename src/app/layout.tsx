@@ -76,7 +76,7 @@ export default function RootLayout({
         <link rel="icon" href="/brand/7xanime-mark.svg" type="image/svg+xml" sizes="any" />
       </head>
       <body
-        className={`${geistSans.className} antialiased max-w-[100vw] overflow-x-hidden bg-background text-foreground`}
+        className={`${geistSans.className} antialiased max-w-[100vw] overflow-x-clip bg-background text-foreground`}
       >
         <ThemeProvider
           attribute="class"
