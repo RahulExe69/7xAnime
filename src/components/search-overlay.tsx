@@ -41,7 +41,7 @@ export default function SearchOverlay({ open, onClose }: Props) {
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("7xanime:back", onNativeBack);
     };
-  }, [open, onClose, router, value]);
+  }, [open, onClose, router]);
 
   const trending = useMemo(() => TRENDING_SEARCHES, []);
   if (!open) return null;
