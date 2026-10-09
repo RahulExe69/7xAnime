@@ -18,7 +18,9 @@ The Android package still contains legacy adapter code, but the app exposes only
 |---:|---|---|---|
 | 1 | `megaplay` | MegaPlay (dedicated iframe) | https://megaplay.buzz |
 | 2 | `anixo` | AniXo (manual embed) | https://anixo.buzz |
-| 3 | `megavid` | Megavid (manual embed) | https://megavid.buzz |\n| 4 | `animeparadise` | AnimeParadise (manual HLS) | https://animeparadise.moe |\n| 5 | `cosmic` | Cosmic Player (MegaPlay-backed embed) | https://cosmic-api-azure.vercel.app |
+| 3 | `megavid` | Megavid (manual embed) | https://megavid.buzz |
+| 4 | `animeparadise` | AnimeParadise (manual HLS) | https://animeparadise.moe |
+| 5 | `cosmic` | Cosmic Player (MegaPlay-backed embed) | https://cosmic-api-azure.vercel.app |
 
 For Sub/Dub, the UI filters providers by the selected audio type and media formats the player can use. The visible provider labels start at **Server 2** because Server 1 is reserved for MegaPlay. AniXo, Megavid, and Cosmic are manually selectable iframe endpoints; AnimeParadise returns HLS but stays manual-only during verification. A route response is not playback proof, and these four are deliberately excluded from Auto. A provider can be loaded but still have no stream for a particular anime/episode; diagnostics distinguish module-load, route/stream extraction, and observed player events. Manual selections are strict: selecting one provider never silently returns another provider's stream. Auto is the only cross-provider race. The same server number may refer to a different provider if the compatible provider set changes.
 
