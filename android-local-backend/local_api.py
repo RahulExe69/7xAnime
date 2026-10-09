@@ -194,8 +194,87 @@ async def local_provider_status():
         "loadedCount": len(available),
         "providerCount": len(snapshot.get("ranking") or []),
         "providers": providers,
-        "note": "Module-loaded status is not a live guarantee for every anime or episode. Attempt metrics are collected as you select or play providers.",
+        "note": "Module-loaded status is not a live guarantee for every anime or episode. Attempt metrics are collected as you select or play providers. HLS, MP4, and embed URLs are supported; DASH-only results are skipped until a DASH engine is available.",
     }
+
+
+def _player_stream_kind(stream: dict) -> str:
+    """Classify provider output by the media type the Android player can consume."""
+    stream_type = str(stream.get("type") or "").strip().lower()
+    url = str(stream.get("url") or "").strip()
+    path = urlsplit(url).path.lower()
+    if "dash" in stream_type or path.endswith(".mpd"):
+        return "dash"
+    if "hls" in stream_type or "m3u8" in stream_type or path.endswith(".m3u8"):
+        return "m3u8"
+    if "mp4" in stream_type or path.endswith(".mp4"):
+        return "mp4"
+    if "embed" in stream_type or "iframe" in stream_type:
+        return "embed"
+    # Provider adapters sometimes return opaque embed URLs without a type.
+    return "embed" if url else "unknown"
+
+
+def _playable_streams(streams: list | None) -> list:
+    # Android's native player supports HLS and MP4; embed-only sources are
+    # rendered in a sandboxed iframe. DASH (.mpd) is not treated as playable
+    # until a DASH engine is installed, rather than mislabelled as HLS.
+    rank = {"m3u8": 0, "mp4": 1, "embed": 2}
+    valid = [
+        {**stream, "type": _player_stream_kind(stream)}
+        for stream in (streams or [])
+        if isinstance(stream, dict)
+        and stream.get("url")
+        and _player_stream_kind(stream) in rank
+    ]
+    return sorted(valid, key=lambda stream: rank.get(stream.get("type", "embed"), 9))
+
+
+async def _watch_one_for_player(mod, name, anilist_id, ep, audio, ctx):
+    actual_name, streams, seconds, _raw_ok = await provider_race._watch_one(
+        mod, name, anilist_id, ep, audio, ctx
+    )
+    playable = _playable_streams(streams)
+    return actual_name, playable, seconds, bool(playable)
+
+
+async def _race_watch_for_player(anilist_id: int, episode: int, audio: str) -> dict | None:
+    """Fastest-wins race that only accepts formats the Android player can use."""
+    mods = provider_race.providers()
+    if not mods:
+        return None
+    ctx = await provider_race.build_ctx(anilist_id)
+    pending = {
+        asyncio.create_task(_watch_one_for_player(mod, name, anilist_id, episode, audio, ctx))
+        for name, mod in mods
+    }
+    timings: dict = {}
+    winner = None
+    try:
+        while pending:
+            done, pending = await asyncio.wait(pending, return_when=asyncio.FIRST_COMPLETED)
+            for task in done:
+                try:
+                    name, streams, seconds, ok = task.result()
+                except Exception as error:
+                    print(f"[7XAnime] provider race task failed: {str(error)[:120]}")
+                    continue
+                timings[name] = {"seconds": seconds, "ok": ok}
+                provider_race.record_latency(name, seconds, ok)
+                if ok and winner is None:
+                    winner = {"provider": name, "streams": streams}
+            if winner is not None:
+                break
+    finally:
+        for task in pending:
+            task.cancel()
+        if pending:
+            await asyncio.gather(*pending, return_exceptions=True)
+    if winner is None:
+        return None
+    winner["timings"] = timings
+    winner["defaultProvider"] = provider_race.default_provider()
+    return winner
 
 
 def _episode_number_from_slug(episode_slug: str) -> int:
@@ -221,11 +300,10 @@ async def legacy_watch_route(provider: str, anilist_id: int, audio: str, episode
         # Auto is the only mode allowed to race across providers. A manually
         # selected server must never silently return another provider's stream.
         if is_auto:
-            raced = await provider_race.race_watch(
+            raced = await _race_watch_for_player(
                 anilist_id,
                 episode_number,
                 audio,
-                preferred=None,
             )
             result = raced or {}
             streams = result.get("streams") or []
@@ -270,11 +348,11 @@ async def legacy_watch_route(provider: str, anilist_id: int, audio: str, episode
             }
 
         ctx = await provider_race.build_ctx(anilist_id)
-        actual_name, streams, seconds, ok = await provider_race._watch_one(
+        actual_name, streams, seconds, ok = await _watch_one_for_player(
             module, preferred, anilist_id, episode_number, audio, ctx
         )
         provider_race.record_latency(actual_name, seconds, ok)
-        streams = streams or [] if ok else []
+        streams = (streams or []) if ok else []
         return {
             "anilistId": anilist_id,
             "episode": episode_number,
