@@ -3,6 +3,7 @@ from pathlib import Path
 import os
 import re
 import sys
+import tempfile
 
 app_gradle = Path("android/app/build.gradle")
 if not app_gradle.is_file():
@@ -149,26 +150,70 @@ density_specs = [
     ("xxhdpi", 144, 324),
     ("xxxhdpi", 192, 432),
 ]
-for density, legacy_size, adaptive_size in density_specs:
-    output_dir = resource_root / f"mipmap-{density}"
-    output_dir.mkdir(parents=True, exist_ok=True)
-    for icon_name in ("ic_launcher", "ic_launcher_round"):
-        cairosvg.svg2png(
-            url=str(brand_mark),
-            write_to=str(output_dir / f"{icon_name}.png"),
-            output_width=legacy_size,
-            output_height=legacy_size,
-        )
-    for icon_name, source in (
-        ("ic_launcher_foreground", brand_foreground),
-        ("ic_launcher_monochrome", brand_monochrome),
-    ):
-        cairosvg.svg2png(
-            url=str(source),
-            write_to=str(output_dir / f"{icon_name}.png"),
-            output_width=adaptive_size,
-            output_height=adaptive_size,
-        )
+def write_padded_launcher_svg(source: Path, destination: Path, *, has_background: bool, scale: float = 0.84) -> None:
+    """Center the 7x artwork within Android's launcher safe area without altering web assets."""
+    source_text = source.read_text(encoding="utf-8")
+    offset = 512 * (1 - scale) / 2
+    transform = f'<g transform="translate({offset:.2f} {offset:.2f}) scale({scale:.2f})">'
+
+    if has_background:
+        background = '<rect width="512" height="512" rx="112" fill="url(#bg)"/>'
+        if background not in source_text:
+            raise ValueError(f"Could not find the background layer in {source}.")
+        prefix, remainder = source_text.split(background, 1)
+        artwork, suffix = remainder.rsplit("</svg>", 1)
+        padded_text = prefix + background + "\\n" + transform + artwork + "\\n</g>\\n</svg>" + suffix
+    else:
+        title_end = re.search(r"</title>", source_text)
+        if not title_end:
+            raise ValueError(f"Could not find the SVG title in {source}.")
+        prefix = source_text[:title_end.end()]
+        remainder = source_text[title_end.end():]
+        artwork, suffix = remainder.rsplit("</svg>", 1)
+        padded_text = prefix + "\\n" + transform + artwork + "\\n</g>\\n</svg>" + suffix
+
+    destination.write_text(padded_text, encoding="utf-8")
+
+
+resource_root = Path("android/app/src/main/res")
+density_specs = [
+    ("mdpi", 48, 108),
+    ("hdpi", 72, 162),
+    ("xhdpi", 96, 216),
+    ("xxhdpi", 144, 324),
+    ("xxxhdpi", 192, 432),
+]
+
+# Only generated Android launcher art gets the extra inset. The web/PWA SVGs stay full-size.
+with tempfile.TemporaryDirectory(prefix="7xanime-launcher-") as temp_dir:
+    temp_root = Path(temp_dir)
+    padded_mark = temp_root / "7xanime-mark-padded.svg"
+    padded_foreground = temp_root / "7xanime-foreground-padded.svg"
+    padded_monochrome = temp_root / "7xanime-monochrome-padded.svg"
+    write_padded_launcher_svg(brand_mark, padded_mark, has_background=True)
+    write_padded_launcher_svg(brand_foreground, padded_foreground, has_background=False)
+    write_padded_launcher_svg(brand_monochrome, padded_monochrome, has_background=False)
+
+    for density, legacy_size, adaptive_size in density_specs:
+        output_dir = resource_root / f"mipmap-{density}"
+        output_dir.mkdir(parents=True, exist_ok=True)
+        for icon_name in ("ic_launcher", "ic_launcher_round"):
+            cairosvg.svg2png(
+                url=str(padded_mark),
+                write_to=str(output_dir / f"{icon_name}.png"),
+                output_width=legacy_size,
+                output_height=legacy_size,
+            )
+        for icon_name, source in (
+            ("ic_launcher_foreground", padded_foreground),
+            ("ic_launcher_monochrome", padded_monochrome),
+        ):
+            cairosvg.svg2png(
+                url=str(source),
+                write_to=str(output_dir / f"{icon_name}.png"),
+                output_width=adaptive_size,
+                output_height=adaptive_size,
+            )
 
 colors_file = resource_root / "values" / "colors.xml"
 colors_file.parent.mkdir(parents=True, exist_ok=True)
