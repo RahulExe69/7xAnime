@@ -71,3 +71,86 @@ The Android packaging patch had reduced that 75-second provider timeout to 8 sec
 ### Integration gate
 
 A source becomes selectable only when a supported adapter is present, its external requirements are configured, it returns normalized streams, and a real Android playback attempt confirms the URL/headers/media type work. Module import, a successful API response, or a repository's “active” table are not sufficient evidence. The three outcomes remain distinct: module loaded, usable stream extracted, and playback actually started. No additional external backend has been deployed as part of this audit, so these candidates are researched but not yet shipped as available servers.
+
+
+## Follow-up research: direct embed platforms and MegaPlay-like sources
+
+**Follow-up audit date:** 2026-10-10  
+**Purpose:** Identify practical alternatives when native stream extraction is unreliable, document embed-based providers separately from API/scraper adapters, and avoid presenting unverified sources as working servers.
+
+### Executive summary
+
+The most promising next experiment is **direct embed playback**, not blindly adding more scraper modules. Platforms such as AniXo and Megavid document player/embed routes that can be loaded in a WebView. That is a different integration contract from a native extractor: the app delegates source selection and playback to the provider's embedded player, rather than expecting a direct HLS/MP4 URL.
+
+The user also identified **yomi.to** as a real-world reference: in their observed player, MegaPlay appears as Server 1 / the primary server and is also used as a fallback. This is valuable product evidence that MegaPlay can be used as a first-class player route and as a recovery path. It is recorded here as a **user-reported observation**, not as an independently reproduced test. We should inspect yomi.to's current behaviour and terms before copying its exact ordering or fallback logic. A platform showing MegaPlay as a selectable player is not proof that every MegaPlay episode works on every device.
+
+### Candidate matrix
+
+| Candidate | Integration shape | What the available evidence says | Main risks / caveats | Recommendation |
+|---|---|---|---|---|
+| [AniXo](https://anixo.buzz/) | Direct iframe/embed; provider-managed engine selection and failover | Its current official site documents AniList/MAL-based embed routes and a `track` parameter for sub/dub. The site advertises multiple engines and automatic failover. | Site claims and route documentation are not a successful playback test on our Android WebView. Providers may change paths, block embedding, show ads, or depend on third-party cookies/headers. | **Priority 1 embed experiment.** Use the current official route format below; test on a physical Android device before enabling as healthy. |
+| [Megavid](https://megavid.buzz/) | Direct iframe/embed; optional documented JSON source API | Official docs describe AniList/MAL routes, sub/dub, and player events. A JSON endpoint is also documented, but access may be origin-restricted. | Do not assume the JSON endpoint is a public CORS-friendly extraction API. Prefer its documented iframe first. Playback and event delivery are unverified on our device. | **Priority 2 embed experiment.** Keep distinct from AniXo and native HLS/MP4 providers. |
+| [MegaPlay](https://megaplay.buzz/) | Provider-managed embedded player/source | User points to yomi.to using MegaPlay as its primary server and fallback. The earlier SDK research includes MegaPlay integration code and E2E test definitions, which are useful implementation clues but not current uptime evidence. | Exact live domain/routes may change. A test in another project or yomi.to does not guarantee our app's WebView, episode mapping, sub/dub, or fallback works. | **High priority to validate**, especially because the user's reference platform appears to rely on it. Treat as a player integration with explicit health/playback verification, not a guaranteed direct-media extractor. |
+| [NontonGo](https://www.nontongo.win/) | Direct embed routes; also advertises non-anime media endpoints | Official site documents anime embed patterns and movie/TV endpoints. The site warns of popup ads. | Higher ad/navigation/UX risk; third-party embed can redirect or open popups. Movie/TV support is broader than 7xAnime's current anime scope. | Lower priority. Do not enable by default until popup handling, navigation boundaries, and real playback are tested. |
+| [AnimeParadise](https://stream.animeparadise.moe/) | Native API + HLS/media source (based on third-party SDK implementation) | The `anime-sdk` repository includes an AnimeParadise E2E test that exercises API-to-stream flow and uses FFmpeg/screenshot output as a playback-oriented assertion. | Repository tests are historical evidence, not current service health; upstream may change or block requests. | Potential native adapter after fresh endpoint/schema checks and a real Android playback test. |
+| [AniCult](https://github.com/aluukill/AniCult) | Open-source client-side SPA/reference implementation | Its app code defines embed providers including MegaPlay, AniXo, and Megavid. Last observed repository activity was 2026-09-22. | A client reference shows integration patterns, not that its provider endpoints are currently healthy. Its AniXo URL shape appears older than the current official route documentation. | Use as a code-reading reference; follow each provider's current official docs rather than copying stale URLs. |
+| [anime-sdk](https://github.com/hexxt-git/anime-sdk) | TypeScript SDK with provider adapters and E2E tests | Includes MegaPlay, Anikoto (using MegaPlay), Allmanga/AllAnime, Gogoanime, Goyabu, AnimeParadise, and manga-related functionality. Some E2E tests use FFmpeg and screenshot checks rather than only asserting a non-empty response. | Latest visible work/release evidence was around June 2026, so treat tests as historical. Some providers have known failure notes (including HTTP 403 in its tested environment). | Best code/test reference for native adapter contracts and test design; do not infer current uptime from passing historical tests. |
+| [MiruroAPI](https://github.com/Shineii86/MiruroAPI) | Aggregator with multiple pipe providers and direct embed helpers | README describes a dozen pipe providers and direct embeds for Megavid/AniXo. The project also says the API may be temporarily paused; hosted pipe calls encountered Cloudflare/5xx issues in the prior audit. | Hosted aggregator reliability is not established. Pipe API failures should not be confused with direct embed availability. | Do not depend on its public API. The documented direct embeds can be assessed independently. |
+| [Yomi Anime API](https://github.com/Wabsa-kh/yomi-anime-api) | Thin API/URL aggregator | README lists MegaPlay, MegaFlix, TryEmbed, CinexStream, and NontonGo. Its source mainly constructs URL strings; the included basic test checks that sources are non-empty rather than proving video playback. | A URL existing in JSON is not a resolved stream or playable video. TryEmbed has not met our trust/playback bar. | Reference only; do not treat its server list as evidence of live working sources. |
+| [Cosmic API](https://github.com/JUSTCHILL098/cosmic-api) | Wrapper around MegaPlay | Its implementation largely wraps MegaPlay and labels the returned source accordingly. | Not an independent upstream source; adding it beside MegaPlay may duplicate the same dependency while creating another failure point. | Do not count it as an independent fallback. Consider only if its wrapper provides a verified, material technical benefit. |
+| [yomi.to](https://yomi.to/) | Reference streaming platform / server picker | **User-reported:** MegaPlay is shown as Server 1 / primary and is also used as a fallback. This matches a useful design pattern: primary route plus recovery route. | We have not independently reproduced the current server order or fallback sequence in this audit. The site may change behaviour and may have legal/terms constraints. | Study behaviour and user experience; validate MegaPlay directly in 7xAnime. Do not copy proprietary code or assume the same server ordering is universally best. |
+
+### Route patterns documented by provider sites
+
+These are route patterns from the respective providers' public documentation, recorded as **integration references**, not tested playable URLs. IDs and episode numbers must be normalized correctly, and the route should be generated only from current official documentation.
+
+- **AniXo**
+  - AniList: `https://anixo.buzz/embed/ani/{AniListID}/{episode}?track={sub|dub}`
+  - MAL: `https://anixo.buzz/embed/mal/{MALId}/{episode}?track={sub|dub}`
+  - Prefer the current `track` query parameter. An older client reference used a language path segment; do not blindly reuse that stale shape.
+- **Megavid**
+  - AniList: `https://megavid.buzz/ani/{AniListID}/{episode}/{sub|dub}`
+  - MAL: `https://megavid.buzz/mal/{MALId}/{episode}/{sub|dub}`
+  - Its documented JSON source endpoint may be origin-restricted; test the embed before building an extraction adapter around the JSON route.
+- **NontonGo**
+  - AniList-style route documented by the site: `https://nontongo.win/anime/{ANILIST_ID}/{EPISODE}/play`
+  - MAL-style route documented by the site: `https://nontongo.win/anime/stream?id={MAL_ID}&e={EPISODE}&type=MAL_ID`
+  - Treat popup/redirect behaviour as a launch-blocking UX/security test, not a minor detail.
+
+No MegaPlay URL template is hard-coded in this document because a current official route template has not been independently established here. Inspect the current provider docs/site and the existing SDK adapter before implementation.
+
+### Recommended 7xAnime playback strategy
+
+1. **Keep two integration types distinct.**
+   - Native source adapter: returns a normalized HLS/MP4 stream URL and the required headers, subtitles, and skip intervals.
+   - Embed provider: returns a provider page URL that must be rendered in a compatible WebView/player surface.
+   Do not pass an embed page to a native HLS player or pretend that the embed URL is a direct media URL.
+2. **Test MegaPlay as a primary route and fallback.** First confirm the current route and ID format; then test sub and dub, several episodes, resume/seek, buffering, and an actual video frame on a physical Android device. Separately test fallback when the primary fails. Record diagnostics that distinguish page load, provider error, and actual playback start.
+3. **Prototype AniXo and Megavid as separate embed choices.** Keep the manual choice strict. Auto may race embed page readiness or use a documented provider-managed failover, but it must not report success merely because an iframe navigated.
+4. **Use a robust fallback state machine.** Primary fails before playback → try the next eligible server. Playback starts then errors → offer/perform a controlled fallback while preserving episode and audio selection. Avoid endless loops, duplicate fallback to the same underlying upstream, and silently switching a manually selected server.
+5. **Avoid duplicate providers masquerading as redundancy.** Anikoto can be a MegaPlay-backed route; Cosmic is largely a MegaPlay wrapper; a second API that calls the same source is not independent fallback capacity. Track upstream identity separately from the visible server label.
+6. **Harden the Android embed surface.** Allow required iframe subframes and media requests; prevent arbitrary top-level navigation out of the app; test redirects, popup windows, cookies, mixed content, autoplay/user gesture requirements, fullscreen, back navigation, and external intents. Do not broadly block all provider subresources while trying to prevent top-level redirects.
+7. **Do not declare a source healthy based on import or HTTP 200.** Use separate states: module available → provider page/stream returned → player initialized → playback observed. For embeds, a video frame/time progression or explicit reliable player event is stronger evidence than page load alone.
+8. **Keep user-facing server lists clean.** Do not show dead/unconfigured providers. Hide a failure only for the current anime + episode + audio selection, let the user retry, and do not permanently blacklist a provider after one transient failure.
+9. **Re-check before each release.** Provider endpoints, domains, ads, embedding policy, and anti-bot protections change frequently. Keep a dated audit and a small repeatable device test checklist.
+
+### Practical verification checklist
+
+- [ ] The chosen anime maps to the correct AniList/MAL ID.
+- [ ] Episode numbering matches the provider (including specials/season splits).
+- [ ] Sub and dub routes are distinct and correctly selected.
+- [ ] The embedded page remains inside the app and the actual video starts.
+- [ ] At least one real frame appears and playback time advances.
+- [ ] Seeking, pause/resume, fullscreen, and back navigation work.
+- [ ] No unhandled popup or unexpected external-app redirect appears.
+- [ ] Primary-server failure activates exactly one sensible fallback.
+- [ ] A manually selected server never silently plays another provider.
+- [ ] Diagnostics identify the selected provider, timeout/error class, and whether playback ever began, without leaking tokens or personal data.
+
+### Evidence and confidence notes
+
+- **Official provider pages/docs** support the URL patterns and the platforms' own feature claims; they do not establish uptime or playback in 7xAnime.
+- **AniCult and anime-sdk** are useful open-source references for implementation and testing. The SDK's E2E test design is stronger evidence than a test that merely checks for a non-empty URL, but stale tests remain historical evidence.
+- **MiruroAPI, Yomi Anime API, and Cosmic API** should not be counted as independent live sources without tracing their underlying upstreams and testing actual playback.
+- **yomi.to MegaPlay ordering/fallback** is included as the user's observed behaviour and a design lead; it is not labelled independently verified.
+- No new external source is marked production-ready by this research alone. The current PR must remain unmerged until the actual Android playback path is verified.
