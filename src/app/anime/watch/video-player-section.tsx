@@ -113,6 +113,7 @@ const VideoPlayerSection = () => {
   const [manualProviderPlaybackFailed, setManualProviderPlaybackFailed] = useState(false);
   const [playbackSourceIndex, setPlaybackSourceIndex] = useState(0);
   const [lastPlayerError, setLastPlayerError] = useState<string | null>(null);
+  const [providerPlaybackOutcomes, setProviderPlaybackOutcomes] = useState<Record<string, "playing" | "failed">>({});
   const attemptedSourceIdsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
@@ -164,6 +165,10 @@ const VideoPlayerSection = () => {
   const activeEpisodeSlug = activeEpisodeId.split("/").pop() || "";
   const activeEpisodeNumberFromSlug = Number(activeEpisodeSlug.match(/(\d+)$/)?.[1]) || 0;
   const currentEpNumber = activeEpisodeNumberFromList || activeEpisodeNumberFromSlug || Math.max(1, Number(epParam) || 1);
+
+  useEffect(() => {
+    setProviderPlaybackOutcomes({});
+  }, [animeIdParam, currentEpNumber, preferredCategory]);
 
   const automaticCandidates = useMemo(() => {
     const candidates: Array<{ id: string; category: "dub" | "sub" }> = [];
@@ -515,12 +520,23 @@ const VideoPlayerSection = () => {
     }
 
     setLastPlayerError(detail || null);
+    const providerKey = episodeData?.provider || currentProviderName;
+    if (providerKey && providerKey !== "auto") {
+      setProviderPlaybackOutcomes((previous) => ({ ...previous, [providerKey]: "failed" }));
+    }
     if (hasManualProviderSelection) {
       setManualProviderPlaybackFailed(true);
       return;
     }
     advanceAfterSourceFailure();
-  }, [advanceAfterSourceFailure, episodeData?.sources, hasManualProviderSelection, playbackSourceIndex]);
+  }, [advanceAfterSourceFailure, currentProviderName, episodeData?.provider, episodeData?.sources, hasManualProviderSelection, playbackSourceIndex]);
+
+  const handlePlayerPlaybackReady = useCallback(() => {
+    const providerKey = episodeData?.provider || currentProviderName;
+    if (providerKey && providerKey !== "auto") {
+      setProviderPlaybackOutcomes((previous) => ({ ...previous, [providerKey]: "playing" }));
+    }
+  }, [currentProviderName, episodeData?.provider]);
 
   const playerAnimeInfo = useMemo(
     () => ({
@@ -587,8 +603,24 @@ const VideoPlayerSection = () => {
               <div key={item.id} className="flex items-center justify-between gap-3 rounded-lg bg-white/[0.025] px-2.5 py-2">
                 <span className="min-w-0 truncate font-semibold text-zinc-300">{getProviderDisplayName(item.id)}</span>
                 <span className="shrink-0 text-right">
-                  <span className={item.status === "recent_attempt_succeeded" ? "text-emerald-300" : item.status === "recent_attempts_failed" || item.status === "module_unavailable" ? "text-rose-300" : "text-zinc-500"}>
-                    {item.status === "module_unavailable" ? "Module missing" : item.status === "not_tested_yet" ? "Not tested" : item.status === "recent_attempts_failed" ? "Recent fail" : "Recent success"}
+                  <span className={
+                    providerPlaybackOutcomes[item.id] === "playing"
+                      ? "text-emerald-300"
+                      : providerPlaybackOutcomes[item.id] === "failed" || item.status === "recent_attempts_failed" || item.status === "module_unavailable"
+                        ? "text-rose-300"
+                        : item.status === "recent_attempt_succeeded" ? "text-sky-300" : "text-zinc-500"
+                  }>
+                    {providerPlaybackOutcomes[item.id] === "playing"
+                      ? "Playback OK"
+                      : providerPlaybackOutcomes[item.id] === "failed"
+                        ? "Playback failed"
+                        : item.status === "module_unavailable"
+                          ? "Module missing"
+                          : item.status === "not_tested_yet"
+                            ? "Not tested"
+                            : item.status === "recent_attempts_failed"
+                              ? "Stream request failed"
+                              : "Stream found"}
                   </span>
                   {typeof item.averageSeconds === "number" && <span className="ml-2 tabular-nums text-zinc-500">{item.averageSeconds.toFixed(1)}s avg</span>}
                 </span>
@@ -824,6 +856,7 @@ const VideoPlayerSection = () => {
         subOrDub={activeCategory}
         autoSkip={autoSkip}
         onError={handlePlayerError}
+        onPlaybackReady={handlePlayerPlaybackReady}
       />
       {playerControls}
     </div>
