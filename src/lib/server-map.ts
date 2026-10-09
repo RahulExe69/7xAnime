@@ -9,7 +9,7 @@ export type ProviderInfo = {
 
 export const KUHI_PROVIDER_ORDER = [
   "anineko", "anizone", "anikoto", "reanime", "aniwaves",
-  "kaa", "anibd", "animegg", "mkissa", "animeonsen", "animenosub",
+  "kaa", "anibd", "animegg", "mkissa", "animeonsen", "animenosub", "anixo", "megavid",
 ] as const;
 
 /**
@@ -29,6 +29,8 @@ export const PROVIDER_INFO: Record<string, ProviderInfo> = {
   mkissa: { name: "MKissa", site: "https://mkissa.to", audio: ["sub", "dub"], formats: ["hls", "mp4", "embed"] },
   animeonsen: { name: "AnimeOnsen", site: "https://www.animeonsen.xyz", audio: ["sub"], formats: ["dash"] },
   animenosub: { name: "AnimeNoSub", site: "https://animenosub.to", audio: ["sub", "dub"], formats: ["embed"] },
+  anixo: { name: "AniXo", site: "https://anixo.buzz", audio: ["sub", "dub"], formats: ["embed"] },
+  megavid: { name: "Megavid", site: "https://megavid.buzz", audio: ["sub", "dub"], formats: ["embed"] },
 };
 
 export const isProviderSelectable = (providerName: string, category: ProviderAudio): boolean => {
