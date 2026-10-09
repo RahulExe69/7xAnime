@@ -133,6 +133,7 @@ const VideoPlayerSection = () => {
   const [lastPlayerError, setLastPlayerError] = useState<string | null>(null);
   const [providerPlaybackOutcomes, setProviderPlaybackOutcomes] = useState<Record<string, "playing" | "failed">>({});
   const attemptedSourceIdsRef = useRef<Set<string>>(new Set());
+  const externalEmbedFrameRef = useRef<HTMLIFrameElement | null>(null);
 
   useEffect(() => {
     setManualProviderPlaybackFailed(false);
@@ -616,6 +617,62 @@ const VideoPlayerSection = () => {
     }
   }, [currentProviderName, episodeData?.provider]);
 
+  // AniXo and Megavid expose iframe player events. Treat only a message from
+  // this exact iframe and the provider's own origin as playback evidence. A
+  // route/iframe load alone is not enough to mark the server healthy.
+  const observedEmbedProvider = (episodeData?.provider || currentProviderName || "").toLowerCase();
+  const observedEmbedSource = episodeData?.sources?.[playbackSourceIndex];
+  useEffect(() => {
+    if (
+      !isLocalBackendEnabled() ||
+      observedEmbedSource?.type !== "embed" ||
+      (observedEmbedProvider !== "anixo" && observedEmbedProvider !== "megavid")
+    ) return;
+
+    const expectedHost = observedEmbedProvider === "anixo" ? "anixo.buzz" : "megavid.buzz";
+    const handleEmbedMessage = (event: MessageEvent) => {
+      if (event.source !== externalEmbedFrameRef.current?.contentWindow) return;
+
+      let raw = event.data;
+      if (typeof raw === "string") {
+        try { raw = JSON.parse(raw); } catch { return; }
+      }
+      if (!raw || typeof raw !== "object") return;
+
+      let hostname = "";
+      try { hostname = new URL(event.origin).hostname.toLowerCase(); } catch { return; }
+      if (hostname !== expectedHost && !hostname.endsWith(`.${expectedHost}`)) return;
+
+      const payload = raw as Record<string, unknown>;
+      const eventType = String(payload.event || payload.type || payload.action || "").toLowerCase();
+      const status = String(payload.status || "").toLowerCase();
+      const failed = eventType.includes("error") || status === "error";
+      if (failed) {
+        handlePlayerError(`${getProviderDisplayName(observedEmbedProvider)} reported a playback error.`);
+        return;
+      }
+
+      const playbackObserved =
+        payload.type === "aniembed:play" ||
+        ["play", "playing", "time", "timeupdate", "watching-log"].includes(eventType);
+      if (playbackObserved) {
+        setProviderPlaybackOutcomes((previous) =>
+          previous[observedEmbedProvider] === "playing"
+            ? previous
+            : { ...previous, [observedEmbedProvider]: "playing" },
+        );
+      }
+    };
+
+    window.addEventListener("message", handleEmbedMessage);
+    return () => window.removeEventListener("message", handleEmbedMessage);
+  }, [
+    observedEmbedProvider,
+    observedEmbedSource?.type,
+    observedEmbedSource?.url,
+    handlePlayerError,
+  ]);
+
   const playerAnimeInfo = useMemo(
     () => ({
       id: anime?.anime?.info?.id || "0",
@@ -689,7 +746,7 @@ const VideoPlayerSection = () => {
             Provider diagnostics {localProviderStatus ? `· ${localProviderStatus.loadedCount}/${localProviderStatus.providerCount} modules loaded` : isLoadingProviderStatus ? "· checking…" : ""}
           </summary>
           <p className="mt-2 leading-5 text-zinc-500">
-            Loaded means the provider module is present, not that every anime has a playable stream. Results update as you try sources.
+            Loaded means the provider module is present, not that every anime has a playable stream. “Embed URL returned” is not playback proof; AniXo and Megavid need a player event before they count as observed playback.
           </p>
           <div className="mt-2 max-h-52 space-y-1.5 overflow-y-auto pr-1">
             {(localProviderStatus?.providers || []).map((item) => (
@@ -731,7 +788,9 @@ const VideoPlayerSection = () => {
                                       ? "Request error"
                                       : "Stream request failed"
                               : item.status === "recent_attempt_succeeded"
-                                ? "Stream found"
+                                ? (item.id === "anixo" || item.id === "megavid")
+                                  ? "Embed URL returned — playback unverified"
+                                  : "Stream found"
                                 : "Not tested"}
                   </span>
                   {typeof item.averageSeconds === "number" && <span className="ml-2 tabular-nums text-zinc-500">{item.averageSeconds.toFixed(1)}s avg</span>}
@@ -896,6 +955,7 @@ const VideoPlayerSection = () => {
         {playerHeader}
         <div className="relative aspect-video w-full overflow-hidden rounded-2xl border border-white/10 bg-black shadow-2xl shadow-black/40">
           <iframe
+            ref={externalEmbedFrameRef}
             key={firstResolvedSource.url}
             src={firstResolvedSource.url}
             title={`${anime?.anime?.info?.name || "Anime"} episode ${currentEpNumber} via ${getProviderDisplayName(embedProvider)}`}
