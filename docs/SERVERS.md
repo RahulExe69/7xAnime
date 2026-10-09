@@ -1,10 +1,10 @@
 # 7xAnime playback server guide
 
-**Server 1 is always the MegaPlay fallback player.** It is the first option on the watch screen and remains available when the primary provider list is empty or a stream fails.
+**Server 1 is the dedicated MegaPlay iframe route.** It is the first manual server choice and is also the recovery player when native extraction returns no source. AniXo and Megavid are additional direct-embed options; they are manual-only until real playback is observed, so Auto never treats a constructed embed URL as a winning stream.
 
 ## Numbered server labels
 
-The embedded provider list starts with Kuhi’s pinned native providers and appends one extra embed-first adapter, AnimeNoSub. The Android build patches the copied provider list; this is the order used by the app:
+The embedded provider list starts with Kuhi’s ten Python adapters and appends three separately authored adapters: AnimeNoSub, AniXo, and Megavid. AnimeNoSub may discover iframe hosts; AniXo and Megavid generate documented embed routes and are excluded from Auto's race. The numbered order used by the app is:
 
 | Local rank | API provider key | Display name | Provider site |
 |---:|---|---|---|
@@ -19,8 +19,10 @@ The embedded provider list starts with Kuhi’s pinned native providers and appe
 | 9 | `mkissa` | MKissa | https://mkissa.to |
 | 10 | `animeonsen` | AnimeOnsen | https://www.animeonsen.xyz |
 | 11 | `animenosub` | AnimeNoSub (extra adapter) | https://animenosub.to |
+| 12 | `anixo` | AniXo (manual embed; not raced by Auto) | https://anixo.buzz |
+| 13 | `megavid` | Megavid (manual embed; not raced by Auto) | https://megavid.buzz |
 
-For Sub/Dub, the UI filters providers by the selected audio type and media formats the player can use. The visible labels start at **Server 2** because Server 1 is reserved for MegaPlay. A provider can be loaded but still have no stream for a particular anime/episode; its status in diagnostics separates module-load, stream extraction, and actual playback results. Manual selections are strict: selecting one provider never silently returns another provider's stream. Auto is the only cross-provider race. The same server number may refer to a different provider if the compatible provider set changes.
+For Sub/Dub, the UI filters providers by the selected audio type and media formats the player can use. The visible provider labels start at **Server 2** because Server 1 is reserved for MegaPlay. AniXo and Megavid are manually selectable iframe endpoints; a route response is not playback proof, and these two are deliberately excluded from Auto. A provider can be loaded but still have no stream for a particular anime/episode; diagnostics distinguish module-load, route/stream extraction, and observed player events. Manual selections are strict: selecting one provider never silently returns another provider's stream. Auto is the only cross-provider race. The same server number may refer to a different provider if the compatible provider set changes.
 
 ## Hindi dub catalogue
 
@@ -36,7 +38,7 @@ Server 1 currently opens:
 
 `https://megaplay.buzz/stream/ani/{anilistId}/{episodeNumber}/{sub-or-dub}`
 
-The iframe progress listener also recognises messages from MegaCloud. The pinned Kuhi provider order originates in `src/providers/_race.py` from the source revision declared in `.github/scripts/fetch-kuhi-backend.sh`; the Android packaging script appends the local AnimeNoSub adapter. Frontend labels/audio-format capability metadata are kept in `src/lib/server-map.ts`.
+The iframe progress listener also recognises messages from MegaCloud. The pinned Kuhi provider order originates in `src/providers/_race.py` from the source revision declared in `.github/scripts/fetch-kuhi-backend.sh`; the Android packaging script appends AnimeNoSub, AniXo, and Megavid. Frontend labels/audio-format capability metadata are kept in `src/lib/server-map.ts`.
 
 ## Updating the map
 
