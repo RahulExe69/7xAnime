@@ -90,6 +90,13 @@ const VideoPlayerSection = () => {
     isError: isEpisodeDataError,
   } = useGetEpisodeData(activeEpisodeId, !useFallback && !isHindiMode);
 
+  const hasPlayableSources = Array.isArray(episodeData?.sources) &&
+    episodeData.sources.some((source) =>
+      typeof source?.url === "string" && source.url.trim().length > 0,
+    );
+  const streamRequestFailed = isEpisodeDataError ||
+    (!!episodeData && !hasPlayableSources);
+
   const [autoSkip, setAutoSkip] = useState<boolean>(true);
 
   const { createOrUpdateBookMark, syncWatchProgress } = useBookMarks({
@@ -168,7 +175,7 @@ const VideoPlayerSection = () => {
 
   useEffect(() => {
     if (!activeEpisodeId || isHindiMode || useFallback || isLoadingData) return;
-    const requestFailed = isEpisodeDataError || (!!episodeData && !episodeData.sources?.length);
+    const requestFailed = streamRequestFailed;
     if (!requestFailed) return;
 
     // The local "auto" route has already raced every bundled stream provider.
@@ -197,7 +204,8 @@ const VideoPlayerSection = () => {
   }, [
     activeEpisodeId, advanceAfterSourceFailure, allEpisodesData?.rawResponse?.complete,
     allEpisodesData?.rawResponse?.source, automaticCandidates, episodeData,
-    isEpisodeDataError, isEpisodesLoading, isHindiMode, isLoadingData, useFallback,
+    isEpisodeDataError, isEpisodesLoading, isHindiMode, isLoadingData,
+    streamRequestFailed, useFallback,
   ]);
   const animeTitleOptions = useMemo(
     () => [...new Set([
@@ -540,25 +548,27 @@ const VideoPlayerSection = () => {
     );
   }
 
-  if (!activeEpisodeId || isLoadingData) {
+  if (!activeEpisodeId || (isLoadingData && !streamRequestFailed)) {
     return (
       <div className="space-y-3">
         {playerHeader}
         <div
-        role="status"
-        aria-live="polite"
-        className="flex aspect-video w-full flex-col items-center justify-center gap-3 rounded-2xl border border-white/[0.06] bg-white/[0.035] text-sm text-zinc-400"
-      >
-        <span className="h-7 w-7 animate-spin rounded-full border-2 border-violet-400/25 border-t-violet-300" />
-        <span>{activeEpisodeId ? "Finding a playable stream…" : "Preparing episode…"}</span>
+          role="status"
+          aria-live="polite"
+          className="flex aspect-video w-full flex-col items-center justify-center gap-3 rounded-2xl border border-white/[0.06] bg-white/[0.035] text-sm text-zinc-400"
+        >
+          <span className="h-7 w-7 animate-spin rounded-full border-2 border-violet-400/25 border-t-violet-300" />
+          <span>{activeEpisodeId ? "Finding a playable stream…" : "Preparing episode…"}</span>
         </div>
         {playerControls}
       </div>
     );
   }
 
-  // Fallback player if API stream fails, throws error, returns no sources, or sys_source_available is false
-  if (isFallbackActive) {
+  // Never mount ArtPlayer with an undefined or empty stream response. That
+  // transient render happens before useEffect can switch to the fallback player
+  // and can crash the entire Next route on slower Android devices.
+  if (isFallbackActive || streamRequestFailed) {
     const fallbackAnimeId = animeIdParam || anime?.anime?.info?.id || "1";
     const fallbackEpId = currentEpNumber || "1";
     const fallbackSrc = `https://megaplay.buzz/stream/ani/${fallbackAnimeId}/${fallbackEpId}/${activeCategory}`;
@@ -573,12 +583,29 @@ const VideoPlayerSection = () => {
     );
   }
 
+  if (!episodeData || !hasPlayableSources) {
+    return (
+      <div className="space-y-3">
+        {playerHeader}
+        <Alert className="rounded-2xl border-white/[0.08] bg-[#101018] text-zinc-200">
+          <AlertCircle className="h-4 w-4 text-[#ff70bd]" />
+          <AlertTitle className="font-bold">No playable stream was returned</AlertTitle>
+          <AlertDescription className="mt-1 flex flex-col gap-3 text-sm text-zinc-400">
+            This provider did not return a usable video URL. Try the alternate player or another server.
+            <Button size="sm" variant="secondary" onClick={() => selectFallbackServer()}>Try Server 1</Button>
+          </AlertDescription>
+        </Alert>
+        {playerControls}
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-3">
       {playerHeader}
       <VideoPlayer
-        key={episodeData?.sources?.[0]?.url}
-        episodeInfo={episodeData!}
+        key={episodeData.sources[0].url}
+        episodeInfo={episodeData}
         serversData={{
           episodeId: activeEpisodeId,
           episodeNo: String(currentEpNumber),
