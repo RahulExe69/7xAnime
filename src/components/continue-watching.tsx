@@ -12,6 +12,7 @@ import useBookMarks from "@/hooks/use-get-bookmark";
 import { useAuthStore } from "@/store/auth-store";
 import { isLocalBackendEnabled } from "@/lib/api";
 import { getRecentLocalWatchProgress } from "@/lib/local-watch-progress";
+import AnimeLanguageBadges from "@/components/anime-language-badges";
 import { Button } from "./ui/button";
 
 type WatchedAnime = IAnime & { episode: WatchHistory | string };
@@ -92,6 +93,7 @@ export default function ContinueWatching({ loading = false }: { loading: boolean
             <Link key={`${item.id}-${index}`} href={ROUTES.watchAnime(item.id, episodeNumber)} className="group flex w-[68%] max-w-[360px] shrink-0 snap-start items-center gap-3 rounded-2xl border border-[#dedbea] bg-white p-2.5 shadow-[0_4px_16px_rgba(37,25,81,0.035)] transition hover:border-[#8b73ed]/65 hover:shadow-[0_9px_24px_rgba(88,68,173,0.10)] dark:border-[#332f47] dark:bg-[#191724] dark:hover:border-[#7565ce] sm:w-[48%] md:w-[38%] lg:w-[30%]">
               <div className="relative h-[70px] w-[50px] shrink-0 overflow-hidden rounded-xl bg-[#ebe9f4] dark:bg-[#2b273b]">
                 <Image src={item.poster || "/brand/7xanime-mark.svg"} alt={item.name} fill sizes="72px" className="object-cover" unoptimized />
+                <AnimeLanguageBadges animeId={String(item.id)} titles={[item.name, item.jname || ""]} />
                 <span className="absolute inset-0 grid place-items-center bg-black/0 text-white transition group-hover:bg-black/25"><Play className="h-6 w-6 opacity-0 drop-shadow group-hover:opacity-100" /></span>
               </div>
               <div className="min-w-0 flex-1">

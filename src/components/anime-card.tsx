@@ -27,6 +27,7 @@ type Props = {
   episodeLabel?: string | null;
   statusLabel?: string | null;
   animeId?: string | number;
+  languageAliases?: string[];
 };
 
 const formatScore = (score?: number | null) => {
@@ -40,21 +41,31 @@ const AnimeCard = ({ displayDetails = true, variant = "sm", ...props }: Props) =
   const clampedCurrent = Math.min(safeCurrent, safeTotal);
   const percentage = safeTotal > 0 ? (clampedCurrent / safeTotal) * 100 : 0;
   const score = formatScore(props.score);
-  const detailsHref = props.href || ROUTES.HOME;
+  const suppliedHref = props.href || ROUTES.HOME;
   const getAnimeId = () => {
     if (props.animeId !== undefined && props.animeId !== null) return String(props.animeId);
     try {
-      const route = new URL(props.quickWatchHref || detailsHref, "https://7xanime.local");
+      const route = new URL(props.quickWatchHref || suppliedHref, "https://7xanime.local");
       const queryId = route.searchParams.get("id") || route.searchParams.get("anime");
       if (queryId) return queryId;
-      const legacyPathId = route.pathname.match(/^\\/anime\\/([^/]+)$/)?.[1];
+      const pathParts = route.pathname.split("/").filter(Boolean);
+      const legacyPathId = pathParts[0] === "anime" && pathParts[1] !== "watch" ? pathParts[1] : "";
       return legacyPathId ? decodeURIComponent(legacyPathId) : "";
     } catch {
       return "";
     }
   };
   const animeId = getAnimeId();
-  const playHref = props.quickWatchHref || (animeId ? ROUTES.watchAnime(animeId) : detailsHref);
+  const detailsHref = (() => {
+    try {
+      const route = new URL(suppliedHref, "https://7xanime.local");
+      if (route.pathname.replace(/\/$/, "") === ROUTES.WATCH && animeId) return ROUTES.animeDetails(animeId);
+      return suppliedHref;
+    } catch {
+      return suppliedHref;
+    }
+  })();
+  const playHref = props.quickWatchHref || (animeId ? ROUTES.watchAnime(animeId) : suppliedHref);
 
   return (
     <div className={cn(
@@ -102,7 +113,7 @@ const AnimeCard = ({ displayDetails = true, variant = "sm", ...props }: Props) =
             <Info className="h-4 w-4" />
           </Link>
         )}
-        {animeId && <AnimeLanguageBadges animeId={animeId} titles={[props.title, props.subTitle || ""].filter(Boolean)} />}
+        {animeId && <AnimeLanguageBadges animeId={animeId} titles={[props.title, props.subTitle || "", ...(props.languageAliases || [])].filter(Boolean)} />}
       </div>
 
       {displayDetails && (

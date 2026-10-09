@@ -180,8 +180,7 @@ const VideoPlayerSection = () => {
   const {
     data: hindiDubData,
     isLoading: isLoadingHindi,
-    isError: isHindiError,
-    refetch: retryHindi,
+
   } = useQuery({
     queryKey: ["HINDI_DUB_STREAMS", animeIdParam, currentEpNumber, animeTitleOptions],
     queryFn: () => getHindiDubStreams(animeTitleOptions, currentEpNumber),
