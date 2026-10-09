@@ -545,7 +545,17 @@ function VideoPlayer({
     };
 
     // --- Initialize ArtPlayer ---
-    const art = new Artplayer(finalOptions);
+    // Invalid provider metadata or a plugin regression must not bubble into
+    // Next's route-level error boundary (the full-screen "Something went wrong").
+    // Let the player section switch to its fallback instead.
+    let art: Artplayer;
+    try {
+      art = new Artplayer(finalOptions);
+    } catch (error) {
+      console.error("ArtPlayer initialization failed; switching to fallback:", error);
+      onError?.();
+      return;
+    }
     artInstanceRef.current = art;
 
     // --- Skip Logic Handler ---
