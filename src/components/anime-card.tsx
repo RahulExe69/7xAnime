@@ -69,7 +69,7 @@ const AnimeCard = ({ displayDetails = true, variant = "sm", ...props }: Props) =
 
   return (
     <div className={cn(
-      "group relative isolate flex w-full min-w-0 flex-col overflow-hidden rounded-2xl border border-[#dedbea] bg-white shadow-[0_5px_18px_rgba(37,25,81,0.045)] transition duration-200 hover:-translate-y-0.5 hover:border-[#8b73ed]/65 hover:shadow-[0_9px_26px_rgba(88,68,173,0.12)] dark:border-[#332f47] dark:bg-[#191724] dark:hover:border-[#7565ce]",
+      "group relative isolate flex w-full min-w-0 flex-col overflow-hidden rounded-2xl border border-[#dedbea] bg-white shadow-[0_5px_18px_rgba(37,25,81,0.045)] transition duration-150 hover:-translate-y-0.5 hover:border-[#ff2f9d]/65 hover:shadow-[0_9px_26px_rgba(88,68,173,0.12)] dark:border-[#332f47] dark:bg-[#191724] dark:hover:border-[#ff2f9d]",
       variant === "sm" && "max-w-[11.5rem]",
       variant === "lg" && "max-w-[15rem]",
       props.className,
@@ -80,7 +80,7 @@ const AnimeCard = ({ displayDetails = true, variant = "sm", ...props }: Props) =
           alt={props.title}
           fill
           sizes="(max-width: 640px) 44vw, (max-width: 1024px) 22vw, 180px"
-          className="object-cover transition-transform duration-300 group-hover:scale-[1.025]"
+          className="object-cover transition-transform duration-150 group-hover:scale-[1.02]"
           unoptimized
         />
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/10" />
@@ -109,7 +109,7 @@ const AnimeCard = ({ displayDetails = true, variant = "sm", ...props }: Props) =
           <span className="sr-only">Watch {props.title}</span>
         </Link>
         {animeId && (
-          <Link href={detailsHref} title={`Details for ${props.title}`} aria-label={`Details for ${props.title}`} className="absolute bottom-2 right-2 z-30 grid h-8 w-8 place-items-center rounded-full border border-white/25 bg-black/75 text-white shadow-lg backdrop-blur transition hover:bg-[#604bd3] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white">
+          <Link href={detailsHref} title={`Details for ${props.title}`} aria-label={`Details for ${props.title}`} className="absolute bottom-2 right-2 z-30 grid h-8 w-8 place-items-center rounded-full border border-white/25 bg-black/75 text-white shadow-lg backdrop-blur transition hover:bg-[#ff2f9d] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white">
             <Info className="h-4 w-4" />
           </Link>
         )}
