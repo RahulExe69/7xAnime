@@ -271,7 +271,14 @@ const VideoPlayerSection = () => {
 
   const advanceAfterSourceFailure = useCallback(() => {
     if (activeEpisodeId) attemptedSourceIdsRef.current.add(activeEpisodeId);
-    const next = automaticCandidates.find((candidate) => !attemptedSourceIdsRef.current.has(candidate.id));
+    const currentCandidateIndex = automaticCandidates.findIndex((candidate) => candidate.id === activeEpisodeId);
+    const orderedCandidates = currentCandidateIndex >= 0
+      ? [
+          ...automaticCandidates.slice(currentCandidateIndex + 1),
+          ...automaticCandidates.slice(0, currentCandidateIndex),
+        ]
+      : automaticCandidates;
+    const next = orderedCandidates.find((candidate) => !attemptedSourceIdsRef.current.has(candidate.id));
     if (next) {
       attemptedSourceIdsRef.current.add(next.id);
       setUseFallback(false);
