@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title">
+  <title id="title">7xAnime mark</title>
+  <defs>
+    <linearGradient id="markFill" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="0.56" stop-color="#eeeaff"/>
+      <stop offset="1" stop-color="#b8a3ff"/>
+    </linearGradient>
+    <radialGradient id="ambient" cx="0.52" cy="0.48" r="0.62">
+      <stop offset="0" stop-color="#6d28d9" stop-opacity="0.25"/>
+      <stop offset="1" stop-color="#09090f" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="softGlow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="10"/>
+    </filter>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="#09090f"/>
+  <circle cx="256" cy="256" r="226" fill="url(#ambient)"/>
+  <path d="M104 98H408V166H300L194 410H122L229 166H104Z" fill="#8b5cf6" opacity="0.24" filter="url(#softGlow)"/>
+  <path d="M104 98H408V166H300L194 410H122L229 166H104Z" fill="url(#markFill)"/>
+  <!-- A small magenta facet embedded in the 7's diagonal, not a separate letter. -->
+  <path d="M203 280L239 296L210 316Z" fill="#ff2f9d"/>
+</svg>

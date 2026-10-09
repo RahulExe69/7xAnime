@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title">
+  <title id="title">7xAnime adaptive icon foreground</title>
+  <defs>
+    <linearGradient id="markFill" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="0.56" stop-color="#eeeaff"/>
+      <stop offset="1" stop-color="#b8a3ff"/>
+    </linearGradient>
+  </defs>
+  <path d="M104 98H408V166H300L194 410H122L229 166H104Z" fill="url(#markFill)"/>
+  <path d="M203 280L239 296L210 316Z" fill="#ff2f9d"/>
+</svg>

@@ -123,4 +123,84 @@ debug_strings.write_text(
     encoding="utf-8",
 )
 
+
+# Generate launcher artwork from the repository's source-of-truth SVGs.
+# CairoSVG is installed explicitly by the Android build workflow.
+try:
+    import cairosvg
+except ImportError as exc:
+    print("ERROR: CairoSVG is required to generate branded Android launcher icons.", file=sys.stderr)
+    raise SystemExit(1) from exc
+
+brand_dir = Path("public/brand")
+brand_mark = brand_dir / "7xanime-mark.svg"
+brand_foreground = brand_dir / "7xanime-foreground.svg"
+brand_monochrome = brand_dir / "7xanime-monochrome.svg"
+for source in (brand_mark, brand_foreground, brand_monochrome):
+    if not source.is_file():
+        print(f"ERROR: missing 7xAnime brand asset: {source}", file=sys.stderr)
+        raise SystemExit(1)
+
+resource_root = Path("android/app/src/main/res")
+density_specs = [
+    ("mdpi", 48, 108),
+    ("hdpi", 72, 162),
+    ("xhdpi", 96, 216),
+    ("xxhdpi", 144, 324),
+    ("xxxhdpi", 192, 432),
+]
+for density, legacy_size, adaptive_size in density_specs:
+    output_dir = resource_root / f"mipmap-{density}"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    for icon_name in ("ic_launcher", "ic_launcher_round"):
+        cairosvg.svg2png(
+            url=str(brand_mark),
+            write_to=str(output_dir / f"{icon_name}.png"),
+            output_width=legacy_size,
+            output_height=legacy_size,
+        )
+    for icon_name, source in (
+        ("ic_launcher_foreground", brand_foreground),
+        ("ic_launcher_monochrome", brand_monochrome),
+    ):
+        cairosvg.svg2png(
+            url=str(source),
+            write_to=str(output_dir / f"{icon_name}.png"),
+            output_width=adaptive_size,
+            output_height=adaptive_size,
+        )
+
+colors_file = resource_root / "values" / "colors.xml"
+colors_file.parent.mkdir(parents=True, exist_ok=True)
+if colors_file.is_file():
+    colors_text = colors_file.read_text(encoding="utf-8")
+else:
+    colors_text = '<?xml version="1.0" encoding="utf-8"?>\\n<resources>\\n</resources>\\n'
+if re.search(r'<color name="brand_background">.*?</color>', colors_text):
+    colors_text = re.sub(
+        r'<color name="brand_background">.*?</color>',
+        '<color name="brand_background">#09090F</color>',
+        colors_text,
+        count=1,
+    )
+else:
+    colors_text = colors_text.replace(
+        "</resources>",
+        '    <color name="brand_background">#09090F</color>\\n</resources>',
+        1,
+    )
+colors_file.write_text(colors_text, encoding="utf-8")
+
+adaptive_icon_dir = resource_root / "mipmap-anydpi-v26"
+adaptive_icon_dir.mkdir(parents=True, exist_ok=True)
+adaptive_icon = '''<?xml version="1.0" encoding="utf-8"?>
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@color/brand_background" />
+    <foreground android:drawable="@mipmap/ic_launcher_foreground" />
+    <monochrome android:drawable="@mipmap/ic_launcher_monochrome" />
+</adaptive-icon>
+'''
+(adaptive_icon_dir / "ic_launcher.xml").write_text(adaptive_icon, encoding="utf-8")
+(adaptive_icon_dir / "ic_launcher_round.xml").write_text(adaptive_icon, encoding="utf-8")
+
 print(f"Configured com.sevenx.anime version {version_name} ({version_code}) with a separate debug id com.sevenx.anime.debug.")

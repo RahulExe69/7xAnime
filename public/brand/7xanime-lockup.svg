@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 220" role="img" aria-labelledby="title">
+  <title id="title">7xAnime</title>
+  <defs>
+    <linearGradient id="markFill" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="0.56" stop-color="#eeeaff"/>
+      <stop offset="1" stop-color="#b8a3ff"/>
+    </linearGradient>
+    <linearGradient id="brandType" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#ff45ad"/>
+      <stop offset="0.55" stop-color="#b58aff"/>
+      <stop offset="1" stop-color="#8d72ff"/>
+    </linearGradient>
+  </defs>
+  <rect width="900" height="220" rx="24" fill="#09090f"/>
+  <g transform="translate(12 18) scale(0.36)">
+    <path d="M104 98H408V166H300L194 410H122L229 166H104Z" fill="url(#markFill)"/>
+    <path d="M203 280L239 296L210 316Z" fill="#ff2f9d"/>
+  </g>
+  <text x="205" y="146" font-family="Geist, Inter, Arial, sans-serif" font-size="91" font-weight="750" letter-spacing="-4" fill="url(#brandType)">7x</text>
+  <text x="318" y="146" font-family="Geist, Inter, Arial, sans-serif" font-size="91" font-weight="750" letter-spacing="-4" fill="#f6f4ff">Anime</text>
+</svg>

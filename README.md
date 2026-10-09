@@ -1,4 +1,4 @@
-![logo.png](logo.png)
+![7xAnime brand mark and wordmark](public/brand/7xanime-lockup.svg)
 
 Watch your favourite anime anywhere, anytime. No Ads.
 

@@ -90,7 +90,7 @@ const NavBar = () => {
             href={ROUTES.HOME}
             className="flex min-w-0 items-center gap-2 cursor-pointer"
           >
-            <Image src="/icon.png" alt="7xAnime logo" width={44} height={44} className="h-11 w-11 rounded-xl object-cover" />
+            <Image src="/brand/7xanime-mark.svg" alt="7xAnime logo" width={44} height={44} unoptimized className="h-11 w-11 rounded-xl object-cover" />
             <h1
               className={cn([
                 nightTokyo.className,
