@@ -63,6 +63,84 @@ export default function NativeBackHandler() {
     currentRoute.current = next;
   }, [route]);
 
+  // On Android, the OS may reclaim the WebView while another app is open.
+  // Remember only a live watch route when backgrounding; if the app is recreated
+  // at "/", restore that exact episode rather than dumping the viewer at Home.
+  const restoreAttempted = useRef(false);
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform() || Capacitor.getPlatform() !== "android") return;
+    const resumeKey = "7xanime:pending-watch-resume";
+
+    const isWatchRoute = (value: string) => {
+      const target = new URL(normalizeRoute(value), "https://7xanime.local");
+      return normalizePath(target.pathname) === WATCH && !!target.searchParams.get("anime");
+    };
+    const persistWatchRoute = () => {
+      const target = normalizeRoute(currentRoute.current);
+      if (!isWatchRoute(target)) return;
+      try {
+        localStorage.setItem(resumeKey, JSON.stringify({ route: target, timestamp: Date.now() }));
+      } catch { /* Storage may be unavailable in restricted WebView contexts. */ }
+    };
+    const clearPendingResume = () => {
+      try { localStorage.removeItem(resumeKey); } catch { /* Best-effort cleanup. */ }
+    };
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "hidden") persistWatchRoute();
+      else if (isWatchRoute(currentRoute.current)) clearPendingResume();
+    };
+
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    window.addEventListener("pagehide", persistWatchRoute);
+    let disposed = false;
+    let listener: { remove: () => Promise<void> } | undefined;
+    void App.addListener("appStateChange", ({ isActive }) => {
+      if (!isActive) persistWatchRoute();
+      else if (isWatchRoute(currentRoute.current)) clearPendingResume();
+    }).then((handle) => {
+      if (disposed) void handle.remove();
+      else listener = handle;
+    }).catch((error) => {
+      console.warn("Could not register watch-route resume handling:", error);
+    });
+
+    return () => {
+      disposed = true;
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      window.removeEventListener("pagehide", persistWatchRoute);
+      if (listener) void listener.remove();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform() || Capacitor.getPlatform() !== "android" || restoreAttempted.current) return;
+    restoreAttempted.current = true;
+    if (normalizePath(pathname) !== HOME) {
+      try { localStorage.removeItem("7xanime:pending-watch-resume"); } catch {}
+      return;
+    }
+
+    try {
+      const raw = localStorage.getItem("7xanime:pending-watch-resume");
+      if (!raw) return;
+      const saved = JSON.parse(raw) as { route?: string; timestamp?: number };
+      const age = Date.now() - Number(saved.timestamp || 0);
+      const target = typeof saved.route === "string" ? normalizeRoute(saved.route) : "";
+      const parsed = target ? new URL(target, "https://7xanime.local") : null;
+      const validRoute = !!parsed &&
+        normalizePath(parsed.pathname) === WATCH &&
+        !!parsed.searchParams.get("anime") &&
+        age >= 0 && age <= 30 * 60 * 1000;
+      localStorage.removeItem("7xanime:pending-watch-resume");
+      if (validRoute && target) {
+        pendingRoute.current = target;
+        routerRef.current.replace(target);
+      }
+    } catch {
+      try { localStorage.removeItem("7xanime:pending-watch-resume"); } catch {}
+    }
+  }, [pathname, search]);
+
   useEffect(() => {
     if (!Capacitor.isNativePlatform() || Capacitor.getPlatform() !== "android") return;
     let disposed = false;
