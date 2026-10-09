@@ -5,7 +5,6 @@ import localFont from "next/font/local";
 
 import NavBar from "@/components/navbar";
 import Footer from "@/components/footer";
-import BottomNav from "@/components/bottom-nav";
 import NativeBackHandler from "@/components/native-back-handler";
 import Script from "next/script";
 import QueryProvider from "@/providers/query-provider";
@@ -77,7 +76,7 @@ export default function RootLayout({
         <link rel="icon" href="/brand/7xanime-mark.svg" type="image/svg+xml" sizes="any" />
       </head>
       <body
-        className={`${geistSans.className} antialiased max-w-[100vw] overflow-x-hidden bg-background text-foreground pb-[78px] lg:pb-0`}
+        className={`${geistSans.className} antialiased max-w-[100vw] overflow-x-hidden bg-background text-foreground`}
       >
         <ThemeProvider
           attribute="class"
@@ -93,7 +92,6 @@ export default function RootLayout({
             <NavBar />
             {children}
             <Footer />
-            <BottomNav />
           </QueryProvider>
         </ThemeProvider>
         <Toaster />
