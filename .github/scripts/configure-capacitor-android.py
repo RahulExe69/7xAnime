@@ -150,7 +150,7 @@ density_specs = [
     ("xxhdpi", 144, 324),
     ("xxxhdpi", 192, 432),
 ]
-def write_padded_launcher_svg(source: Path, destination: Path, *, has_background: bool, scale: float = 0.62) -> None:
+def write_padded_launcher_svg(source: Path, destination: Path, *, has_background: bool, scale: float = 0.76) -> None:
     """Center the 7x artwork within Android's launcher safe area without altering web assets."""
     source_text = source.read_text(encoding="utf-8")
     offset = 512 * (1 - scale) / 2
