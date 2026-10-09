@@ -1,6 +1,6 @@
 # 7xAnime playback server guide
 
-**Active servers are limited to three known-working choices:** Server 1 is MegaPlay, followed by AniXo and Megavid. The screenshot/device test confirms these three can play. Kuhi's native adapters and the other researched APIs are parked and are not queried; re-enable or integrate them only when explicitly requested. Auto no longer races the inactive providers.
+**Server 1 remains MegaPlay**, followed by manually selectable AniXo, Megavid, AnimeParadise, and Cosmic Player. The first three of the previously tested choices (MegaPlay, AniXo, and Megavid) are user-reported working; AnimeParadise and Cosmic are new manual tests and are not verified on a real device yet. Other Kuhi adapters remain parked. Auto excludes these manual-only test sources.
 
 ## New manual test servers
 
@@ -12,15 +12,15 @@ Both new choices are held out of automatic provider racing until real Android pl
 
 ## Numbered server labels
 
-The Android package still contains legacy adapter code, but the app exposes only AniXo and Megavid as Server 2 and Server 3. MegaPlay is Server 1. The other eleven adapters are disabled at the app/backend allowlist and must not be contacted by episode discovery or playback. The active server map is:
+The Android package still contains legacy adapter code, but the app exposes only the four allowlisted manual selections below after Server 1. AnimeParadise is resolved only after explicit selection to avoid unnecessary searches; its HLS/signed-link flow still requires a phone playback check. Other Kuhi adapters are disabled at the app/backend allowlist and must not be contacted by episode discovery or playback. The active server map is:
 
 | Local rank | API provider key | Display name | Provider site |
 |---:|---|---|---|
 | 1 | `megaplay` | MegaPlay (dedicated iframe) | https://megaplay.buzz |
 | 2 | `anixo` | AniXo (manual embed) | https://anixo.buzz |
-| 3 | `megavid` | Megavid (manual embed) | https://megavid.buzz |
+| 3 | `megavid` | Megavid (manual embed) | https://megavid.buzz |\n| 4 | `animeparadise` | AnimeParadise (manual HLS) | https://animeparadise.moe |\n| 5 | `cosmic` | Cosmic Player (MegaPlay-backed embed) | https://cosmic-api-azure.vercel.app |
 
-For Sub/Dub, the UI filters providers by the selected audio type and media formats the player can use. The visible provider labels start at **Server 2** because Server 1 is reserved for MegaPlay. AniXo and Megavid are manually selectable iframe endpoints; a route response is not playback proof, and these two are deliberately excluded from Auto. A provider can be loaded but still have no stream for a particular anime/episode; diagnostics distinguish module-load, route/stream extraction, and observed player events. Manual selections are strict: selecting one provider never silently returns another provider's stream. Auto is the only cross-provider race. The same server number may refer to a different provider if the compatible provider set changes.
+For Sub/Dub, the UI filters providers by the selected audio type and media formats the player can use. The visible provider labels start at **Server 2** because Server 1 is reserved for MegaPlay. AniXo, Megavid, and Cosmic are manually selectable iframe endpoints; AnimeParadise returns HLS but stays manual-only during verification. A route response is not playback proof, and these four are deliberately excluded from Auto. A provider can be loaded but still have no stream for a particular anime/episode; diagnostics distinguish module-load, route/stream extraction, and observed player events. Manual selections are strict: selecting one provider never silently returns another provider's stream. Auto is the only cross-provider race. The same server number may refer to a different provider if the compatible provider set changes.
 
 ## Hindi dub catalogue
 
@@ -36,7 +36,7 @@ Server 1 currently opens:
 
 `https://megaplay.buzz/stream/ani/{anilistId}/{episodeNumber}/{sub-or-dub}`
 
-The iframe progress listener also recognises messages from MegaCloud. Kuhi's pinned source remains in the repository for later research, but it is currently parked: local episode discovery, diagnostics, and watch routes only allow AniXo and Megavid. Frontend labels/audio-format capability metadata are kept in `src/lib/server-map.ts`.
+The iframe progress listener also recognises messages from MegaCloud. Kuhi's pinned source remains in the repository for later research, but it is currently parked: local diagnostics and watch routes allow only AniXo, Megavid, AnimeParadise, and Cosmic; background episode discovery skips AnimeParadise until a user selects it. Frontend labels/audio-format capability metadata are kept in `src/lib/server-map.ts`.
 
 ## Updating the map
 
