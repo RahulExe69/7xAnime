@@ -21,8 +21,26 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useGetAllEpisodes } from "@/query/get-all-episodes";
 
 import useBookMarks from "@/hooks/use-get-bookmark";
-import { isLocalBackendEnabled } from "@/lib/api";
+import { api, isLocalBackendEnabled } from "@/lib/api";
 import { saveLocalWatchProgress } from "@/lib/local-watch-progress";
+
+type LocalProviderDiagnostic = {
+  id: string;
+  moduleLoaded: boolean;
+  status: "module_unavailable" | "not_tested_yet" | "recent_attempts_failed" | "recent_attempt_succeeded";
+  averageSeconds: number | null;
+  episodesSeconds: number | null;
+  failuresSinceLastSuccess: number;
+};
+
+type LocalProviderStatus = {
+  mode: string;
+  defaultProvider: string;
+  loadedCount: number;
+  providerCount: number;
+  providers: LocalProviderDiagnostic[];
+  note: string;
+};
 
 const updateEpisodeUrl = (episodeId: string, episodeNumber: number) => {
   if (typeof window === "undefined") return;
@@ -72,6 +90,10 @@ const VideoPlayerSection = () => {
     : "";
   const activeEpisodeId = episodeIdParam || localAutoEpisodeId || preferredEpisodeId ||
     (epParam ? targetEpByNumber?.episodeId || "" : allEpisodesData?.episodes?.[0]?.episodeId || "");
+  const hasManualProviderSelection =
+    isLocalBackendEnabled() &&
+    !!episodeIdParam &&
+    !episodeIdParam.startsWith("watch/auto/");
 
   // Only mirror an explicit episode ID from the URL into Zustand.
   // When a URL contains only ?ep=N, EpisodePlaylist owns the highlighted
@@ -88,7 +110,12 @@ const VideoPlayerSection = () => {
   const [useFallback, setUseFallback] = useState<boolean>(false);
   const [isHindiMode, setIsHindiMode] = useState<boolean>(false);
   const [selectedHindiServer, setSelectedHindiServer] = useState<number>(0);
+  const [manualProviderPlaybackFailed, setManualProviderPlaybackFailed] = useState(false);
   const attemptedSourceIdsRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    setManualProviderPlaybackFailed(false);
+  }, [activeEpisodeId]);
 
   const {
     data: episodeData,
@@ -184,6 +211,11 @@ const VideoPlayerSection = () => {
     const requestFailed = streamRequestFailed;
     if (!requestFailed) return;
 
+    // A manually chosen provider is strict. Keep the failure visible so the
+    // viewer can compare another source instead of silently cycling through all
+    // sources and ending up at Server 1 every time.
+    if (hasManualProviderSelection) return;
+
     // The local "auto" route has already raced every bundled stream provider.
     // If that race returned no source, trying the same providers sequentially
     // can add another long wait per host; move to Server 1 instead.
@@ -211,7 +243,7 @@ const VideoPlayerSection = () => {
     activeEpisodeId, advanceAfterSourceFailure, allEpisodesData?.rawResponse?.complete,
     allEpisodesData?.rawResponse?.source, automaticCandidates, episodeData,
     isEpisodeDataError, isEpisodesLoading, isHindiMode, isLoadingData,
-    streamRequestFailed, useFallback,
+    streamRequestFailed, useFallback, hasManualProviderSelection,
   ]);
   const animeTitleOptions = useMemo(
     () => [...new Set([
@@ -232,6 +264,15 @@ const VideoPlayerSection = () => {
     staleTime: 1000 * 60 * 10,
   });
   const hindiStreams = hindiDubData?.streams || [];
+
+  const { data: localProviderStatus, isLoading: isLoadingProviderStatus } = useQuery<LocalProviderStatus>({
+    queryKey: ["local-provider-status"],
+    queryFn: async () => (await api.get<LocalProviderStatus>("/providers/status")).data,
+    enabled: isLocalBackendEnabled(),
+    staleTime: 1000 * 15,
+    refetchOnWindowFocus: false,
+    retry: 0,
+  });
 
   // Check sub/dub availability for this episode
   const hasSub = providerNames.some((p) => (rawProviders[p]?.episodes?.sub || []).length > 0);
@@ -417,7 +458,14 @@ const VideoPlayerSection = () => {
     currentProviderName === "auto" &&
     !isHindiMode &&
     !useFallback;
-  const activeServerLabel = isAutomaticServerActive ? "Auto" : `Server ${activeServerNumber}`;
+  const actualProviderName = episodeData?.provider || "";
+  const activeServerLabel = isAutomaticServerActive
+    ? actualProviderName && actualProviderName !== "auto"
+      ? `Auto → ${getProviderDisplayName(actualProviderName)}`
+      : "Auto"
+    : activeServerNumber === 1
+      ? "Server 1 — MegaPlay"
+      : `Server ${activeServerNumber} — ${getProviderDisplayName(currentProviderName)}`;
 
   const selectFallbackServer = (category?: "sub" | "dub") => {
     if (category) setPreferredCategory(category);
@@ -430,6 +478,23 @@ const VideoPlayerSection = () => {
     setSelectedHindiServer(0);
     setIsHindiMode(true);
   };
+
+  const selectAutomaticServer = () => {
+    setIsHindiMode(false);
+    setUseFallback(false);
+    const targetId = `watch/auto/${animeIdParam}/${activeCategory}/episode-${currentEpNumber}`;
+    attemptedSourceIdsRef.current.delete(targetId);
+    setSelectedEpisode(targetId);
+    updateEpisodeUrl(targetId, currentEpNumber);
+  };
+
+  const handlePlayerError = useCallback(() => {
+    if (hasManualProviderSelection) {
+      setManualProviderPlaybackFailed(true);
+      return;
+    }
+    advanceAfterSourceFailure();
+  }, [advanceAfterSourceFailure, hasManualProviderSelection]);
 
   const playerAnimeInfo = useMemo(
     () => ({
@@ -469,9 +534,13 @@ const VideoPlayerSection = () => {
           ))
         ) : (
           <>
-            <Button size="sm" title="Server 1 — MegaPlay" aria-label="Server 1 — MegaPlay" onClick={() => selectFallbackServer()} className={`h-9 min-w-9 rounded-xl px-3 text-xs font-extrabold transition ${activeServerNumber === 1 && (useFallback || isFallbackActive) ? "bg-[#ff2f9d] text-white" : "border border-white/[0.08] bg-white/[0.035] text-zinc-300 hover:border-[#ff2f9d]/30 hover:bg-[#ff2f9d]/10"}`}>1</Button>
+            <Button size="sm" title="Server 1 — MegaPlay" aria-label="Server 1 — MegaPlay" onClick={() => selectFallbackServer()} className={`h-10 min-w-12 rounded-xl px-2.5 text-xs font-extrabold transition ${activeServerNumber === 1 && (useFallback || isFallbackActive) ? "bg-[#ff2f9d] text-white" : "border border-white/[0.08] bg-white/[0.035] text-zinc-300 hover:border-[#ff2f9d]/30 hover:bg-[#ff2f9d]/10"}`}>
+              <span className="flex flex-col items-center gap-0.5 leading-none"><span>1</span><span className="text-[8px] font-semibold opacity-80">MegaPlay</span></span>
+            </Button>
             {availableProviderNames.map((providerName, index) => (
-              <Button key={`${activeCategory}-${providerName}`} size="sm" title={getServerProviderTitle(availableProviderNames, providerName)} aria-label={getServerProviderTitle(availableProviderNames, providerName)} onClick={() => handleProviderSelect(providerName, activeCategory)} className={`h-9 min-w-9 rounded-xl px-3 text-xs font-extrabold transition ${activeServerNumber === index + 2 ? "bg-[#ff2f9d] text-white" : "border border-white/[0.08] bg-white/[0.035] text-zinc-300 hover:border-[#ff2f9d]/30 hover:bg-[#ff2f9d]/10"}`}>{index + 2}</Button>
+              <Button key={`${activeCategory}-${providerName}`} size="sm" title={getServerProviderTitle(availableProviderNames, providerName)} aria-label={getServerProviderTitle(availableProviderNames, providerName)} onClick={() => handleProviderSelect(providerName, activeCategory)} className={`h-10 min-w-12 rounded-xl px-2.5 text-xs font-extrabold transition ${currentProviderName === providerName && !useFallback && !isHindiMode ? "bg-[#ff2f9d] text-white" : "border border-white/[0.08] bg-white/[0.035] text-zinc-300 hover:border-[#ff2f9d]/30 hover:bg-[#ff2f9d]/10"}`}>
+                <span className="flex flex-col items-center gap-0.5 leading-none"><span>{index + 2}</span><span className="text-[8px] font-semibold opacity-80">{getProviderDisplayName(providerName)}</span></span>
+              </Button>
             ))}
             {isLocalBackendEnabled() && !nativeCatalogueComplete && availableProviderNames.length === 0 && (
               <span className="px-2 text-xs text-zinc-500" role="status">Finding servers…</span>
@@ -479,6 +548,29 @@ const VideoPlayerSection = () => {
           </>
         )}
       </div>
+      {isLocalBackendEnabled() && (
+        <details className="border-t border-white/[0.06] pt-3 text-xs text-zinc-400">
+          <summary className="cursor-pointer select-none font-semibold text-zinc-300">
+            Provider diagnostics {localProviderStatus ? `· ${localProviderStatus.loadedCount}/${localProviderStatus.providerCount} modules loaded` : isLoadingProviderStatus ? "· checking…" : ""}
+          </summary>
+          <p className="mt-2 leading-5 text-zinc-500">
+            Loaded means the provider module is present, not that every anime has a playable stream. Results update as you try sources.
+          </p>
+          <div className="mt-2 max-h-52 space-y-1.5 overflow-y-auto pr-1">
+            {(localProviderStatus?.providers || []).map((item) => (
+              <div key={item.id} className="flex items-center justify-between gap-3 rounded-lg bg-white/[0.025] px-2.5 py-2">
+                <span className="min-w-0 truncate font-semibold text-zinc-300">{getProviderDisplayName(item.id)}</span>
+                <span className="shrink-0 text-right">
+                  <span className={item.status === "recent_attempt_succeeded" ? "text-emerald-300" : item.status === "recent_attempts_failed" || item.status === "module_unavailable" ? "text-rose-300" : "text-zinc-500"}>
+                    {item.status === "module_unavailable" ? "Module missing" : item.status === "not_tested_yet" ? "Not tested" : item.status === "recent_attempts_failed" ? "Recent fail" : "Recent success"}
+                  </span>
+                  {typeof item.averageSeconds === "number" && <span className="ml-2 tabular-nums text-zinc-500">{item.averageSeconds.toFixed(1)}s avg</span>}
+                </span>
+              </div>
+            ))}
+          </div>
+        </details>
+      )}
     </div>
   );
   const playerHeader = (
@@ -575,7 +667,31 @@ const VideoPlayerSection = () => {
   // Never mount ArtPlayer with an undefined or empty stream response. That
   // transient render happens before useEffect can switch to the fallback player
   // and can crash the entire Next route on slower Android devices.
-  if (isFallbackActive || streamRequestFailed) {
+  if (hasManualProviderSelection && (streamRequestFailed || manualProviderPlaybackFailed)) {
+    const failedProvider = episodeData?.provider || currentProviderName;
+    return (
+      <div className="space-y-3">
+        {playerHeader}
+        <Alert className="rounded-2xl border-amber-300/15 bg-amber-300/[0.04] text-zinc-200">
+          <AlertCircle className="h-4 w-4 text-amber-300" />
+          <AlertTitle className="font-bold">{getProviderDisplayName(failedProvider)} could not play this episode</AlertTitle>
+          <AlertDescription className="mt-1 flex flex-col gap-3 text-sm text-zinc-400">
+            {episodeData?.providerError || (manualProviderPlaybackFailed
+              ? "The provider returned a stream, but playback failed in the player."
+              : "This provider returned no playable stream for this episode. It has not been silently replaced with another provider.")}
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" variant="secondary" onClick={selectAutomaticServer}>Try Auto</Button>
+              <Button size="sm" onClick={() => selectFallbackServer()}>Try Server 1 · MegaPlay</Button>
+            </div>
+            <span className="text-xs text-zinc-500">Or tap a differently named provider below to test that server directly.</span>
+          </AlertDescription>
+        </Alert>
+        {playerControls}
+      </div>
+    );
+  }
+
+  if (isFallbackActive || (streamRequestFailed && !hasManualProviderSelection)) {
     const fallbackAnimeId = animeIdParam || anime?.anime?.info?.id || "1";
     const fallbackEpId = currentEpNumber || "1";
     const fallbackSrc = `https://megaplay.buzz/stream/ani/${fallbackAnimeId}/${fallbackEpId}/${activeCategory}`;
@@ -634,7 +750,7 @@ const VideoPlayerSection = () => {
         animeInfo={playerAnimeInfo}
         subOrDub={activeCategory}
         autoSkip={autoSkip}
-        onError={advanceAfterSourceFailure}
+        onError={handlePlayerError}
       />
       {playerControls}
     </div>
