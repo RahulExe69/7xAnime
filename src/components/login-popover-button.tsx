@@ -7,6 +7,7 @@ import DiscordIcon from "@/icons/discord";
 import GoogleIcon from "@/icons/google";
 import { pb } from "@/lib/pocketbase";
 import { toast } from "sonner";
+import { UserRound } from "lucide-react";
 import { useAuthStore } from "@/store/auth-store";
 import { isLocalBackendEnabled } from "@/lib/api";
 
@@ -185,15 +186,19 @@ function LoginPopoverButton() {
   if (isLocalBackendEnabled()) {
     return (
       <Button
+        type="button"
         variant="outline"
-        className="border-violet-400/30 bg-violet-500/10 text-violet-100 hover:bg-violet-500/20"
+        aria-label="Guest profile"
+        title="Guest profile"
+        className="grid h-9 w-9 place-items-center rounded-xl border-white/10 bg-white/[0.04] p-0 text-zinc-200 hover:border-[#ff2f9d]/40 hover:bg-[#ff2f9d]/10 hover:text-white"
         onClick={() =>
           toast.info(
             "Guest mode is active. Browsing and playback are on-device; accounts, shared comments, and synced lists need a separate server.",
           )
         }
       >
-        Guest mode
+        <UserRound className="h-5 w-5" aria-hidden="true" />
+        <span className="sr-only">Guest profile</span>
       </Button>
     );
   }
@@ -202,10 +207,14 @@ function LoginPopoverButton() {
     <Popover>
       <PopoverTrigger asChild>
         <Button
+          type="button"
           variant="outline"
-          className="bg-white text-md text-black hover:bg-gray-200 hover:text-black transition-all duration-300"
+          aria-label="Sign in or open profile"
+          title="Sign in"
+          className="grid h-9 w-9 place-items-center rounded-xl border-white/10 bg-white/[0.04] p-0 text-zinc-200 transition hover:border-[#ff2f9d]/40 hover:bg-[#ff2f9d]/10 hover:text-white"
         >
-          Login
+          <UserRound className="h-5 w-5" aria-hidden="true" />
+          <span className="sr-only">Sign in</span>
         </Button>
       </PopoverTrigger>
       <PopoverContent
