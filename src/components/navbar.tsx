@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import React, { useEffect, useState } from "react";
-import { Search, Shuffle } from "lucide-react";
+import { Compass, Search, Shuffle } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { toast } from "sonner";
 
@@ -19,9 +19,8 @@ import SearchOverlay from "./search-overlay";
 
 const menuItems = [
   { title: "Home", href: ROUTES.HOME },
-  { title: "Trending", href: "/#trending" },
-  { title: "Schedule", href: "/#schedule" },
-  { title: "Browse", href: ROUTES.SEARCH },
+  { title: "Explore", href: ROUTES.SEARCH },
+  { title: "My List", href: "/library" },
 ];
 
 export default function NavBar() {
@@ -70,7 +69,7 @@ export default function NavBar() {
       const options = (response.data.results || []).filter((item) => !item.isAdult && item.id);
       if (!options.length) throw new Error("No anime available to randomize");
       const selected = options[Math.floor(Math.random() * options.length)];
-      router.push(ROUTES.animeDetails(selected.id));
+      router.push(ROUTES.watchAnime(selected.id));
     } catch {
       toast.error("Could not load a random anime. Try again in a moment.");
     } finally { setRandomLoading(false); }
@@ -80,17 +79,18 @@ export default function NavBar() {
 
   return (
     <>
-      <header className="fixed inset-x-0 top-0 z-[100] border-b border-[#e2deee] bg-white/90 text-[#5d5874] shadow-[0_2px_12px_rgba(40,28,80,0.025)] backdrop-blur-xl dark:border-[#2a2738] dark:bg-[#13111b]/90 dark:text-[#c0bad7]">
+      <header className="fixed inset-x-0 top-0 z-[100] border-b border-white/[0.07] bg-[#100e19]/95 text-[#d4cfea] shadow-[0_6px_24px_rgba(0,0,0,0.18)] backdrop-blur-xl">
         <Container className="flex h-[62px] items-center justify-between gap-3 px-3 sm:px-5 lg:h-[72px] lg:gap-6">
           <Link href={ROUTES.HOME} aria-label="7xAnime home" className="flex shrink-0 items-center gap-2">
-            <Image src="/brand/7xanime-lockup.svg" alt="7xAnime" width={188} height={48} unoptimized className="h-9 w-[132px] object-contain sm:h-10 sm:w-[150px] lg:h-11 lg:w-[174px]" />
+            <Image src="/brand/7xanime-lockup.svg" alt="7xAnime" width={188} height={48} unoptimized className="h-9 w-[150px] object-contain object-left sm:w-[168px] lg:h-11 lg:w-[190px]" />
           </Link>
           <nav className="hidden items-center gap-5 text-sm font-semibold lg:flex">{menuItems.map((item) => <Link key={item.title} href={item.href} className="transition hover:text-[#ff2f9d] dark:hover:text-[#ff8bc8]">{item.title}</Link>)}</nav>
           <div className="flex min-w-0 items-center justify-end gap-1.5 sm:gap-2 lg:gap-2.5">
 
-            <button type="button" onClick={openRandomAnime} disabled={randomLoading} aria-label="Surprise me with a random anime" title="Random anime" className="grid h-9 w-9 shrink-0 place-items-center rounded-xl transition hover:bg-[#efedf7] hover:text-[#ff2f9d] disabled:opacity-50 dark:hover:bg-white/5 dark:hover:text-[#ff8bc8]"><Shuffle className={`h-[21px] w-[21px] ${randomLoading ? "animate-pulse" : ""}`} /></button>
-            <button type="button" onClick={() => setSearchOpen(true)} aria-label="Search anime" title="Search anime" className="grid h-9 w-9 shrink-0 place-items-center rounded-xl transition hover:bg-[#efedf7] hover:text-[#ff2f9d] dark:hover:bg-white/5 dark:hover:text-[#ff8bc8]"><Search className="h-[22px] w-[22px]" /></button>
-            {auth.auth ? <NavbarAvatar auth={auth} /> : <div className="flex h-9 items-center justify-center rounded-full bg-[#7563d8]/15 px-1 text-sm font-bold text-[#5f4acb] dark:bg-[#7563d8]/20 dark:text-[#c2b7ff]"><LoginPopoverButton /></div>}
+            <Link href={ROUTES.SEARCH} aria-label="Explore anime" title="Explore" className="grid h-9 w-9 place-items-center rounded-xl text-[#bdb5d6] transition-colors hover:bg-white/[0.07] hover:text-white lg:hidden"><Compass className="h-5 w-5" /></Link>
+            <button type="button" onClick={openRandomAnime disabled={randomLoading} aria-label="Surprise me with a random anime" title="Random anime" className="grid h-9 w-9 shrink-0 place-items-center rounded-xl text-[#bdb5d6] transition-colors hover:bg-white/[0.07] hover:text-white disabled:opacity-50"><Shuffle className={`h-[21px] w-[21px] ${randomLoading ? "animate-pulse" : ""}`} /></button>
+            <button type="button" onClick={() => setSearchOpen(true)} aria-label="Search anime" title="Search anime" className="grid h-9 w-9 shrink-0 place-items-center rounded-xl text-[#bdb5d6] transition-colors hover:bg-white/[0.07] hover:text-white"><Search className="h-[22px] w-[22px]" /></button>
+            {auth.auth ? <NavbarAvatar auth={auth} /> : <LoginPopoverButton />}
           </div>
         </Container>
       </header>
