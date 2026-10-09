@@ -10,7 +10,7 @@ from unittest.mock import AsyncMock, patch
 from fastapi.testclient import TestClient
 
 import local_api
-from src.providers import animenosub, anixo, megavid
+from src.providers import animenosub, anixo, animeparadise, cosmic, megavid
 
 
 class LocalAnimeApiTests(unittest.TestCase):
@@ -451,6 +451,76 @@ class LocalAnimeApiTests(unittest.TestCase):
 
         asyncio.run(exercise())
 
+    def test_animeparadise_resolves_signed_hls_and_subtitles_without_network(self) -> None:
+        context = {
+            "media": {"id": 21, "episodes": 12, "title": {"english": "Test Series"}},
+            "anizip": None,
+        }
+        series = {
+            "mediaId": "ap-series-9",
+            "title": "Test Series",
+            "mode": "direct",
+            "offset": 0,
+            "score": 1.0,
+        }
+        catalogue = [
+            {"number": 1, "title": "Episode 1", "uid": "ap-uid-1", "mediaId": "ap-series-9"},
+            {"number": 2, "title": "Episode 2", "uid": "ap-uid-2", "mediaId": "ap-series-9"},
+        ]
+
+        async def exercise() -> None:
+            with (
+                patch.object(animeparadise, "resolve_series", new=AsyncMock(return_value=series)),
+                patch.object(animeparadise, "episode_catalogue", new=AsyncMock(return_value=catalogue)),
+                patch.object(animeparadise, "_get_json", new=AsyncMock(return_value={
+                    "data": {"episode": {
+                        "streamLink": "signed token+/",
+                        "subData": [{"url": "https://subs.example/ep2.vtt", "label": "English"}],
+                    }}
+                })) as get_json,
+            ):
+                sources = await animeparadise.watch(21, "sub", 2, context)
+
+            self.assertEqual(len(sources), 1)
+            self.assertEqual(sources[0]["type"], "hls")
+            self.assertEqual(sources[0]["server"], "AnimeParadise")
+            self.assertIn("/m3u8?url=", sources[0]["url"])
+            self.assertIn("signed+token%2B%2F", sources[0]["url"])
+            self.assertEqual(sources[0]["referer"], "https://animeparadise.moe/")
+            self.assertEqual(sources[0]["subtitles"][0]["url"], "https://subs.example/ep2.vtt")
+            get_json.assert_awaited_once_with("/ep/ap-uid-2", {"origin": "ap-series-9"})
+
+            with (
+                patch.object(animeparadise, "resolve_series", new=AsyncMock(return_value=series)),
+                patch.object(animeparadise, "episode_catalogue", new=AsyncMock(return_value=catalogue)),
+            ):
+                episodes = await animeparadise.get_episodes(21, context)
+            self.assertEqual(len(episodes["episodes"]["sub"]), 2)
+            self.assertEqual(episodes["episodes"]["sub"][1]["id"], "watch/animeparadise/21/sub/animeparadise-2")
+            self.assertEqual(episodes["episodes"]["dub"], [])
+
+        asyncio.run(exercise())
+
+    def test_cosmic_returns_its_player_embed_without_network(self) -> None:
+        context = {
+            "media": {"id": 21, "episodes": 12, "title": {"english": "Test Series"}},
+            "anizip": None,
+        }
+
+        async def exercise() -> None:
+            sources = await cosmic.watch(21, "dub", 7, context)
+            self.assertEqual(sources[0]["type"], "embed")
+            self.assertEqual(sources[0]["url"], "https://cosmic-api-azure.vercel.app/embeds/21/7")
+            self.assertEqual(sources[0]["server"], "Cosmic Player")
+            self.assertEqual(sources[0]["upstream"], "cosmic")
+
+            episodes = await cosmic.get_episodes(21, context)
+            self.assertEqual(len(episodes["episodes"]["sub"]), 12)
+            self.assertEqual(len(episodes["episodes"]["dub"]), 12)
+            self.assertEqual(episodes["episodes"]["dub"][6]["id"], "watch/cosmic/21/dub/cosmic-7")
+
+        asyncio.run(exercise())
+
     def test_auto_race_does_not_call_parked_or_manual_embed_providers(self) -> None:
         attempted = []
 
@@ -462,6 +532,7 @@ class LocalAnimeApiTests(unittest.TestCase):
             with (
                 patch.object(local_api.provider_race, "providers", return_value=[
                     ("anineko", object()), ("anixo", anixo), ("megavid", megavid),
+                    ("animeparadise", animeparadise), ("cosmic", cosmic),
                 ]),
                 patch.object(local_api.provider_race, "build_ctx", new=AsyncMock(return_value={
                     "media": {"id": 21, "title": {"english": "Test"}}, "anizip": None,
