@@ -97,6 +97,52 @@ jobs:
           python3 .github/scripts/configure-capacitor-android.py
           python3 .github/scripts/configure-local-anime-backend.py
 
+      - name: Verify native ad blocking and fullscreen wiring
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          java_root = Path("android/app/src/main/java/com/sevenx/anime")
+          required = {
+              "StreamingNavigationWebViewClient.java",
+              "StreamingWebChromeClient.java",
+              "PlayerFullscreenPlugin.java",
+              "LocalAnimeBackendPlugin.java",
+          }
+          missing = sorted(name for name in required if not (java_root / name).is_file())
+          if missing:
+              raise SystemExit(f"Native player integration files missing: {missing}")
+
+          main_files = list(Path("android/app/src/main/java").rglob("MainActivity.java"))
+          if len(main_files) != 1:
+              raise SystemExit(f"Expected one MainActivity.java, found {len(main_files)}")
+          main_activity = main_files[0].read_text(encoding="utf-8")
+          expected_wiring = (
+              "registerPlugin(PlayerFullscreenPlugin.class)",
+              "StreamingNavigationWebViewClient(getBridge())",
+              "setWebChromeClient(streamingWebChromeClient)",
+              "streamingWebChromeClient.handleBackPressed()",
+          )
+          missing_wiring = [item for item in expected_wiring if item not in main_activity]
+          if missing_wiring:
+              raise SystemExit(f"MainActivity native wiring missing: {missing_wiring}")
+
+          nav = (java_root / "StreamingNavigationWebViewClient.java").read_text(encoding="utf-8")
+          chrome = (java_root / "StreamingWebChromeClient.java").read_text(encoding="utf-8")
+          for item, text in (
+              ("BLOCKED_AD_DOMAINS", nav),
+              ("shouldInterceptRequest", nav),
+              ("onCreateWindow", chrome),
+              ("onJsConfirm", chrome),
+              ("onPermissionRequest", chrome),
+              ("handleBackPressed", chrome),
+          ):
+              if item not in text:
+                  raise SystemExit(f"Native ad/fullscreen feature missing: {item}")
+
+          print("Native ad filtering, popup/JS prompt protection, fullscreen plugin and Back integration are wired.")
+          PY
+
       # Test the exact patched Python tree that Chaquopy packages in the APK,
       # not the raw upstream checkout that still contains Python 3.12-only syntax.
       - name: Smoke test packaged Kuhi providers
