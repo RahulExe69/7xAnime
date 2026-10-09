@@ -171,9 +171,9 @@ The network-free contract tests now cover the two new route templates, sub/dub p
 
 ## Provider pause after physical-device verification (2026-10-10)
 
-The user tested the current Android build and reported that **MegaPlay (Server 1), AniXo, and Megavid work** for the tested title/episode. This is stronger evidence than route-construction tests, but it is not a universal availability guarantee.
+The user tested the current Android build and reported that **MegaPlay (Server 1), AniXo, and Megavid work** for the tested title/episode. This is stronger evidence than route-construction tests, but it is not a universal availability guarantee. AnimeParadise and Cosmic Player were added afterward as manual-only experiments and have not yet had a real-device playback check.
 
-To avoid repeatedly hammering unproductive upstreams, the app now exposes only AniXo and Megavid in its manual provider map alongside the existing MegaPlay Server 1 iframe. The backend allowlist filters episode discovery, diagnostics, and manual watch routes to AniXo/Megavid; Auto no longer invokes the Kuhi native provider race. Legacy Kuhi adapter code remains bundled for now but is parked and must not be contacted by the active watch flow. AnimeNoSub is also parked.
+To avoid repeatedly hammering unproductive upstreams, the app exposes MegaPlay as Server 1 plus four explicit manual selections: AniXo, Megavid, AnimeParadise, and Cosmic Player. The backend allowlist filters routes to those choices; Auto does not invoke the parked Kuhi native-provider race or any new candidate. AnimeParadise catalogue lookups are deferred until a user explicitly selects it. Cosmic is a MegaPlay-backed player wrapper, not an independent upstream. Legacy Kuhi adapter code remains bundled but parked, and AnimeNoSub remains parked.
 
 The eight researched, not-yet-integrated candidates remain **research only** and have not been queried or integrated as part of this change:
 1. [amvstrm-ani-api](https://github.com/saurabhgangule/amvstrm-ani-api)
