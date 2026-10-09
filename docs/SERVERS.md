@@ -27,7 +27,7 @@ The Android package still contains legacy adapter code, but the app exposes only
 | 8 | `cinexstream` | CinexStream (manual embed) | https://cinextream.cc |
 | 9 | `nontongo` | NontonGo (sub-only manual embed) | https://nontongo.win |
 
-For Sub/Dub, the UI filters providers by the selected audio type and media formats the player can use. The visible provider labels start at **Server 2** because Server 1 is reserved for MegaPlay. AniXo, Megavid, Cosmic, MegaFlix, TryEmbed, CinexStream, and NontonGo are manually selectable iframe endpoints; AnimeParadise returns HLS but stays manual-only during verification. A route response is not playback proof, and all eight choices after MegaPlay are deliberately excluded from Auto. A provider can be loaded but still have no stream for a particular anime/episode; diagnostics distinguish module-load, route/stream extraction, and observed player events. Manual selections are strict: selecting one provider never silently returns another provider's stream. Auto is the only route allowed to race native extractors. No native extractor is enabled in the current manual-only map, so Auto fails fast and the client switches to MegaPlay rather than waiting through parked providers. The same server number may refer to a different provider if the compatible provider set changes.
+For Sub/Dub, the UI filters providers by the selected audio type and media formats the player can use. The visible provider labels start at **Server 2** because Server 1 is reserved for MegaPlay. AniXo, Megavid, Cosmic, MegaFlix, TryEmbed, CinexStream, and NontonGo are manually selectable iframe endpoints; AnimeParadise returns HLS but stays manual-only during verification. A route response is not playback proof, and all eight choices after MegaPlay are deliberately excluded from Auto. A provider can be loaded but still have no stream for a particular anime/episode; diagnostics distinguish module-load, route/stream extraction, and observed player events. Server choices remain visible after failures; a detected request/player failure marks the choice for retry and advances to the next configured server, finally falling back to MegaPlay after the candidates are exhausted. A same-origin/cross-origin HTML ad overlay may not emit a failure signal, so it cannot always trigger automatic switching. Auto is not a parallel race over the manual iframe choices; it moves through the configured candidates sequentially and uses MegaPlay as final fallback. The same server number may refer to a different provider if the compatible provider set changes.
 
 ## Hindi dub catalogue
 
@@ -48,3 +48,8 @@ The iframe progress listener also recognises messages from MegaCloud. Kuhi's pin
 ## Updating the map
 
 When updating the bundled Kuhi revision, compare its `src/providers/_race.py` `RANKING` list with `KUHI_PROVIDER_ORDER` in `src/lib/server-map.ts`, then test a series with many providers and one with partial provider availability.
+
+
+## Player UX and ad filtering
+
+Android uses a conservative known-ad-domain request filter, blocks pop-up windows and remote JS alert/confirm/prompt dialogs, and keeps external top-level navigation blocked. It cannot reliably remove HTML overlays served by the provider itself. The player viewport provides native fullscreen/landscape, app-owned swipe gestures and double-tap ±10-second seeking for the app-owned ArtPlayer player; cross-origin embeds may retain provider-owned gesture behaviour. See [PLAYER-MARATHON.md](PLAYER-MARATHON.md) for scope and physical-device test checklist.
