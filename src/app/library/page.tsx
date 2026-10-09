@@ -122,7 +122,7 @@ export default function LibraryPage() {
             </div>
             <h1 className="text-3xl font-black tracking-tight sm:text-4xl">My List</h1>
             <p className="mt-2 text-sm leading-6 text-[#b8afcb]">
-              Keep track of what you're watching, what you want to start, and the series you've finished.
+              Keep track of what you&apos;re watching, what you want to start, and the series you&apos;ve finished.
             </p>
           </div>
           <Link href={ROUTES.SEARCH} className="inline-flex h-10 shrink-0 items-center justify-center gap-2 self-start rounded-xl bg-[#ff2f9d] px-4 text-sm font-bold text-white transition hover:bg-[#e51e86] sm:self-auto">
