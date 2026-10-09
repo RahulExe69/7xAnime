@@ -51,7 +51,7 @@ const fetchAniListEpisodesFallback = async (
           number: epNum,
           isFiller: false,
           hasSub: true,
-          hasDub: true,
+          hasDub: false,
         };
       },
     );
@@ -71,7 +71,7 @@ const fetchAniListEpisodesFallback = async (
       number: i + 1,
       isFiller: false,
       hasSub: true,
-      hasDub: true,
+      hasDub: false,
     }));
     return {
       totalEpisodes: 12,
@@ -164,5 +164,9 @@ export const useGetAllEpisodes = (animeId: string) => {
     queryFn: () => getAllEpisodes(animeId),
     queryKey: [GET_ALL_EPISODES, animeId],
     enabled: !!animeId,
+    staleTime: 1000 * 60 * 15,
+    cacheTime: 1000 * 60 * 30,
+    refetchOnWindowFocus: false,
+    retry: 0,
   });
 };
