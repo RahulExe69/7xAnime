@@ -581,6 +581,14 @@ def main() -> None:
         if not source.is_file():
             fail(f"Required native Android source is missing: {source}")
 
+    # Ship the dependency's license with the APK, not just a repository link.
+    license_source = ROOT / "third_party/AdblockAndroid-LICENSE.txt"
+    if not license_source.is_file():
+        fail("The AdblockAndroid LGPL license file is missing.")
+    license_destination = ANDROID / "app/src/main/assets/THIRD_PARTY_LICENSES/AdblockAndroid-LICENSE.txt"
+    license_destination.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(license_source, license_destination)
+
     package_dir = ANDROID / "app/src/main/java/com/sevenx/anime"
     package_dir.mkdir(parents=True, exist_ok=True)
     for filename, source in native_sources.items():
