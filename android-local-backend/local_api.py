@@ -36,7 +36,8 @@ _server_lock = threading.Lock()
 app.include_router(router)
 
 # Episode discovery should not hold the watch page hostage while every scraper
-# finishes. Return early results first and let the frontend poll while others run.
+# finishes. Context creation and each provider scraper run in the background so
+# the first request can return a partial catalogue quickly.
 _EPISODE_DISCOVERY_TTL = 300.0
 _episode_discovery_lock = asyncio.Lock()
 _episode_discovery_cache: dict[int, dict] = {}
@@ -52,8 +53,35 @@ async def _collect_episode_provider(anilist_id: int, name: str, mod, ctx: dict, 
     state["finished"].add(result_name)
     if data:
         state["providers"][result_name] = data
-    if len(state["finished"]) >= len(state["provider_names"]):
+    if state["initialized"] and len(state["finished"]) >= len(state["provider_names"]):
         state["complete"] = True
+        state["expires_at"] = time.time() + _EPISODE_DISCOVERY_TTL
+
+
+async def _start_episode_provider_discovery(anilist_id: int, state: dict) -> None:
+    try:
+        mods = provider_race.providers()
+        state["provider_names"] = [name for name, _ in mods]
+        if not mods:
+            state["initialized"] = True
+            state["complete"] = True
+            state["expires_at"] = time.time() + _EPISODE_DISCOVERY_TTL
+            return
+
+        ctx = await provider_race.build_ctx(anilist_id)
+        state["tasks"] = [
+            asyncio.create_task(_collect_episode_provider(anilist_id, name, mod, ctx, state))
+            for name, mod in mods
+        ]
+        state["initialized"] = True
+        if not state["provider_names"]:
+            state["complete"] = True
+            state["expires_at"] = time.time() + _EPISODE_DISCOVERY_TTL
+    except Exception as error:
+        print(f"[7XAnime] provider discovery initialization failed: {str(error)[:160]}")
+        state["initialized"] = True
+        state["complete"] = True
+        state["finished"].update(state["provider_names"])
         state["expires_at"] = time.time() + _EPISODE_DISCOVERY_TTL
 
 
@@ -67,36 +95,37 @@ async def _progressive_merged_episodes(anilist_id: int) -> dict | None:
             state = None
 
         if state is None:
-            mods = provider_race.providers()
-            if not mods:
-                return None
-            ctx = await provider_race.build_ctx(anime_id)
             state = {
                 "providers": {},
                 "finished": set(),
-                "provider_names": [name for name, _ in mods],
+                "provider_names": [],
                 "tasks": [],
+                "initialized": False,
                 "complete": False,
                 "expires_at": now + _EPISODE_DISCOVERY_TTL,
+                "initialization_task": None,
             }
             _episode_discovery_cache[anime_id] = state
-            for name, mod in mods:
-                state["tasks"].append(
-                    asyncio.create_task(_collect_episode_provider(anime_id, name, mod, ctx, state))
-                )
+            state["initialization_task"] = asyncio.create_task(
+                _start_episode_provider_discovery(anime_id, state)
+            )
 
-    # Spend at most 850 ms waiting for the first useful provider. Later polls
-    # return quickly while slower provider scrapers continue in the background.
+    # Bound the initial setup wait as well as the provider wait; a slow shared
+    # context request must not block the Watch screen before the player can start.
+    initializer = state.get("initialization_task")
+    if initializer is not None and not initializer.done():
+        await asyncio.wait({initializer}, timeout=0.4)
+
     pending = [task for task in state["tasks"] if not task.done()]
     if pending:
         await asyncio.wait(
             pending,
-            timeout=0.85 if not state["providers"] else 0.05,
+            timeout=0.5 if not state["providers"] else 0.05,
             return_when=asyncio.FIRST_COMPLETED,
         )
 
-    state["complete"] = len(state["finished"]) >= len(state["provider_names"])
-    if state["complete"]:
+    if state["initialized"] and len(state["finished"]) >= len(state["provider_names"]):
+        state["complete"] = True
         state["expires_at"] = time.time() + _EPISODE_DISCOVERY_TTL
     ordered_providers = {
         name: state["providers"][name]
@@ -112,7 +141,6 @@ async def _progressive_merged_episodes(anilist_id: int) -> dict | None:
 
 
 provider_race.merged_episodes = _progressive_merged_episodes
-
 
 @app.middleware("http")
 async def local_request_guard(request: Request, call_next):
