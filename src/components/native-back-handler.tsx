@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { App } from "@capacitor/app";
 import { Capacitor } from "@capacitor/core";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -53,12 +53,12 @@ export default function NativeBackHandler() {
 
   useEffect(() => { routerRef.current = router; }, [router]);
 
-  const navigateInApp = (target: string) => {
+  const navigateInApp = useCallback((target: string) => {
     pendingRoute.current = normalizeRoute(target);
     routerRef.current.replace(target);
-  };
+  }, []);
 
-  const navigateBackInApp = () => {
+  const navigateBackInApp = useCallback(() => {
     const current = new URL(currentRoute.current, "https://7xanime.local");
     const currentPath = normalizePath(current.pathname);
     let rememberedRoute = routeStack.current.pop();
@@ -95,7 +95,7 @@ export default function NativeBackHandler() {
     }
     lastHomeBackAt.current = now;
     toast("Press back again to exit 7xAnime", { duration: 1600 });
-  };
+  }, [navigateInApp]);
 
   // The in-player back arrow and Android's system Back share one route-aware
   // handler, so neither sends the user to the anime details page by default.
@@ -108,7 +108,7 @@ export default function NativeBackHandler() {
     };
     window.addEventListener("7xanime:navigate-back", handleRequestedBack);
     return () => window.removeEventListener("7xanime:navigate-back", handleRequestedBack);
-  }, []);
+  }, [navigateBackInApp]);
 
   useEffect(() => {
     const next = normalizeRoute(route);
@@ -222,7 +222,7 @@ export default function NativeBackHandler() {
       disposed = true;
       if (listener) void listener.remove();
     };
-  }, []);
+  }, [navigateBackInApp]);
 
   return null;
 }
