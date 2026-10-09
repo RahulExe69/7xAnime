@@ -43,6 +43,10 @@ LOCAL_CONTEXT_CACHE_TTL = 600.0
 LOCAL_WATCH_TIMEOUT = 45.0
 LOCAL_WATCH_CACHE_TTL = 35.0
 LOCAL_ROUTE_TIMEOUT = 80.0
+# These providers construct documented third-party iframe routes rather than
+# resolving a media stream. Keep them available for manual selection, but out of
+# Auto's extraction race: returning a URL is not proof that playback works.
+MANUAL_EMBED_ONLY_PROVIDERS = {"anixo", "megavid"}
 _LOCAL_CONTEXT_CACHE: dict[int, tuple[float, dict]] = {}
 # Asyncio primitives are event-loop-bound. Keep in-flight work and locks scoped
 # to the current loop so isolated test loops cannot reuse a task from another loop.
@@ -306,7 +310,7 @@ async def local_provider_status():
         "loadedCount": len(available),
         "providerCount": len(snapshot.get("ranking") or []),
         "providers": providers,
-        "note": "Module-loaded status is not a live guarantee for every anime or episode. Attempt metrics are collected as you select or play providers. HLS, MP4, and embed URLs are supported; DASH-only results are skipped until a DASH engine is available.",
+        "note": "Module-loaded status is not a live guarantee for every anime or episode. Attempt metrics are collected as you select or play providers. AniXo and Megavid are manual-only embed routes and are excluded from Auto until playback is verified. HLS, MP4, and embed URLs are supported; DASH-only results are skipped until a DASH engine is available.",
     }
 
 
@@ -402,7 +406,11 @@ async def _watch_one_for_player(mod, name, anilist_id, ep, audio, ctx):
 
 async def _race_watch_for_player(anilist_id: int, episode: int, audio: str) -> dict | None:
     """Fastest-wins race that only accepts formats the Android player can use."""
-    mods = provider_race.providers()
+    mods = [
+        (name, mod)
+        for name, mod in provider_race.providers()
+        if name not in MANUAL_EMBED_ONLY_PROVIDERS
+    ]
     if not mods:
         return None
     ctx = await _get_local_provider_context(anilist_id)
