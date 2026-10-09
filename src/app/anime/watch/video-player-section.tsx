@@ -73,11 +73,17 @@ const VideoPlayerSection = () => {
   const activeEpisodeId = episodeIdParam || localAutoEpisodeId || preferredEpisodeId ||
     (epParam ? targetEpByNumber?.episodeId || "" : allEpisodesData?.episodes?.[0]?.episodeId || "");
 
+  // Only mirror an explicit episode ID from the URL into Zustand.
+  // When a URL contains only ?ep=N, EpisodePlaylist owns the highlighted
+  // selection while the player may use a temporary watch/auto URL. Syncing
+  // that temporary URL back into the same store creates a feedback loop:
+  // the player writes watch/auto/.../dub/episode-N, the playlist writes its
+  // provider episode ID, and the two effects keep triggering each other
+  // until React throws error #185 (maximum update depth exceeded).
   useEffect(() => {
-    if (activeEpisodeId && selectedEpisode !== activeEpisodeId) {
-      setSelectedEpisode(activeEpisodeId);
-    }
-  }, [activeEpisodeId, selectedEpisode, setSelectedEpisode]);
+    if (!episodeIdParam || selectedEpisode === episodeIdParam) return;
+    setSelectedEpisode(episodeIdParam);
+  }, [episodeIdParam, selectedEpisode, setSelectedEpisode]);
 
   const [useFallback, setUseFallback] = useState<boolean>(false);
   const [isHindiMode, setIsHindiMode] = useState<boolean>(false);
