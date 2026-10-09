@@ -8,6 +8,8 @@ const VideoPlayer = dynamic(() => import("@/components/video-player"), {
   ssr: false,
 });
 import { useGetEpisodeData } from "@/query/get-episode-data";
+import { useQuery } from "react-query";
+import { getHindiDubStreams } from "@/lib/hindi-dub";
 import { ArrowLeft, Captions, Mic, AlertCircle, Tv } from "lucide-react";
 import Link from "next/link";
 import { ROUTES } from "@/constants/routes";
@@ -58,12 +60,14 @@ const VideoPlayerSection = () => {
 
   const [useFallback, setUseFallback] = useState<boolean>(false);
   const [forcePrimary, setForcePrimary] = useState<boolean>(false);
+  const [isHindiMode, setIsHindiMode] = useState<boolean>(false);
+  const [selectedHindiServer, setSelectedHindiServer] = useState<number>(0);
 
   const {
     data: episodeData,
     isLoading: isLoadingData,
     refetch: retryEpisodeData,
-  } = useGetEpisodeData(activeEpisodeId, (!isPrimaryDisabled || forcePrimary) && !useFallback);
+  } = useGetEpisodeData(activeEpisodeId, (!isPrimaryDisabled || forcePrimary) && !useFallback && !isHindiMode);
 
   const [autoSkip, setAutoSkip] = useState<boolean>(true);
   const [preferredCategory, setPreferredCategory] = useState<"sub" | "dub">("sub");
@@ -80,6 +84,8 @@ const VideoPlayerSection = () => {
   useEffect(() => {
     setUseFallback(false);
     setForcePrimary(false);
+    setIsHindiMode(false);
+    setSelectedHindiServer(0);
   }, [activeEpisodeId]);
 
   useEffect(() => {
@@ -111,6 +117,26 @@ const VideoPlayerSection = () => {
   const activeEpisodeSlug = activeEpisodeId.split("/").pop() || "";
   const activeEpisodeNumberFromSlug = Number(activeEpisodeSlug.match(/(\d+)$/)?.[1]) || 0;
   const currentEpNumber = activeEpisodeNumberFromList || activeEpisodeNumberFromSlug || 1;
+  const animeTitleOptions = useMemo(
+    () => [...new Set([
+      anime?.anime?.info?.name || "",
+      anime?.anime?.moreInfo?.japanese || "",
+    ].map((title) => title.trim()).filter(Boolean))],
+    [anime?.anime?.info?.name, anime?.anime?.moreInfo?.japanese],
+  );
+  const {
+    data: hindiDubData,
+    isLoading: isLoadingHindi,
+    isError: isHindiError,
+    refetch: retryHindi,
+  } = useQuery({
+    queryKey: ["HINDI_DUB_STREAMS", animeIdParam, currentEpNumber, animeTitleOptions],
+    queryFn: () => getHindiDubStreams(animeTitleOptions, currentEpNumber),
+    enabled: isHindiMode && !!animeTitleOptions.length && !!currentEpNumber,
+    retry: 0,
+    staleTime: 1000 * 60 * 10,
+  });
+  const hindiStreams = hindiDubData?.streams || [];
 
   const updateEpisodeUrl = (episodeId: string) => {
     if (typeof window === "undefined") return;
@@ -129,6 +155,9 @@ const VideoPlayerSection = () => {
   );
 
   const handleCategoryChange = (cat: "sub" | "dub") => {
+    setIsHindiMode(false);
+    setUseFallback(false);
+    setForcePrimary(false);
     setPreferredCategory(cat);
     localStorage.setItem("preferredCategory", cat);
 
@@ -175,10 +204,11 @@ const VideoPlayerSection = () => {
     allEpisodesData,
   ]);
 
-  const isFallbackActive =
+  const isFallbackActive = !isHindiMode && (
     (!forcePrimary && isSourceAvailable === false) ||
     useFallback ||
-    (!isLoadingData && (!episodeData || !episodeData.sources?.length));
+    (!isLoadingData && (!episodeData || !episodeData.sources?.length))
+  );
 
   // Listen to postMessage events from Fallback Player iframe (megaplay.buzz / megacloud)
   useEffect(() => {
@@ -288,6 +318,9 @@ const VideoPlayerSection = () => {
   ]);
 
   const handleProviderSelect = (pName: string, category: "sub" | "dub") => {
+    setIsHindiMode(false);
+    setUseFallback(false);
+    setForcePrimary(false);
     setPreferredCategory(category);
     localStorage.setItem("preferredCategory", category);
 
@@ -303,7 +336,26 @@ const VideoPlayerSection = () => {
   const cleanParts = activeEpisodeId.replace(/^\//, "").split("/");
   const currentProviderName = cleanParts[1] || providerNames[0] || "auto";
   const activeCategory = cleanParts[3] === "dub" ? "dub" : preferredCategory;
-  const activeServerLabel = getServerLabel(providerNames, currentProviderName);
+  const activeServerLabel = isHindiMode
+    ? `Server${selectedHindiServer + 2}`
+    : useFallback || isFallbackActive
+      ? "Server1"
+      : getServerLabel(providerNames, currentProviderName);
+  const selectFallbackServer = (category?: "sub" | "dub") => {
+    if (category) {
+      setPreferredCategory(category);
+      localStorage.setItem("preferredCategory", category);
+    }
+    setIsHindiMode(false);
+    setForcePrimary(false);
+    setUseFallback(true);
+  };
+  const selectHindiMode = () => {
+    setUseFallback(false);
+    setForcePrimary(false);
+    setSelectedHindiServer(0);
+    setIsHindiMode(true);
+  };
   const playerHeader = (
     <div className="flex min-w-0 items-center gap-3 rounded-2xl border border-white/[0.07] bg-[#101018] px-3 py-3 sm:px-4">
       <Link
@@ -318,7 +370,7 @@ const VideoPlayerSection = () => {
           {anime?.anime?.info?.name || "Now Playing"}
         </p>
         <p className="mt-0.5 truncate text-xs text-zinc-400">
-          Episode {currentEpNumber} <span className="px-1 text-zinc-600">·</span> {activeCategory.toUpperCase()} <span className="px-1 text-zinc-600">·</span> {activeServerLabel}
+          Episode {currentEpNumber} <span className="px-1 text-zinc-600">·</span> {isHindiMode ? "HINDI DUB" : activeCategory.toUpperCase()} <span className="px-1 text-zinc-600">·</span> {activeServerLabel}
         </p>
       </div>
       <Link
@@ -329,6 +381,75 @@ const VideoPlayerSection = () => {
       </Link>
     </div>
   );
+
+  if (isHindiMode && isLoadingHindi) {
+    return (
+      <div className="space-y-3">
+        {playerHeader}
+        <div role="status" aria-live="polite" className="flex aspect-video w-full flex-col items-center justify-center gap-3 rounded-2xl border border-[#dedbea] bg-white text-sm text-[#716b87] dark:border-[#302c40] dark:bg-[#14121c] dark:text-zinc-400">
+          <span className="h-7 w-7 animate-spin rounded-full border-2 border-[#604bd3]/25 border-t-[#604bd3]" />
+          <span>Finding Hindi dub for episode {currentEpNumber}…</span>
+        </div>
+        <p className="text-xs text-[#77728f] dark:text-zinc-500">Hindi sources come from a community-maintained catalogue, so some anime or episodes may be missing.</p>
+      </div>
+    );
+  }
+
+  if (isHindiMode) {
+    const selectedHindi = hindiStreams[selectedHindiServer];
+    return (
+      <div className="flex w-full flex-col gap-3">
+        {playerHeader}
+        {selectedHindi ? (
+          <div className="relative aspect-video w-full overflow-hidden rounded-2xl border border-[#dedbea] bg-black shadow-xl dark:border-[#302c40]">
+            <iframe
+              key={selectedHindi.embed}
+              src={selectedHindi.embed}
+              title={`${hindiDubData?.matchedTitle || anime?.anime?.info?.name || "Anime"} episode ${currentEpNumber} Hindi dub via ${selectedHindi.host}`}
+              width="100%"
+              height="100%"
+              allow="autoplay; fullscreen; picture-in-picture; encrypted-media"
+              allowFullScreen
+              referrerPolicy="strict-origin-when-cross-origin"
+              className="absolute inset-0 h-full w-full border-0"
+            />
+          </div>
+        ) : (
+          <Alert className="rounded-2xl border-[#dedbea] bg-white text-[#37324e] dark:border-[#302c40] dark:bg-[#171520] dark:text-zinc-200">
+            <AlertCircle className="h-4 w-4 text-[#604bd3]" />
+            <AlertTitle className="font-bold">{isHindiError ? "Hindi sources are unavailable right now" : "No Hindi dub listing found"}</AlertTitle>
+            <AlertDescription className="mt-1 flex flex-col gap-3 text-sm text-[#716b87] dark:text-zinc-400">
+              <span>The community catalogue did not return a matching embed for this series and episode. This is not a guarantee that a Hindi dub does not exist.</span>
+              <div className="flex flex-wrap gap-2">
+                <Button size="sm" onClick={() => void retryHindi()} className="bg-[#604bd3] text-white hover:bg-[#5140c4]">Retry Hindi search</Button>
+                <Button size="sm" variant="outline" onClick={() => handleCategoryChange("dub")} className="border-[#dedbea] bg-white text-[#514b70] dark:border-[#393449] dark:bg-[#201d2a] dark:text-zinc-200">Use regular Dub</Button>
+              </div>
+            </AlertDescription>
+          </Alert>
+        )}
+        <div className="flex flex-col gap-3 rounded-2xl border border-[#dedbea] bg-white p-3 dark:border-[#302c40] dark:bg-[#14121c] sm:p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5 rounded-xl border border-[#e3dfef] bg-[#f8f7fd] p-1 dark:border-[#302c40] dark:bg-[#1b1826]">
+              <Button size="sm" variant="ghost" onClick={() => handleCategoryChange("sub")} disabled={!hasSub} className="h-8 rounded-lg px-3 text-xs font-bold text-[#6f6986] hover:bg-[#ebe7f9] hover:text-[#604bd3] dark:text-zinc-300 dark:hover:bg-white/10"><Captions className="mr-1.5 h-3.5 w-3.5" /> SUB</Button>
+              <Button size="sm" variant="ghost" onClick={() => handleCategoryChange("dub")} disabled={!hasDub} className="h-8 rounded-lg px-3 text-xs font-bold text-[#6f6986] hover:bg-[#ebe7f9] hover:text-[#604bd3] dark:text-zinc-300 dark:hover:bg-white/10"><Mic className="mr-1.5 h-3.5 w-3.5" /> DUB</Button>
+              <Button size="sm" className="h-8 rounded-lg bg-[#604bd3] px-3 text-xs font-bold text-white hover:bg-[#5140c4]"><span className="mr-1.5">हिं</span> HINDI</Button>
+            </div>
+            <Button size="sm" variant="outline" onClick={() => selectFallbackServer()} className="h-9 border-[#dedbea] bg-[#f8f7fd] text-xs font-bold text-[#514b70] hover:bg-[#ebe7f9] dark:border-[#393449] dark:bg-[#201d2a] dark:text-zinc-200"><Tv className="mr-1.5 h-3.5 w-3.5" /> Server1 · Fallback</Button>
+          </div>
+          {hindiStreams.length > 0 && (
+            <div className="flex min-w-0 gap-2 overflow-x-auto pb-1">
+              {hindiStreams.map((stream, index) => (
+                <Button key={stream.embed} size="sm" title={`Server${index + 2} — ${stream.host}`} aria-label={`Server${index + 2} — Hindi dub — ${stream.host}`} onClick={() => setSelectedHindiServer(index)} className={`h-9 shrink-0 rounded-xl px-4 text-xs font-bold ${selectedHindiServer === index ? "bg-[#604bd3] text-white" : "border border-[#e3dfef] bg-[#f8f7fd] text-[#514b70] hover:bg-[#ebe7f9] dark:border-[#393449] dark:bg-[#201d2a] dark:text-zinc-200"}`}>
+                  Server{index + 2}
+                </Button>
+              ))}
+            </div>
+          )}
+          {selectedHindi && <p className="text-[11px] leading-relaxed text-[#77728f] dark:text-zinc-500">Hindi dub · {hindiDubData?.matchedTitle} · {selectedHindi.host}. Embeds are independently hosted and may not work on every device.</p>}
+        </div>
+      </div>
+    );
+  }
 
   if (!activeEpisodeId || isLoadingData) {
     return (
@@ -365,9 +486,9 @@ const VideoPlayerSection = () => {
             className="w-full h-full border-0"
           ></iframe>
         </div>
-        <div className="flex flex-col justify-between gap-3 rounded-2xl border border-white/[0.07] bg-white/[0.035] p-3 sm:flex-row sm:items-center sm:p-4">
+        <div className="flex flex-col gap-3 rounded-2xl border border-white/[0.07] bg-white/[0.035] p-3 sm:p-4">
           <div className="flex flex-wrap items-center gap-3">
-            <span className="text-xs font-bold text-gray-400 tracking-wider">CATEGORY:</span>
+            <span className="text-xs font-bold tracking-wider text-gray-400">FALLBACK · SERVER1</span>
             <Button
               size="sm"
               variant="ghost"
@@ -399,6 +520,7 @@ const VideoPlayerSection = () => {
             size="sm"
             variant="outline"
             onClick={() => {
+              setIsHindiMode(false);
               setForcePrimary(true);
               setUseFallback(false);
               void retryEpisodeData();
@@ -420,7 +542,7 @@ const VideoPlayerSection = () => {
   }
 
   return (
-    <div>
+    <div className="space-y-3">
       {playerHeader}
       <VideoPlayer
         key={episodeData.sources?.[0]?.url}
@@ -471,6 +593,14 @@ const VideoPlayerSection = () => {
               >
                 <Mic className="mr-1.5 h-3.5 w-3.5" /> DUB
               </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={selectHindiMode}
+                className="h-8 rounded-lg px-3 text-xs font-bold text-zinc-400 transition hover:bg-[#604bd3]/15 hover:text-white"
+              >
+                <span className="mr-1.5">हिं</span> HINDI
+              </Button>
             </div>
             <div className="flex items-center gap-2 rounded-xl border border-white/[0.08] bg-white/[0.025] px-3 py-2">
               <Switch checked={autoSkip} onCheckedChange={onHandleAutoSkipChange} id="auto-skip" />
@@ -480,6 +610,15 @@ const VideoPlayerSection = () => {
         </div>
 
         <div className="flex min-w-0 gap-2 overflow-x-auto pb-1">
+          <Button
+            size="sm"
+            title="Server1 — MegaPlay fallback player"
+            aria-label="Server1 — MegaPlay fallback player"
+            onClick={() => selectFallbackServer()}
+            className="h-9 shrink-0 rounded-xl border border-[#ff2f9d]/25 bg-[#ff2f9d]/[0.07] px-4 text-xs font-bold text-[#ff70bd] hover:bg-[#ff2f9d]/15"
+          >
+            Server1
+          </Button>
           {providerNames.map((pName) => {
             const availableEpisodes = rawProviders[pName]?.episodes?.[activeCategory] || [];
             if (!availableEpisodes.length) return null;
