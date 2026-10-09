@@ -14,9 +14,9 @@ export type ProviderInfo = {
 export const KUHI_PROVIDER_ORDER = ["anixo", "megavid", "animeparadise", "cosmic", "megaflix", "tryembed", "cinexstream", "nontongo"] as const;
 
 /**
- * Embedded Kuhi provider capabilities from the pinned adapters/documentation.
- * These are general capabilities, not a promise that every title/episode has a stream.
- * DASH-only results are deliberately excluded until a DASH player is bundled.
+ * Explicitly supported manual player/embed routes. These are advertised audio/format
+ * capabilities, not a guarantee that every title or episode plays. The four Yomi-derived
+ * adapters construct iframe URLs and are not treated as direct stream extractors.
  */
 export const PROVIDER_INFO: Record<string, ProviderInfo> = {
   anixo: { name: "AniXo", site: "https://anixo.buzz", audio: ["sub", "dub"], formats: ["embed"] },
