@@ -11,7 +11,7 @@ export type ProviderInfo = {
  * candidate awaiting device verification; Cosmic is a MegaPlay-backed player
  * wrapper for UI comparison, not an independent streaming source.
  */
-export const KUHI_PROVIDER_ORDER = ["anixo", "megavid", "animeparadise", "cosmic"] as const;
+export const KUHI_PROVIDER_ORDER = ["anixo", "megavid", "animeparadise", "cosmic", "megaflix", "tryembed", "cinexstream", "nontongo"] as const;
 
 /**
  * Embedded Kuhi provider capabilities from the pinned adapters/documentation.
@@ -23,6 +23,10 @@ export const PROVIDER_INFO: Record<string, ProviderInfo> = {
   megavid: { name: "Megavid", site: "https://megavid.buzz", audio: ["sub", "dub"], formats: ["embed"] },
   animeparadise: { name: "AnimeParadise", site: "https://animeparadise.moe", audio: ["sub"], formats: ["hls"] },
   cosmic: { name: "Cosmic Player", site: "https://cosmic-api-azure.vercel.app", audio: ["sub", "dub"], formats: ["embed"] },
+  megaflix: { name: "MegaFlix", site: "https://www.megaflix.buzz", audio: ["sub", "dub"], formats: ["embed"] },
+  tryembed: { name: "TryEmbed", site: "https://tryembed.us.cc", audio: ["sub", "dub"], formats: ["embed"] },
+  cinexstream: { name: "CinexStream", site: "https://cinextream.cc", audio: ["sub", "dub"], formats: ["embed"] },
+  nontongo: { name: "NontonGo", site: "https://nontongo.win", audio: ["sub"], formats: ["embed"] },
 };
 
 export const isProviderSelectable = (providerName: string, category: ProviderAudio): boolean => {
