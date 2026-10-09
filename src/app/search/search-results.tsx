@@ -26,11 +26,22 @@ import Button from "@/components/common/custom-button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { cn } from "@/lib/utils";
 
+const COLLECTION_TITLES: Record<string, string> = {
+  new: "New Today",
+  "currently-airing": "Currently Airing",
+  trending: "Trending Now",
+  popular: "All-Time Popular",
+  upcoming: "Coming Next Season",
+  "top-airing": "Top Rated Airing Now",
+  completed: "Top Completed Series",
+};
+
 const SearchResults = () => {
   const params = useAnimeSearchParams();
   const router = useRouter();
   const searchParams = useSearchParams();
   const displayPhrase = params.q.replace(/^"+|"+$/g, "").trim();
+  const collectionTitle = params.collection ? COLLECTION_TITLES[params.collection] : undefined;
 
   const { data: searchResults, isLoading } = useGetSearchAnimeResults(params);
 
@@ -105,7 +116,7 @@ const SearchResults = () => {
   return (
     <div className="mx-auto flex min-h-[75vh] w-full max-w-[1600px] flex-col gap-6 px-4 pb-16 pt-28 text-[#211e38] sm:gap-8 md:px-6 lg:pt-32 lg:px-8 dark:text-white">
       <div className="flex flex-col gap-5 rounded-2xl border border-[#dedbea] bg-white p-4 shadow-[0_5px_20px_rgba(37,25,81,0.035)] sm:p-6 dark:border-[#302c40] dark:bg-[#191724]">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div className="flex items-center gap-2"><Search className="h-5 w-5 text-[#604bd3] dark:text-[#b6a8ff]" /><p className="text-lg font-semibold">Find your next anime</p></div><span className="text-xs text-[#77728f] dark:text-[#a39db9]">Search by title or narrow it down with filters</span></div><SearchBar className="max-w-2xl" showFilterButton={false} /><p className="text-sm font-semibold text-[#5f5a73] dark:text-zinc-300">Refine results</p>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div className="flex items-center gap-2"><Search className="h-5 w-5 text-[#604bd3] dark:text-[#b6a8ff]" /><p className="text-lg font-semibold">{collectionTitle ? `Browse ${collectionTitle}` : "Find your next anime"}</p></div><span className="text-xs text-[#77728f] dark:text-[#a39db9]">{collectionTitle ? `Curated list: ${collectionTitle}` : "Search by title or narrow it down with filters"}</span></div><SearchBar className="max-w-2xl" showFilterButton={false} /><p className="text-sm font-semibold text-[#5f5a73] dark:text-zinc-300">Refine results</p>
         <div className="flex flex-wrap gap-3">
           <Select
             options={types}
@@ -191,14 +202,12 @@ const SearchResults = () => {
         </div>
       </div>
       <div className="text-xl font-semibold tracking-tight sm:text-2xl">
-        {displayPhrase === "" ? (
-          "Filter Results"
-        ) : (
+        {collectionTitle || (displayPhrase === "" ? "Filter Results" : (
           <>
             Search Results for{" "}
             <span className="font-[800]">&quot;{params.q}&quot;</span>
           </>
-        )}
+        ))}
       </div>
       {isLoading && (
         <div className="grid w-full grid-cols-2 content-start gap-x-3 gap-y-5 sm:grid-cols-3 sm:gap-4 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7">

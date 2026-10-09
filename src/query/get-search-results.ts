@@ -4,6 +4,16 @@ import { IAnimeSearch, SearchAnimeParams } from "@/types/anime";
 import { MediaList, PaginatedResponse } from "@/types/miruro-api";
 import { useQuery } from "react-query";
 
+const COLLECTION_REQUESTS: Record<string, { endpoint: string; params?: Record<string, string> }> = {
+  new: { endpoint: "/recent" },
+  trending: { endpoint: "/trending" },
+  popular: { endpoint: "/popular" },
+  upcoming: { endpoint: "/upcoming" },
+  "currently-airing": { endpoint: "/filter", params: { status: "RELEASING", sort: "START_DATE_DESC" } },
+  "top-airing": { endpoint: "/filter", params: { status: "RELEASING", sort: "SCORE_DESC" } },
+  completed: { endpoint: "/filter", params: { status: "FINISHED", sort: "SCORE_DESC" } },
+};
+
 const searchAnime = async (params: SearchAnimeParams): Promise<IAnimeSearch> => {
   const requestParams: Record<string, any> = {
     page: params.page || 1,
@@ -17,14 +27,16 @@ const searchAnime = async (params: SearchAnimeParams): Promise<IAnimeSearch> => 
 
   const cleanQuery = params.q ? params.q.replace(/^"+|"+$/g, "").trim() : "";
 
-  // If search term is present without specific filter override, use /search or pass to filter query
-  const endpoint = cleanQuery && !params.genres && !params.season && !params.type && !params.status
-    ? "/search"
-    : "/filter";
+  // Curated homepage sections keep their real data source when opening View All.
+  const collectionRequest = params.collection ? COLLECTION_REQUESTS[params.collection] : undefined;
+  const endpoint = collectionRequest?.endpoint || (
+    cleanQuery && !params.genres && !params.season && !params.type && !params.status
+      ? "/search"
+      : "/filter"
+  );
 
-  if (endpoint === "/search") {
-    requestParams.query = cleanQuery;
-  }
+  if (collectionRequest?.params) Object.assign(requestParams, collectionRequest.params);
+  if (endpoint === "/search") requestParams.query = cleanQuery;
 
   const res = await api.get<PaginatedResponse<MediaList>>(endpoint, {
     params: requestParams,

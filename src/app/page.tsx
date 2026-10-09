@@ -32,13 +32,13 @@ export default function Home() {
       <div id="continue-watching" className="scroll-mt-20">
         <ContinueWatching loading={false} />
       </div>
-      <AnimeShelf title="New Today" eyebrow="Freshly updated" mode="new" viewAllHref="/search?sort=UPDATED_AT_DESC" items={recentRes?.results || []} loading={loadingRecent} />
-      <AnimeShelf title="Currently Airing" eyebrow="On the air" icon={<Flame className="h-5 w-5 fill-current text-orange-500" />} viewAllHref="/search?status=RELEASING&sort=START_DATE_DESC" items={airingRes?.results || []} loading={loadingAiring} />
-      <AnimeShelf title="Trending Now" eyebrow="Popular this week" icon={<span className="text-[#604bd3]">↗</span>} viewAllHref="/search?sort=TRENDING_DESC" items={trendingRes?.results || []} loading={loadingTrending} />
-      <AnimeShelf title="All-Time Popular" eyebrow="Fan favourites" icon={<Star className="h-5 w-5 fill-current text-amber-400" />} viewAllHref="/search?sort=POPULARITY_DESC" items={popularRes?.results || []} loading={loadingPopular} />
-      <AnimeShelf title="Coming Next Season" eyebrow="Up next" icon={<CalendarClock className="h-5 w-5 text-[#604bd3]" />} viewAllHref="/search?status=NOT_YET_RELEASED&sort=START_DATE_DESC" items={upcomingRes?.results || []} loading={loadingUpcoming} />
-      <AnimeShelf title="Top Rated Airing Now" eyebrow="Highest rated this season" icon={<Trophy className="h-5 w-5 text-amber-500" />} viewAllHref="/search?status=RELEASING&sort=SCORE_DESC" items={topAiringRes?.results || []} loading={loadingTopAiring} />
-      <AnimeShelf title="Top Completed Series" eyebrow="Worth catching up on" icon={<CheckCircle2 className="h-5 w-5 text-emerald-500" />} viewAllHref="/search?status=FINISHED&sort=SCORE_DESC" items={completedRes?.results || []} loading={loadingCompleted} />
+      <AnimeShelf title="New Today" eyebrow="Freshly updated" mode="new" viewAllHref="/search?collection=new" items={recentRes?.results || []} loading={loadingRecent} />
+      <AnimeShelf title="Currently Airing" eyebrow="On the air" icon={<Flame className="h-5 w-5 fill-current text-orange-500" />} viewAllHref="/search?collection=currently-airing" items={airingRes?.results || []} loading={loadingAiring} />
+      <AnimeShelf title="Trending Now" eyebrow="Popular this week" icon={<span className="text-[#604bd3]">↗</span>} viewAllHref="/search?collection=trending" items={trendingRes?.results || []} loading={loadingTrending} />
+      <AnimeShelf title="All-Time Popular" eyebrow="Fan favourites" icon={<Star className="h-5 w-5 fill-current text-amber-400" />} viewAllHref="/search?collection=popular" items={popularRes?.results || []} loading={loadingPopular} />
+      <AnimeShelf title="Coming Next Season" eyebrow="Up next" icon={<CalendarClock className="h-5 w-5 text-[#604bd3]" />} viewAllHref="/search?collection=upcoming" items={upcomingRes?.results || []} loading={loadingUpcoming} />
+      <AnimeShelf title="Top Rated Airing Now" eyebrow="Highest rated this season" icon={<Trophy className="h-5 w-5 text-amber-500" />} viewAllHref="/search?collection=top-airing" items={topAiringRes?.results || []} loading={loadingTopAiring} />
+      <AnimeShelf title="Top Completed Series" eyebrow="Worth catching up on" icon={<CheckCircle2 className="h-5 w-5 text-emerald-500" />} viewAllHref="/search?collection=completed" items={completedRes?.results || []} loading={loadingCompleted} />
       <div className="mt-4"><AnimeSchedule /></div>
       <RecentCommentsSection />
     </main>
