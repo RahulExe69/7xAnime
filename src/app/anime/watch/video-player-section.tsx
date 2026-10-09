@@ -945,7 +945,7 @@ const VideoPlayerSection = () => {
           <AlertCircle className="h-4 w-4 text-amber-300" />
           <AlertTitle className="font-bold">This server is taking too long</AlertTitle>
           <AlertDescription className="mt-1 flex flex-col gap-3 text-sm text-zinc-400">
-            The stream request has not returned a playable source yet. You can retry this server or open MegaPlay now; you don't need to wait for the request to finish.
+            The stream request has not returned a playable source yet. You can retry this server or open MegaPlay now; there is no need to wait for the request to finish.
             <div className="flex flex-wrap gap-2">
               <Button size="sm" onClick={() => selectFallbackServer()}>Open Server 1 · MegaPlay</Button>
               <Button size="sm" variant="secondary" onClick={retryStreamResolution}>Retry this server</Button>
