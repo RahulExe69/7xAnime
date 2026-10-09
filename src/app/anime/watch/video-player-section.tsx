@@ -102,7 +102,7 @@ const VideoPlayerSection = () => {
     (episode) => episode.episodeId === activeEpisodeId,
   )?.number;
   const activeEpisodeSlug = activeEpisodeId.split("/").pop() || "";
-  const activeEpisodeNumberFromSlug = Number(activeEpisodeSlug.match(/(\\d+)$/)?.[1]) || 0;
+  const activeEpisodeNumberFromSlug = Number(activeEpisodeSlug.match(/(\d+)$/)?.[1]) || 0;
   const currentEpNumber = activeEpisodeNumberFromList || activeEpisodeNumberFromSlug || 1;
 
   const updateEpisodeUrl = (episodeId: string) => {
