@@ -101,7 +101,7 @@ HINDI_API_BASE = "https://anime-api-ashen-chi.vercel.app/api"
 async def _fetch_hindi_api(path: str, params: dict):
     """Proxy a fixed set of endpoints from the community Hindi anime catalog."""
     try:
-        async with httpx.AsyncClient(timeout=12.0, follow_redirects=True) as client:
+        async with httpx.AsyncClient(timeout=9.0, follow_redirects=True) as client:
             upstream = await client.get(f"{HINDI_API_BASE}/{path}", params=params)
         if not upstream.is_success:
             return JSONResponse(

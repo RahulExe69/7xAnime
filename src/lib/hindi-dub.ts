@@ -2,6 +2,7 @@ import axios from "axios";
 import { api, isLocalBackendEnabled } from "@/lib/api";
 
 const HINDI_API_BASE = "https://anime-api-ashen-chi.vercel.app/api";
+const HINDI_REQUEST_TIMEOUT_MS = 9000;
 
 export type HindiDubStream = {
   server: string;
@@ -42,14 +43,14 @@ const scoreTitle = (candidate: string, query: string) => {
 
 const getHindiJson = async <T,>(route: "search" | "stream", params: Record<string, string | number>) => {
   if (isLocalBackendEnabled()) {
-    const response = await api.get<T>(`/hindi/${route}`, { params, timeout: 15000 });
+    const response = await api.get<T>(`/hindi/${route}`, { params, timeout: 10500 });
     return response.data;
   }
   const response = await axios.get<T>(`${HINDI_API_BASE}/${route}`, {
     params: route === "search"
       ? { s: params.s, page: params.page || 1 }
       : { id: params.id, season: params.season || 1, ep: params.ep || 1 },
-    timeout: 12000,
+    timeout: HINDI_REQUEST_TIMEOUT_MS,
   });
   return response.data;
 };
@@ -87,32 +88,41 @@ export async function getHindiDubStreams(
   episode: number,
 ): Promise<{ streams: HindiDubStream[]; matchedTitle: string }> {
   const titleQueries = [...new Set(titles.map((title) => title.trim()).filter(Boolean))].slice(0, 3);
-  const candidates: Array<SearchCandidate & { score: number; queryTitle: string }> = [];
-
-  for (const title of titleQueries) {
+  const searchResponses = await Promise.all(titleQueries.map(async (title) => {
     try {
       const body = await getHindiJson<any>("search", { s: title, page: 1 });
-      for (const candidate of parseCandidates(body)) {
-        const score = Math.max(
-          scoreTitle(candidate.title, title),
-          scoreTitle(candidate.anime_id.replace(/-/g, " "), title),
-        );
-        if (score >= 0.48 && !candidates.some((item) => item.anime_id === candidate.anime_id)) {
-          candidates.push({ ...candidate, score, queryTitle: title });
+      return { title, candidates: parseCandidates(body) };
+    } catch {
+      return { title, candidates: [] as SearchCandidate[] };
+    }
+  }));
+  const candidates: Array<SearchCandidate & { score: number; queryTitle: string }> = [];
+  for (const response of searchResponses) {
+    for (const candidate of response.candidates) {
+      const score = Math.max(
+        scoreTitle(candidate.title, response.title),
+        scoreTitle(candidate.anime_id.replace(/-/g, " "), response.title),
+      );
+      if (score >= 0.48) {
+        const existing = candidates.find((item) => item.anime_id === candidate.anime_id);
+        if (existing) {
+          if (score > existing.score) {
+            existing.score = score;
+            existing.queryTitle = response.title;
+          }
+        } else {
+          candidates.push({ ...candidate, score, queryTitle: response.title });
         }
       }
-      if (candidates.some((candidate) => candidate.score >= 0.95)) break;
-    } catch {
-      // Try the next AniList title alias before reporting that the catalogue is unavailable.
     }
   }
 
   candidates.sort((a, b) => b.score - a.score);
-  const topCandidates = candidates.slice(0, 4);
+  const topCandidates = candidates.slice(0, 3);
 
   for (const candidate of topCandidates) {
-    const season = Number(candidate.season) || seasonFromTitle(candidate.title) || seasonFromTitle(candidate.anime_id) || 1;
-    const seasonsToTry = [...new Set([season, 1, 2, 3, 4].filter((value) => value >= 1))];
+    const season = seasonFromTitle(candidate.title) || seasonFromTitle(candidate.anime_id) || Number(candidate.season) || 1;
+    const seasonsToTry = [...new Set([season, ...(season > 1 ? [1] : [])])];
     for (const candidateSeason of seasonsToTry) {
       try {
         const body = await getHindiJson<any>("stream", {
