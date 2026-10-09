@@ -457,13 +457,15 @@ const VideoPlayerSection = () => {
   );
   const playerHeader = (
     <div className="flex min-w-0 items-center gap-3 rounded-2xl border border-white/[0.07] bg-[#101018] px-3 py-3 sm:px-4">
-      <Link
-        href={ROUTES.animeDetails(animeIdParam)}
-        aria-label="Back to anime details"
+      <button
+        type="button"
+        onClick={() => window.dispatchEvent(new Event("7xanime:navigate-back"))}
+        aria-label="Back to previous page"
+        title="Back"
         className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-white/10 bg-white/[0.04] text-zinc-200 transition hover:border-[#ff2f9d]/40 hover:bg-[#ff2f9d]/10 hover:text-white"
       >
         <ArrowLeft className="h-5 w-5" />
-      </Link>
+      </button>
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-bold text-white sm:text-base">
           {anime?.anime?.info?.name || "Now Playing"}
