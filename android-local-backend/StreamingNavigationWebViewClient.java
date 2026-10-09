@@ -19,10 +19,9 @@ import java.util.Locale;
 import java.util.Set;
 
 /**
- * Keeps remote players inside the app and applies a conservative first-party
- * WebView request filter for known ad/redirect networks. Media/player hosts are
- * not blanket-blocked; this deliberately prefers a short host list over broad
- * URL heuristics that might break video segments.
+ * Keeps remote players inside the app and applies both a conservative fallback
+ * host denylist and EasyList-compatible request filtering to the Android WebView.
+ * Media/player hosts are not blanket-blocked by custom URL heuristics.
  */
 public final class StreamingNavigationWebViewClient extends BridgeWebViewClient {
     private static final String TAG = "7xAnimeNavigation";
