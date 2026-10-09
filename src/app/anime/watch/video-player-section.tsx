@@ -267,9 +267,10 @@ const VideoPlayerSection = () => {
 
   const { data: localProviderStatus, isLoading: isLoadingProviderStatus } = useQuery<LocalProviderStatus>({
     queryKey: ["local-provider-status"],
-    queryFn: async () => (await api.get<LocalProviderStatus>("/providers/status")).data,
+    queryFn: async () => (await api.get<LocalProviderStatus>("/api/diagnostics/providers")).data,
     enabled: isLocalBackendEnabled(),
     staleTime: 1000 * 15,
+    refetchInterval: isLocalBackendEnabled() ? 5000 : false,
     refetchOnWindowFocus: false,
     retry: 0,
   });
