@@ -321,6 +321,29 @@ def copy_python_source() -> None:
         shutil.rmtree(destination_src)
     shutil.copytree(source_dir / "src", destination_src)
 
+    # The pinned upstream snapshot includes PEP 701 f-string syntax that
+    # Python 3.11 cannot parse. The Android workflow deliberately uses Python
+    # 3.11, so make these two provider modules compatible before importing them.
+    anibd_file = destination_src / "providers" / "anibd.py"
+    anibd_text = anibd_file.read_text(encoding="utf-8")
+    anibd_bad = String.raw`    data = await fetch_json(f"{BASE}/apilink.php?data={quote(provider_link, safe="-_.!~*'()")}")`
+    anibd_good = `    encoded_link = quote(provider_link, safe="-_.!~*'()")
+    data = await fetch_json(f"{BASE}/apilink.php?data={encoded_link}")`
+    if anibd_bad in anibd_text:
+        anibd_text = anibd_text.replace(anibd_bad, anibd_good, 1)
+    elif 'encoded_link = quote(provider_link, safe="-_.!~*\'()")' not in anibd_text:
+        fail("Could not apply the Python 3.11 compatibility patch to anibd.py.")
+    anibd_file.write_text(anibd_text, encoding="utf-8")
+
+    mkissa_file = destination_src / "providers" / "mkissa.py"
+    mkissa_text = mkissa_file.read_text(encoding="utf-8")
+    pep701_fragment = String.raw`safe="'")`
+    if pep701_fragment in mkissa_text:
+        mkissa_text = mkissa_text.replace(pep701_fragment, "safe=chr(39))")
+    elif 'safe=chr(39))' not in mkissa_text:
+        fail("Could not apply the Python 3.11 compatibility patch to mkissa.py.")
+    mkissa_file.write_text(mkissa_text, encoding="utf-8")
+
     # The upstream race waits up to eight seconds after finding a winning stream,
     # only to collect optional latency measurements. That tail delay is noticeable
     # on mobile, so cancel slower competitors almost immediately after a winner.
@@ -347,6 +370,10 @@ def copy_python_source() -> None:
     import py_compile
     py_compile.compile(str(PYTHON_ROOT / "local_api.py"), doraise=True)
     py_compile.compile(str(race_file), doraise=True)
+    # Catch optional provider syntax regressions during the build, not only at
+    # first playback when the UI would otherwise show a silently missing server.
+    for provider_file in (destination_src / "providers").rglob("*.py"):
+        py_compile.compile(str(provider_file), doraise=True)
 
 
 def main() -> None:
