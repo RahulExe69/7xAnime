@@ -4,7 +4,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useAnimeStore } from "@/store/anime-store";
 import dynamic from "next/dynamic";
 
-const KitsunePlayer = dynamic(() => import("@/components/video-player"), {
+const VideoPlayer = dynamic(() => import("@/components/video-player"), {
   ssr: false,
 });
 import { useGetEpisodeData } from "@/query/get-episode-data";
@@ -36,17 +36,13 @@ const VideoPlayerSection = () => {
     ? allEpisodesData.episodes.find((e) => e.number === Number(epParam))
     : null;
 
-  // Do not fall back to a stale global selection while a requested episode
-  // number is still resolving. Direct episode IDs (including resume URLs) win
-  // over Zustand state, which can outlive the watch page.
-  const selectedEpisodeBelongsToAnime = !!selectedEpisode &&
-    !!allEpisodesData?.episodes?.some((episode) => episode.episodeId === selectedEpisode);
+  // Explicit route parameters always win. With no requested episode, start
+  // at the first resolved episode rather than trusting global Zustand state:
+  // provider IDs can be reused (for example "1", "2"...) by API fallbacks for
+  // different anime, so membership alone cannot prove a selection belongs here.
   const activeEpisodeId = epParam
     ? targetEpByNumber?.episodeId || ""
-    : episodeIdParam ||
-      (selectedEpisodeBelongsToAnime ? selectedEpisode : "") ||
-      allEpisodesData?.episodes?.[0]?.episodeId ||
-      "";
+    : episodeIdParam || allEpisodesData?.episodes?.[0]?.episodeId || "";
 
   // Sync selectedEpisode in store with ?ep= parameter if provided
   useEffect(() => {
@@ -392,7 +388,7 @@ const VideoPlayerSection = () => {
 
   return (
     <div>
-      <KitsunePlayer
+      <VideoPlayer
         key={episodeData.sources?.[0]?.url}
         episodeInfo={episodeData}
         serversData={{
