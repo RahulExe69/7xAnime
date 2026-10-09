@@ -340,12 +340,19 @@ def copy_python_source() -> None:
         shutil.rmtree(destination_src)
     shutil.copytree(source_dir / "src", destination_src)
 
-    # Add the independent AnimeNoSub adapter as an optional eleventh provider.
-    # It is embed-first and does not replace any existing Kuhi provider.
-    extra_provider = ROOT / "android-local-backend/extra-providers/animenosub.py"
-    if not extra_provider.is_file():
-        fail("The extra AnimeNoSub provider adapter is missing.")
-    shutil.copy2(extra_provider, destination_src / "providers" / "animenosub.py")
+    # Copy the independently authored extra adapters into the packaged provider tree.
+    # AniXo and Megavid are manual-only embed servers; local_api.py excludes them
+    # from Auto racing so a constructed iframe URL cannot masquerade as playback.
+    extra_providers = {
+        "animenosub": "android-local-backend/extra-providers/animenosub.py",
+        "anixo": "android-local-backend/extra-providers/anixo.py",
+        "megavid": "android-local-backend/extra-providers/megavid.py",
+    }
+    for provider_name, relative_path in extra_providers.items():
+        extra_provider = ROOT / relative_path
+        if not extra_provider.is_file():
+            fail(f"The extra {provider_name} provider adapter is missing.")
+        shutil.copy2(extra_provider, destination_src / "providers" / f"{provider_name}.py")
 
     # The pinned upstream snapshot includes PEP 701 f-string syntax that
     # Python 3.11 cannot parse. The Android workflow deliberately uses Python
@@ -395,7 +402,13 @@ def copy_python_source() -> None:
         if '"animeonsen"' not in ranking_block:
             fail("Could not append AnimeNoSub to Kuhi's provider ranking.")
         ranking_block = ranking_block.replace('"animeonsen"', '"animeonsen", "animenosub"', 1)
-        race_text = race_text[:ranking_match.start(1)] + ranking_block + race_text[ranking_match.end(1):]
+
+    # These documented iframe integrations are selectable manually, but are
+    # intentionally filtered out of the Auto race in local_api.py.
+    for provider_name in ("anixo", "megavid"):
+        if f'"{provider_name}"' not in ranking_block:
+            ranking_block = ranking_block.rstrip() + f', "{provider_name}"'
+    race_text = race_text[:ranking_match.start(1)] + ranking_block + race_text[ranking_match.end(1):]
 
     slow_cleanup = "await asyncio.wait(pending, timeout=8.0)"
     if slow_cleanup in race_text:
