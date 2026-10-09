@@ -66,6 +66,12 @@ Open `http://localhost:3000`. The stack runs the 7xAnime web app, Miruro API (po
 
 More details, optional Google OAuth setup, and the Android HTTPS endpoint requirements are in [docs/SELF_HOSTING.md](docs/SELF_HOSTING.md). The bundled Miruro API may be blocked by Cloudflare or the hosting provider's IP range, so verify it from the actual deployment before relying on it. The candidate provider API audit and integration decisions are tracked in [docs/PROVIDER_RESEARCH.md](docs/PROVIDER_RESEARCH.md).
 
+## Manual playback candidates
+
+The Android local backend also exposes two manual test choices: **AnimeParadise** (a direct HLS candidate with subtitle tracks) and **Cosmic Player** (a custom embedded player whose documented response points to MegaPlay). Cosmic is for comparing player UI; it must not be counted as an independent provider. Both choices stay out of Auto until tested on a real Android device. See [server notes](docs/SERVERS.md) and the [provider research log](docs/PROVIDER_RESEARCH.md).
+
+Megavid can occasionally display a deceptive “Click Allow” prompt inside its third-party embed. Do not grant notification permissions or tap the prompt; use MegaPlay or AniXo instead. The parent app cannot safely remove content rendered inside a cross-origin iframe.
+
 ## Android APK with an on-device API
 
 The Android debug build now has an experimental **local-backend** path: the APK bundles
