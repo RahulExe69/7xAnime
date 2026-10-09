@@ -3,14 +3,13 @@
 import Link from "next/link";
 import Image from "next/image";
 import React, { useEffect, useState } from "react";
-import { Compass, Search, Shuffle } from "lucide-react";
+import { Compass, Search } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 import Container from "./container";
 import { ROUTES } from "@/constants/routes";
-import { api, isLocalBackendEnabled } from "@/lib/api";
-import { MediaList, PaginatedResponse } from "@/types/miruro-api";
+import { isLocalBackendEnabled } from "@/lib/api";
 import { useAuthStore } from "@/store/auth-store";
 import LoginPopoverButton from "./login-popover-button";
 import NavbarAvatar from "./navbar-avatar";
@@ -28,7 +27,6 @@ export default function NavBar() {
   const router = useRouter();
   const auth = useAuthStore();
   const [searchOpen, setSearchOpen] = useState(false);
-  const [randomLoading, setRandomLoading] = useState(false);
 
   useEffect(() => {
     const refreshAuth = async () => {
@@ -61,19 +59,6 @@ export default function NavBar() {
     void refreshAuth();
   }, []);
 
-  const openRandomAnime = async () => {
-    if (randomLoading) return;
-    setRandomLoading(true);
-    try {
-      const response = await api.get<PaginatedResponse<MediaList>>("/trending", { params: { page: 1, per_page: 30 }, timeout: 12000 });
-      const options = (response.data.results || []).filter((item) => !item.isAdult && item.id);
-      if (!options.length) throw new Error("No anime available to randomize");
-      const selected = options[Math.floor(Math.random() * options.length)];
-      router.push(ROUTES.watchAnime(selected.id));
-    } catch {
-      toast.error("Could not load a random anime. Try again in a moment.");
-    } finally { setRandomLoading(false); }
-  };
 
   if (pathname === ROUTES.WATCH || pathname === `${ROUTES.WATCH}/`) return null;
 
@@ -88,7 +73,6 @@ export default function NavBar() {
           <div className="flex min-w-0 items-center justify-end gap-1.5 sm:gap-2 lg:gap-2.5">
 
             <Link href={ROUTES.SEARCH} aria-label="Explore anime" title="Explore" className="grid h-9 w-9 place-items-center rounded-xl text-[#bdb5d6] transition-colors hover:bg-white/[0.07] hover:text-white lg:hidden"><Compass className="h-5 w-5" /></Link>
-            <button type="button" onClick={openRandomAnime} disabled={randomLoading} aria-label="Surprise me with a random anime" title="Random anime" className="grid h-9 w-9 shrink-0 place-items-center rounded-xl text-[#bdb5d6] transition-colors hover:bg-white/[0.07] hover:text-white disabled:opacity-50"><Shuffle className={`h-[21px] w-[21px] ${randomLoading ? "animate-pulse" : ""}`} /></button>
             <button type="button" onClick={() => setSearchOpen(true)} aria-label="Search anime" title="Search anime" className="grid h-9 w-9 shrink-0 place-items-center rounded-xl text-[#bdb5d6] transition-colors hover:bg-white/[0.07] hover:text-white"><Search className="h-[22px] w-[22px]" /></button>
             {auth.auth ? <NavbarAvatar auth={auth} /> : <LoginPopoverButton />}
           </div>
