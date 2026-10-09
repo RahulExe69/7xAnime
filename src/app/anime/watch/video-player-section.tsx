@@ -337,11 +337,12 @@ const VideoPlayerSection = () => {
     (rawProviders[providerName]?.episodes?.[activeCategory] || []).some((episode) => episode.number === currentEpNumber),
   );
   const selectedProviderIndex = availableProviderNames.indexOf(currentProviderName);
+  const fallbackServerNumber = availableProviderNames.length + 1;
   const activeServerNumber = isHindiMode
-    ? (hindiStreams.length ? selectedHindiServer + 2 : 1)
+    ? selectedHindiServer + 1
     : useFallback || isFallbackActive
-      ? 1
-      : selectedProviderIndex >= 0 ? selectedProviderIndex + 2 : 2;
+      ? fallbackServerNumber
+      : selectedProviderIndex >= 0 ? selectedProviderIndex + 1 : 1;
   const activeServerLabel = `Server ${activeServerNumber}`;
 
   const selectFallbackServer = (category?: "sub" | "dub") => {
@@ -379,12 +380,18 @@ const VideoPlayerSection = () => {
       </div>
       <div className="flex min-w-0 flex-wrap items-center gap-2 border-t border-white/[0.06] pt-3">
         <span className="mr-1 text-xs font-extrabold tracking-wide text-zinc-400">Server:</span>
-        <Button size="sm" title="Server 1 — MegaPlay" aria-label="Server 1 — MegaPlay" onClick={() => selectFallbackServer()} className={`h-9 min-w-9 rounded-xl px-3 text-xs font-extrabold transition ${activeServerNumber === 1 ? "bg-[#ff2f9d] text-white" : "border border-white/[0.08] bg-white/[0.035] text-zinc-300 hover:border-[#ff2f9d]/30 hover:bg-[#ff2f9d]/10"}`}>1</Button>
-        {isHindiMode ? hindiStreams.map((stream, index) => (
-          <Button key={stream.embed} size="sm" title={`Server ${index + 2} — Hindi dub — ${stream.host}`} aria-label={`Server ${index + 2} — Hindi dub — ${stream.host}`} onClick={() => setSelectedHindiServer(index)} className={`h-9 min-w-9 rounded-xl px-3 text-xs font-extrabold transition ${activeServerNumber === index + 2 ? "bg-[#ff2f9d] text-white" : "border border-white/[0.08] bg-white/[0.035] text-zinc-300 hover:border-[#ff2f9d]/30 hover:bg-[#ff2f9d]/10"}`}>{index + 2}</Button>
-        )) : availableProviderNames.map((providerName, index) => (
-          <Button key={`${activeCategory}-${providerName}`} size="sm" title={getServerProviderTitle(availableProviderNames, providerName)} aria-label={getServerProviderTitle(availableProviderNames, providerName)} onClick={() => handleProviderSelect(providerName, activeCategory)} className={`h-9 min-w-9 rounded-xl px-3 text-xs font-extrabold transition ${activeServerNumber === index + 2 ? "bg-[#ff2f9d] text-white" : "border border-white/[0.08] bg-white/[0.035] text-zinc-300 hover:border-[#ff2f9d]/30 hover:bg-[#ff2f9d]/10"}`}>{index + 2}</Button>
-        ))}
+        {isHindiMode ? (
+          hindiStreams.map((stream, index) => (
+            <Button key={stream.embed} size="sm" title={`Server ${index + 1} — Hindi dub — ${stream.host}`} aria-label={`Server ${index + 1} — Hindi dub — ${stream.host}`} onClick={() => setSelectedHindiServer(index)} className={`h-9 min-w-9 rounded-xl px-3 text-xs font-extrabold transition ${activeServerNumber === index + 1 ? "bg-[#ff2f9d] text-white" : "border border-white/[0.08] bg-white/[0.035] text-zinc-300 hover:border-[#ff2f9d]/30 hover:bg-[#ff2f9d]/10"}`}>{index + 1}</Button>
+          ))
+        ) : (
+          <>
+            {availableProviderNames.map((providerName, index) => (
+              <Button key={`${activeCategory}-${providerName}`} size="sm" title={getServerProviderTitle(availableProviderNames, providerName)} aria-label={getServerProviderTitle(availableProviderNames, providerName)} onClick={() => handleProviderSelect(providerName, activeCategory)} className={`h-9 min-w-9 rounded-xl px-3 text-xs font-extrabold transition ${activeServerNumber === index + 1 ? "bg-[#ff2f9d] text-white" : "border border-white/[0.08] bg-white/[0.035] text-zinc-300 hover:border-[#ff2f9d]/30 hover:bg-[#ff2f9d]/10"}`}>{index + 1}</Button>
+            ))}
+            <Button size="sm" title={`Server ${fallbackServerNumber} — MegaPlay backup`} aria-label={`Server ${fallbackServerNumber} — MegaPlay backup`} onClick={() => selectFallbackServer()} className={`h-9 min-w-9 rounded-xl px-3 text-xs font-extrabold transition ${activeServerNumber === fallbackServerNumber && (useFallback || isFallbackActive) ? "bg-[#ff2f9d] text-white" : "border border-white/[0.08] bg-white/[0.035] text-zinc-300 hover:border-[#ff2f9d]/30 hover:bg-[#ff2f9d]/10"}`}>{fallbackServerNumber}</Button>
+          </>
+        )}
       </div>
     </div>
   );
