@@ -718,6 +718,34 @@ const VideoPlayerSection = () => {
     );
   }
 
+  const firstResolvedSource = episodeData?.sources?.[0];
+  if (firstResolvedSource?.type === "embed" && firstResolvedSource.url) {
+    const embedProvider = episodeData.provider || currentProviderName;
+    return (
+      <div className="flex w-full flex-col gap-3">
+        {playerHeader}
+        <div className="relative aspect-video w-full overflow-hidden rounded-2xl border border-white/10 bg-black shadow-2xl shadow-black/40">
+          <iframe
+            key={firstResolvedSource.url}
+            src={firstResolvedSource.url}
+            title={`${anime?.anime?.info?.name || "Anime"} episode ${currentEpNumber} via ${getProviderDisplayName(embedProvider)}`}
+            width="100%"
+            height="100%"
+            allow="autoplay; fullscreen; picture-in-picture; encrypted-media"
+            allowFullScreen
+            sandbox="allow-scripts allow-same-origin allow-forms allow-presentation"
+            referrerPolicy="strict-origin-when-cross-origin"
+            className="absolute inset-0 h-full w-full border-0"
+          />
+        </div>
+        <p className="text-xs text-zinc-500">
+          Embedded source: {getProviderDisplayName(embedProvider)}. External popups and top-level redirects are blocked.
+        </p>
+        {playerControls}
+      </div>
+    );
+  }
+
   if (!episodeData || !hasPlayableSources) {
     return (
       <div className="space-y-3">
