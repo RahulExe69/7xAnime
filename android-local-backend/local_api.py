@@ -5,10 +5,12 @@ native Capacitor bridge protects requests from unrelated apps/web pages.
 """
 from __future__ import annotations
 
+import asyncio
 import ipaddress
 import re
 import secrets
 import threading
+import time
 from urllib.parse import urlencode, urljoin, urlsplit
 
 import httpx
@@ -31,6 +33,84 @@ _server_lock = threading.Lock()
 # Kuhi's native router is mounted at /anime by upstream. Mounting the same
 # router at / also supplies the paths expected by the existing 7xAnime client.
 app.include_router(router)
+
+# Episode discovery should not hold the watch page hostage while every scraper
+# finishes. Return early results first and let the frontend poll while others run.
+_EPISODE_DISCOVERY_TTL = 300.0
+_episode_discovery_lock = asyncio.Lock()
+_episode_discovery_cache: dict[int, dict] = {}
+
+
+async def _collect_episode_provider(anilist_id: int, name: str, mod, ctx: dict, state: dict) -> None:
+    try:
+        result_name, data = await provider_race._episodes_one(mod, name, anilist_id, ctx)
+    except Exception as error:
+        print(f"[7XAnime] provider episode lookup failed for {name}: {str(error)[:120]}")
+        result_name, data = name, None
+
+    state["finished"].add(result_name)
+    if data:
+        state["providers"][result_name] = data
+    if len(state["finished"]) >= len(state["provider_names"]):
+        state["complete"] = True
+        state["expires_at"] = time.time() + _EPISODE_DISCOVERY_TTL
+
+
+async def _progressive_merged_episodes(anilist_id: int) -> dict | None:
+    anime_id = int(anilist_id)
+    now = time.time()
+    async with _episode_discovery_lock:
+        state = _episode_discovery_cache.get(anime_id)
+        if state and state["complete"] and now >= state["expires_at"]:
+            _episode_discovery_cache.pop(anime_id, None)
+            state = None
+
+        if state is None:
+            mods = provider_race.providers()
+            if not mods:
+                return None
+            ctx = await provider_race.build_ctx(anime_id)
+            state = {
+                "providers": {},
+                "finished": set(),
+                "provider_names": [name for name, _ in mods],
+                "tasks": [],
+                "complete": False,
+                "expires_at": now + _EPISODE_DISCOVERY_TTL,
+            }
+            _episode_discovery_cache[anime_id] = state
+            for name, mod in mods:
+                state["tasks"].append(
+                    asyncio.create_task(_collect_episode_provider(anime_id, name, mod, ctx, state))
+                )
+
+    # Spend at most 850 ms waiting for the first useful provider. Later polls
+    # return quickly while slower provider scrapers continue in the background.
+    pending = [task for task in state["tasks"] if not task.done()]
+    if pending:
+        await asyncio.wait(
+            pending,
+            timeout=0.85 if not state["providers"] else 0.05,
+            return_when=asyncio.FIRST_COMPLETED,
+        )
+
+    state["complete"] = len(state["finished"]) >= len(state["provider_names"])
+    if state["complete"]:
+        state["expires_at"] = time.time() + _EPISODE_DISCOVERY_TTL
+    ordered_providers = {
+        name: state["providers"][name]
+        for name in state["provider_names"]
+        if name in state["providers"]
+    }
+    return {
+        "anilistId": anime_id,
+        "source": "native",
+        "providers": ordered_providers,
+        "complete": state["complete"],
+    }
+
+
+provider_race.merged_episodes = _progressive_merged_episodes
 
 
 @app.middleware("http")
