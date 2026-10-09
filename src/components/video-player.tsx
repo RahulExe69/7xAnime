@@ -59,7 +59,7 @@ const generateHighlights = (
 };
 
 // --- The Combined ArtPlayer Component ---
-function KitsunePlayer({
+function VideoPlayer({
   episodeInfo,
   animeInfo,
   subOrDub,
@@ -825,4 +825,4 @@ function KitsunePlayer({
   );
 }
 
-export default KitsunePlayer;
+export default VideoPlayer;

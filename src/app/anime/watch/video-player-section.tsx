@@ -4,7 +4,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useAnimeStore } from "@/store/anime-store";
 import dynamic from "next/dynamic";
 
-const KitsunePlayer = dynamic(() => import("@/components/kitsune-player"), {
+const KitsunePlayer = dynamic(() => import("@/components/video-player"), {
   ssr: false,
 });
 import { useGetEpisodeData } from "@/query/get-episode-data";
