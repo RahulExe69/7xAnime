@@ -43,7 +43,7 @@ LOCAL_WATCH_CACHE_TTL = 35.0
 
 
 def _safe_provider_error(error: Exception) -> str:
-    message = re.sub(r"https?://\S+, "<upstream URL>", str(error or "").strip())
+    message = re.sub(r"https?://\S+", "<upstream URL>", str(error or "").strip())
     message = re.sub(r"(?i)(token|key|secret|signature)=([^&\s]+)", r"\1=<redacted>", message)
     return f"{type(error).__name__}: {message[:180]}" if message else type(error).__name__
 
