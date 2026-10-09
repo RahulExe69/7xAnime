@@ -301,6 +301,7 @@ def register_plugin(main_activity: Path) -> None:
 def install_navigation_guard(main_activity: Path) -> None:
     """Keep main-frame navigation in-app without sandboxing the streaming iframe itself."""
     text = main_activity.read_text(encoding="utf-8")
+    text = add_import(text, "import com.sevenx.anime.StreamingNavigationWebViewClient;")
     statement = "getBridge().getWebView().setWebViewClient(new StreamingNavigationWebViewClient(getBridge()));"
     if statement in text:
         return
