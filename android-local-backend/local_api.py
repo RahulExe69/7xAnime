@@ -175,33 +175,101 @@ async def legacy_watch_route(provider: str, anilist_id: int, audio: str, episode
     if audio not in {"sub", "dub"}:
         audio = "sub"
 
-    preferred = provider.lower() if provider.lower() in provider_race.RANKING else None
+    requested_provider = (provider or "").strip().lower()
+    is_auto = requested_provider == "auto"
+    preferred = requested_provider if requested_provider in provider_race.RANKING else None
 
-    # Call the already-parallel provider race directly. Kuhi's extract_simple
-    # wrapper performs an extra AniList format lookup first and may then run a
-    # legacy sequential fallback, which adds long delays to every tap on mobile.
-    # Bound the entire operation so a stalled context lookup cannot leave the UI
-    # in "Finding a playable stream…" indefinitely.
-    try:
-        raced = await asyncio.wait_for(
-            provider_race.race_watch(
+    async def extract_streams() -> dict:
+        # Auto is the only mode allowed to race across providers. A manually
+        # selected server must never silently return another provider's stream.
+        if is_auto:
+            raced = await provider_race.race_watch(
                 anilist_id,
                 episode_number,
                 audio,
-                preferred=preferred,
-            ),
-            timeout=10.0,
+                preferred=None,
+            )
+            result = raced or {}
+            streams = result.get("streams") or []
+            return {
+                "anilistId": anilist_id,
+                "episode": episode_number,
+                "type": audio,
+                "provider": result.get("provider") or "auto",
+                "requestedProvider": "auto",
+                "defaultProvider": result.get("defaultProvider") or provider_race.default_provider(),
+                "providerStatus": "ok" if streams else "no_stream",
+                "streams": streams,
+                "subtitles": provider_race.merge_subtitles(streams),
+            }
+
+        if preferred is None:
+            return {
+                "anilistId": anilist_id,
+                "episode": episode_number,
+                "type": audio,
+                "provider": requested_provider,
+                "requestedProvider": requested_provider,
+                "providerStatus": "unsupported_provider",
+                "providerError": "This server name is not in the bundled provider list.",
+                "streams": [],
+                "subtitles": [],
+            }
+
+        provider_modules = dict(provider_race.providers())
+        module = provider_modules.get(preferred)
+        if module is None:
+            return {
+                "anilistId": anilist_id,
+                "episode": episode_number,
+                "type": audio,
+                "provider": preferred,
+                "requestedProvider": preferred,
+                "providerStatus": "provider_unavailable",
+                "providerError": "This provider could not be loaded in the embedded API.",
+                "streams": [],
+                "subtitles": [],
+            }
+
+        ctx = await provider_race.build_ctx(anilist_id)
+        actual_name, streams, seconds, ok = await provider_race._watch_one(
+            module, preferred, anilist_id, episode_number, audio, ctx
         )
-        streams = (raced or {}).get("streams") or []
+        provider_race.record_latency(actual_name, seconds, ok)
+        streams = streams or [] if ok else []
+        return {
+            "anilistId": anilist_id,
+            "episode": episode_number,
+            "type": audio,
+            "provider": actual_name,
+            "requestedProvider": preferred,
+            "defaultProvider": provider_race.default_provider(),
+            "providerStatus": "ok" if ok and streams else "no_stream",
+            "providerError": None if ok and streams else "The selected provider returned no stream for this episode.",
+            "timings": {actual_name: {"seconds": seconds, "ok": bool(ok and streams)}},
+            "streams": streams,
+            "subtitles": provider_race.merge_subtitles(streams),
+        }
+
+    # Bound provider context creation and extraction together. The direct provider
+    # branch uses _watch_one's shorter per-provider timeout; Auto races everyone.
+    try:
+        data = await asyncio.wait_for(extract_streams(), timeout=10.0)
+    except asyncio.TimeoutError:
+        print(
+            f"[7XAnime] stream lookup timed out for provider={provider}, "
+            f"anime={anilist_id}, episode={episode_number}"
+        )
         data = {
             "anilistId": anilist_id,
             "episode": episode_number,
             "type": audio,
-            "provider": (raced or {}).get("provider") or preferred,
-            "defaultProvider": (raced or {}).get("defaultProvider"),
-            "requestedProvider": (raced or {}).get("requestedProvider"),
-            "streams": streams,
-            "subtitles": provider_race.merge_subtitles(streams),
+            "provider": preferred or ("auto" if is_auto else requested_provider),
+            "requestedProvider": preferred or ("auto" if is_auto else requested_provider),
+            "providerStatus": "timeout",
+            "providerError": "The selected stream lookup exceeded the 10-second time limit.",
+            "streams": [],
+            "subtitles": [],
         }
     except Exception as error:
         print(
@@ -212,7 +280,10 @@ async def legacy_watch_route(provider: str, anilist_id: int, audio: str, episode
             "anilistId": anilist_id,
             "episode": episode_number,
             "type": audio,
-            "provider": preferred,
+            "provider": preferred or ("auto" if is_auto else requested_provider),
+            "requestedProvider": preferred or ("auto" if is_auto else requested_provider),
+            "providerStatus": "error",
+            "providerError": str(error)[:200],
             "streams": [],
             "subtitles": [],
         }
