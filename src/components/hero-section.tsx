@@ -43,7 +43,7 @@ const HeroSection = (props: IHeroSectionProps) => {
     return <LoadingSkeleton />;
 
   return (
-    <div className="relative h-[36svh] min-h-[270px] max-h-[430px] w-full md:h-[78vh] md:min-h-[560px]">
+    <div className="relative h-[68svh] min-h-[500px] max-h-[700px] w-full md:h-[78vh] md:min-h-[600px] md:max-h-[780px]">
       <Carousel className="w-full" setApi={setApi} opts={{ loop: true }}>
         <CarouselContent>
           {props.spotlightAnime.map((anime, index) => (
@@ -55,7 +55,7 @@ const HeroSection = (props: IHeroSectionProps) => {
       </Carousel>
       <div className="absolute bottom-3 left-1/2 z-50 flex -translate-x-1/2 items-center gap-2 md:bottom-5">
         {props.spotlightAnime.map((anime, index) => (
-          <button key={anime.id || index} type="button" aria-label={`Show spotlight ${index + 1}`} aria-current={selectedSlide === index ? "true" : undefined} onClick={() => api?.scrollTo(index)} className={`h-2 rounded-full transition-all duration-200 ${selectedSlide === index ? "w-7 bg-[#604bd3]" : "w-2 bg-[#77728f]/30 hover:bg-[#77728f]/55 dark:bg-white/25 dark:hover:bg-white/50"}`} />
+          <button key={anime.id || index} type="button" aria-label={`Show spotlight ${index + 1}`} aria-current={selectedSlide === index ? "true" : undefined} onClick={() => api?.scrollTo(index)} className={`h-2 rounded-full transition-all duration-200 ${selectedSlide === index ? "w-7 bg-[#ff2f9d]" : "w-2 bg-[#77728f]/30 hover:bg-[#77728f]/55 dark:bg-white/25 dark:hover:bg-white/50"}`} />
         ))}
       </div>
       <div className="absolute hidden md:flex items-center gap-5 right-10 3xl:bottom-10 bottom-20 z-50 isolate">
@@ -63,7 +63,7 @@ const HeroSection = (props: IHeroSectionProps) => {
           onClick={() => {
             api?.scrollPrev();
           }}
-          className="h-10 w-10 rounded-full border border-white/20 bg-black/40 text-white backdrop-blur hover:bg-[#604bd3]"
+          className="h-10 w-10 rounded-full border border-white/20 bg-black/40 text-white backdrop-blur hover:bg-[#ff2f9d]"
         >
           <ArrowLeft className="shrink-0" />
         </Button>
@@ -89,24 +89,24 @@ const HeroCarouselItem = ({ anime }: { anime: MediaList }) => {
 
   return (
     <div
-      className="relative h-[64svh] min-h-[430px] max-h-[700px] w-full bg-cover bg-center bg-no-repeat md:h-[78vh] md:min-h-[560px]"
+      className="relative h-[64svh] min-h-[430px] max-h-[700px] w-full bg-cover bg-center bg-no-repeat h-[68svh] min-h-[500px] max-h-[700px] md:h-[78vh] md:min-h-[600px] md:max-h-[780px]"
       style={{ backgroundImage: `url(${bgImage})` }}
     >
       {/* Gradient Overlay */}
       <div className="absolute h-full w-full inset-0 m-auto bg-gradient-to-r from-black/75 via-black/40 to-transparent z-10"></div>
-      <div className="absolute h-full w-full inset-0 m-auto bg-gradient-to-t from-[#f6f5fc] via-[#f6f5fc]/25 to-transparent dark:from-[#111019] dark:via-[#111019]/25 z-10"></div>
+      <div className="absolute h-full w-full inset-0 m-auto bg-gradient-to-t from-[#0b0a10] via-[#0b0a10]/30 to-transparent z-10"></div>
 
       {/* Content Section */}
       <div className="relative z-20 h-full w-full">
         <Container className="flex h-full w-full flex-col justify-end pb-12 pt-24 md:justify-center md:pb-10 md:pt-20">
           <div className="max-w-2xl space-y-3 md:space-y-4 lg:w-[48vw]">
-            <h1 className="line-clamp-3 text-3xl font-black leading-tight tracking-tight text-white drop-shadow-2xl sm:text-4xl md:line-clamp-2 md:text-5xl lg:text-6xl">
+            <h1 className="line-clamp-3 max-w-[13ch] text-[2rem] font-black leading-[1.08] tracking-[-0.035em] text-white drop-shadow-2xl sm:max-w-[16ch] sm:text-4xl md:line-clamp-2 md:text-5xl lg:text-6xl">
               {title}
             </h1>
 
             <div className="flex flex-wrap items-center gap-2 text-xs">
               {anime.format && (
-                <Badge className="border-0 bg-[#604bd3] text-white font-semibold">
+                <Badge className="border-0 bg-[#ff2f9d] text-white font-semibold">
                   {anime.format}
                 </Badge>
               )}
@@ -131,7 +131,7 @@ const HeroCarouselItem = ({ anime }: { anime: MediaList }) => {
               <ButtonLink
                 href={ROUTES.watchAnime(anime.id)}
                 LeftIcon={Play}
-                className="h-12 rounded-xl bg-[#604bd3] px-5 text-sm font-bold text-white shadow-lg shadow-[#604bd3]/25 transition hover:bg-[#513cc4]"
+                className="h-12 rounded-xl bg-[#ff2f9d] px-5 text-sm font-bold text-white shadow-lg shadow-[#ff2f9d]/25 transition hover:bg-[#e51e86]"
               >
                 Watch Now
               </ButtonLink>
@@ -151,7 +151,7 @@ const HeroCarouselItem = ({ anime }: { anime: MediaList }) => {
 
 const LoadingSkeleton = () => {
   return (
-    <div className="relative h-[36svh] min-h-[270px] max-h-[430px] w-full md:h-[78vh] md:min-h-[560px]">
+    <div className="relative h-[68svh] min-h-[500px] max-h-[700px] w-full md:h-[78vh] md:min-h-[600px] md:max-h-[780px]">
       <div className="relative z-20 h-full w-full">
         <Container className="flex h-full w-full flex-col justify-end pb-12 pt-24 md:justify-center md:pb-10 md:pt-20">
           <div className="space-y-2 lg:w-[40vw]">
