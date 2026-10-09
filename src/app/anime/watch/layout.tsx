@@ -53,7 +53,7 @@ const Layout = (props: Props) => (
 
 const LayoutContent = (props: Props) => {
   const searchParams = useSearchParams();
-  const { setAnime, setSelectedEpisode } = useAnimeStore();
+  const { setAnime, selectedEpisode, setSelectedEpisode } = useAnimeStore();
   const router = useRouter();
 
   const currentAnimeId = searchParams.get("anime");
@@ -150,15 +150,17 @@ const LayoutContent = (props: Props) => {
   // list is still loading, and URL replacement here used to restart that work.
   useEffect(() => {
     if (episodeId) {
-      setSelectedEpisode(episodeId);
+      if (selectedEpisode !== episodeId) setSelectedEpisode(episodeId);
       return;
     }
     if (!episodes?.episodes?.length) return;
     const epNum = epNumberParam ? Number(epNumberParam) : 1;
     const matchedEp =
       episodes.episodes.find((episode) => Number(episode.number) === epNum) || episodes.episodes[0];
-    if (matchedEp?.episodeId) setSelectedEpisode(matchedEp.episodeId);
-  }, [episodes, episodeId, epNumberParam, setSelectedEpisode]);
+    if (matchedEp?.episodeId && selectedEpisode !== matchedEp.episodeId) {
+      setSelectedEpisode(matchedEp.episodeId);
+    }
+  }, [episodes, episodeId, epNumberParam, selectedEpisode, setSelectedEpisode]);
 
   return (
       <Container className="mt-3 space-y-5 pb-12 sm:mt-5 md:mt-6 md:space-y-7">
