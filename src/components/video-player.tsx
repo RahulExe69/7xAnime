@@ -399,9 +399,9 @@ function VideoPlayer({
     const finalOptions: Option = {
       container: artContainerRef.current,
       url: uri,
-      // Only force HLS for an HLS source. MP4 should use the browser's native
+      // Preserve the actual media type. MP4 should use the browser's native
       // video pipeline; forcing every source to m3u8 makes MP4 providers fail.
-      ...(isHlsSource ? { type: "m3u8" as const } : {}),
+      ...(isHlsSource ? { type: "m3u8" as const } : sourceType === "mp4" ? { type: "mp4" as const } : {}),
       customType: {
         m3u8: (
           videoElement: HTMLMediaElement,
