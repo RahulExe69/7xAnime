@@ -57,7 +57,7 @@ const EpisodePlaylist = ({
     // Route parameters are authoritative. Never guess from the characters in a
     // provider's episode slug (some IDs end in "12", not "episode-12").
     if (episodeId) {
-      setSelectedEpisode(episodeId);
+      if (selectedEpisode !== episodeId) setSelectedEpisode(episodeId);
       return;
     }
 
@@ -65,7 +65,7 @@ const EpisodePlaylist = ({
       const requestedEpisode = episodes.episodes.find(
         (episode) => episode.number === Number(episodeNumberParam),
       );
-      if (requestedEpisode?.episodeId) {
+      if (requestedEpisode?.episodeId && selectedEpisode !== requestedEpisode.episodeId) {
         setSelectedEpisode(requestedEpisode.episodeId);
       }
       return;
@@ -79,7 +79,7 @@ const EpisodePlaylist = ({
     const fallbackEpisode = isLatestEpisode
       ? episodes.episodes[episodes.episodes.length - 1]
       : episodes.episodes[0];
-    if (fallbackEpisode?.episodeId) {
+    if (fallbackEpisode?.episodeId && selectedEpisode !== fallbackEpisode.episodeId) {
       setSelectedEpisode(fallbackEpisode.episodeId);
     }
   }, [
