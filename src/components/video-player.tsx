@@ -37,6 +37,7 @@ interface ArtPlayerProps extends HTMLAttributes<HTMLDivElement> {
   autoSkip?: boolean;
   serversData: IEpisodeServers;
   onError?: (detail?: string) => void;
+  onPlaybackReady?: () => void;
 }
 
 // --- Helper to generate highlights ---
@@ -66,6 +67,7 @@ function VideoPlayer({
   autoSkip = true,
   serversData,
   onError,
+  onPlaybackReady,
   ...rest // Spread other div attributes like className, id, etc.
 }: ArtPlayerProps): JSX.Element {
   const artContainerRef = useRef<HTMLDivElement>(null); // Ref for the mounting div
@@ -735,6 +737,8 @@ function VideoPlayer({
       onError?.(detail);
     });
 
+    const handlePlaybackReady = () => onPlaybackReady?.();
+    art.on("video:playing", handlePlaybackReady);
     art.on("video:timeupdate", handleTimeUpdate);
 
     const handleInteractionUpdate = () => {
@@ -800,6 +804,7 @@ function VideoPlayer({
         console.log("Cleanup: Destroying ArtPlayer instance.");
         art.off("video:pause", handleInteractionUpdate);
         art.off("video:seeked", handleInteractionUpdate);
+        art.off("video:playing", handlePlaybackReady);
         art.off("video:timeupdate", handleTimeUpdate);
 
         console.log("Cleanup: Pausing player");
