@@ -199,7 +199,7 @@ export default function LibraryPage() {
             <div className="mb-3 grid h-12 w-12 place-items-center rounded-2xl bg-white/[0.05] text-[#aaa2bd]"><Clock3 className="h-6 w-6" /></div>
             <h3 className="text-base font-bold">{search ? "No matching anime" : selectedStatus === "all" ? "Your list is empty" : `Nothing marked ${STATUS_LABELS[selectedStatus]?.toLowerCase() || "here"} yet`}</h3>
             <p className="mt-2 max-w-sm text-sm leading-6 text-[#928aa8]">
-              {localMode ? "Watch an episode and your recent series will appear here." : selectedStatus === "all" && !search ? "Save anime from its details page to build your personal watchlist." : "Try another status, clear the search, or explore more anime."}
+              {localMode ? "Watch an episode and your recent series will appear here." : !auth ? "Sign in to save statuses and sync your anime list across devices." : selectedStatus === "all" && !search ? "Save anime from its details page to build your personal watchlist." : "Try another status, clear the search, or explore more anime."}
             </p>
             {search && <button type="button" onClick={() => setSearch("")} className="mt-4 rounded-xl border border-white/10 px-4 py-2 text-sm font-semibold text-[#d6cfe6] hover:bg-white/[0.06]">Clear search</button>}
             <Link href={ROUTES.SEARCH} className="mt-4 inline-flex items-center gap-2 rounded-xl bg-white/[0.08] px-4 py-2.5 text-sm font-bold hover:bg-white/[0.13]"><Compass className="h-4 w-4" /> Discover anime</Link>
