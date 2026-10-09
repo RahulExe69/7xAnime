@@ -1,6 +1,6 @@
 # 7xAnime player marathon
 
-This work stays in draft PR #2 and is split into four phases. CI verifies compile/package behaviour, but physical-device playback is still required before calling the player experience production-ready.
+The original four-phase player updates have been merged into `master`. CI verifies compile/package behaviour, but physical-device playback is still required before calling the player experience production-ready. The follow-up native filter-list proof of concept is described in [ANDROID-ADBLOCKING.md](ANDROID-ADBLOCKING.md) and remains a separate, device-test-gated change.
 
 ## Phase 1 — Ad and redirect protection
 
