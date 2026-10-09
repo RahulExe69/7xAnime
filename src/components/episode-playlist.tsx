@@ -102,8 +102,12 @@ const EpisodePlaylist = ({
   }, [episodes, currentGroup]);
 
   useEffect(() => {
-    const episodeIndex = episodes?.episodes.findIndex(
-      (episode) => episode.episodeId === episodeId,
+    const episodeIndex = episodes?.episodes.findIndex((episode) =>
+      episodeId
+        ? episode.episodeId === episodeId
+        : episodeNumberParam
+          ? episode.number === Number(episodeNumberParam)
+          : false,
     );
 
     if (
@@ -127,7 +131,7 @@ const EpisodePlaylist = ({
       }
     }
     //eslint-disable-next-line
-  }, [animeId, episodes]);
+  }, [animeId, episodes, episodeId, episodeNumberParam]);
 
   const handleOnSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!episodes) return;
