@@ -110,7 +110,7 @@ jobs:
 
           expected = {
               "anineko", "anizone", "anikoto", "reanime", "aniwaves",
-              "kaa", "anibd", "animegg", "mkissa", "animeonsen",
+              "kaa", "anibd", "animegg", "mkissa", "animeonsen", "animenosub",
           }
           providers = _race.providers()
           loaded_names = {name for name, _ in providers}
@@ -151,7 +151,7 @@ jobs:
               assert status.status_code == 200, status.text
               reported = {item["id"] for item in status.json()["providers"] if item["moduleLoaded"]}
               assert expected <= reported, f"Diagnostics do not list all packaged providers: {sorted(expected - reported)}"
-          print("Packaged API: all 10 providers loaded; health, auth, diagnostics and CORS passed.")
+          print("Packaged API: all 11 providers loaded; health, auth, diagnostics and CORS passed.")
           PY
 
       - name: Run packaged API contract tests
