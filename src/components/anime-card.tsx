@@ -37,96 +37,56 @@ const formatScore = (score?: number | null) => {
 const AnimeCard = ({ displayDetails = true, variant = "sm", ...props }: Props) => {
   const safeCurrent = typeof props.watchDetail?.current === "number" ? props.watchDetail.current : 0;
   const safeTotal = typeof props.watchDetail?.timestamp === "number" && props.watchDetail.timestamp > 0 ? props.watchDetail.timestamp : 0;
-  const clampedCurrent = Math.min(safeCurrent, safeTotal);
-  const percentage = safeTotal > 0 ? (clampedCurrent / safeTotal) * 100 : 0;
+  const percentage = safeTotal > 0 ? (Math.min(safeCurrent, safeTotal) / safeTotal) * 100 : 0;
   const score = formatScore(props.score);
   const suppliedHref = props.href || ROUTES.HOME;
-  const getAnimeId = () => {
+
+  const animeId = (() => {
     if (props.animeId !== undefined && props.animeId !== null) return String(props.animeId);
     try {
       const route = new URL(props.quickWatchHref || suppliedHref, "https://7xanime.local");
       const queryId = route.searchParams.get("id") || route.searchParams.get("anime");
       if (queryId) return queryId;
-      const pathParts = route.pathname.split("/").filter(Boolean);
-      const legacyPathId = pathParts[0] === "anime" && pathParts[1] !== "watch" ? pathParts[1] : "";
-      return legacyPathId ? decodeURIComponent(legacyPathId) : "";
+      const parts = route.pathname.split("/").filter(Boolean);
+      return parts[0] === "anime" && parts[1] !== "watch" ? decodeURIComponent(parts[1] || "") : "";
     } catch {
       return "";
     }
-  };
-  const animeId = getAnimeId();
+  })();
+
   const detailsHref = (() => {
     try {
       const route = new URL(suppliedHref, "https://7xanime.local");
       if (route.pathname.replace(/\/$/, "") === ROUTES.WATCH && animeId) return ROUTES.animeDetails(animeId);
-      return suppliedHref;
-    } catch {
-      return suppliedHref;
-    }
+    } catch {}
+    return suppliedHref;
   })();
   const playHref = props.quickWatchHref || (animeId ? ROUTES.watchAnime(animeId) : suppliedHref);
 
   return (
-    <article className={cn(
-      "group relative isolate w-full min-w-0 overflow-hidden rounded-xl border border-white/[0.09] bg-[#15121d] shadow-[0_8px_22px_rgba(0,0,0,0.18)] transition-colors duration-150 hover:border-[#ff2f9d]/70 hover:shadow-[0_10px_28px_rgba(255,47,157,0.10)]",
-      variant === "sm" && "max-w-[11.5rem]",
-      variant === "lg" && "max-w-[15rem]",
-      props.className,
-    )}>
-      <div className="relative aspect-[2/3] w-full overflow-hidden bg-[#17131f]">
-        <Image
-          src={props.poster || "/brand/7xanime-mark.svg"}
-          alt={props.title}
-          fill
-          sizes="(max-width: 640px) 42vw, (max-width: 1024px) 22vw, 180px"
-          className="object-cover transition-transform duration-150 group-hover:scale-[1.02]"
-          unoptimized
-        />
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#08060d] via-[#08060d]/10 to-black/20" />
-        {score && (
-          <span className="absolute right-2 top-2 z-[5] inline-flex items-center gap-1 rounded-lg border border-white/10 bg-[#08060d]/85 px-2 py-1 text-[11px] font-bold text-white shadow-sm backdrop-blur-sm">
-            <span className="text-amber-300">★</span> {score}
-          </span>
-        )}
-        {props.episodeCard && !!props.episodes && !props.episodeLabel && (
-          <span className="absolute left-2 top-10 z-[5] rounded-lg border border-white/10 bg-[#08060d]/85 px-2 py-1 text-[10px] font-bold text-white backdrop-blur-sm">
-            EP {props.episodes}
-          </span>
-        )}
-        {props.episodeLabel && !props.watchDetail && (
-          <span className="absolute left-2 top-10 z-[5] max-w-[calc(100%-1rem)] truncate rounded-lg border border-white/10 bg-[#08060d]/85 px-2 py-1 text-[10px] font-bold text-white backdrop-blur-sm">
-            {props.episodeLabel}
-          </span>
-        )}
-        {props.watchDetail && (
-          <div className="pointer-events-none absolute inset-x-2 bottom-2 z-[5] flex flex-col gap-1 rounded-lg border border-white/10 bg-[#08060d]/85 px-2 py-2 text-[10px] font-semibold text-white backdrop-blur-sm">
-            <span>Ep {props.watchDetail.episodeNumber} · {formatSecondsToMMSS(props.watchDetail.current)} left</span>
-            <Progress value={percentage} className="h-1 bg-white/20" />
-          </div>
-        )}
-        <Link href={playHref} aria-label={`Watch ${props.title}`} className="absolute inset-0 z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#ff2f9d]">
-          <span className="sr-only">Watch {props.title}</span>
-        </Link>
-        {displayDetails && (
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex flex-col gap-1.5 bg-gradient-to-t from-[#08060d] via-[#08060d]/85 to-transparent px-3 pb-3 pt-14">
-            <h3 className="line-clamp-2 text-[13px] font-extrabold leading-[1.25] tracking-[-0.01em] text-white sm:text-sm">
-              {props.title}
-            </h3>
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] font-medium text-zinc-300 sm:text-[11px]">
-              {props.format && <span>{props.format}</span>}
-              {!!props.episodes && <span>{props.episodes} ep</span>}
-              {props.statusLabel && <span>{props.statusLabel}</span>}
-            </div>
-            {props.subTitle && <p className="line-clamp-1 text-[10px] text-zinc-400">{props.subTitle}</p>}
-          </div>
-        )}
-        {animeId && (
-          <Link href={detailsHref} title={`Details for ${props.title}`} aria-label={`Details for ${props.title}`} className="absolute bottom-2 right-2 z-30 grid h-8 w-8 place-items-center rounded-full border border-white/20 bg-[#08060d]/85 text-white shadow-lg backdrop-blur transition-colors hover:border-[#ff2f9d] hover:bg-[#ff2f9d] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white">
-            <Info className="h-4 w-4" />
-          </Link>
-        )}
+    <article className={cn("group flex min-w-0 flex-col gap-2.5", variant === "sm" && "w-full max-w-[11.5rem]", variant === "lg" && "w-full max-w-[15rem]", props.className)}>
+      <div className="relative aspect-[2/3] w-full overflow-hidden rounded-xl border border-white/[0.07] bg-[#171521] shadow-[0_7px_22px_rgba(0,0,0,0.18)] transition-colors duration-150 group-hover:border-[#8b70f2]/60 sm:rounded-2xl">
+        <Image src={props.poster || "/brand/7xanime-mark.svg"} alt={props.title} fill sizes="(max-width: 640px) 42vw, (max-width: 1024px) 22vw, 180px" className="object-cover" />
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/75 via-transparent to-black/10" />
+        {score && <span className="absolute right-2 top-2 z-[5] inline-flex items-center gap-1 rounded-lg border border-white/10 bg-[#111019]/90 px-2 py-1 text-[10px] font-extrabold text-white backdrop-blur-sm sm:text-[11px]"><span className="text-amber-300">★</span>{score}</span>}
+        {props.episodeCard && !!props.episodes && <span className="absolute left-2 top-2 z-[5] rounded-lg border border-white/10 bg-[#111019]/90 px-2 py-1 text-[10px] font-bold text-white sm:text-[11px]">EP {props.episodes}</span>}
+        {props.episodeLabel && !props.watchDetail && <span className="absolute bottom-2 left-2 z-[5] max-w-[calc(100%-3rem)] truncate rounded-lg border border-white/10 bg-[#111019]/90 px-2 py-1.5 text-[10px] font-bold text-white backdrop-blur-sm sm:text-[11px]">{props.episodeLabel}</span>}
+        {props.watchDetail && <div className="absolute inset-x-2 bottom-2 z-[5] flex flex-col gap-1.5 rounded-lg border border-white/10 bg-[#111019]/90 px-2.5 py-2 text-[10px] font-semibold text-white backdrop-blur-sm sm:text-[11px]"><span className="truncate">Ep {props.watchDetail.episodeNumber} · {formatSecondsToMMSS(props.watchDetail.current)} watched</span><Progress value={percentage} className="h-1 bg-white/20" /></div>}
+        <Link href={playHref} aria-label={"Watch " + props.title} className="absolute inset-0 z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#a78bfa]"><span className="sr-only">Watch {props.title}</span></Link>
+        {animeId && <Link href={detailsHref} title={"Details for " + props.title} aria-label={"Details for " + props.title} className="absolute bottom-2 right-2 z-30 grid h-8 w-8 place-items-center rounded-lg border border-white/15 bg-[#111019]/90 text-white shadow-lg backdrop-blur-sm transition-colors hover:bg-[#604bd3] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"><Info className="h-4 w-4" aria-hidden="true" /></Link>}
         {animeId && <AnimeLanguageBadges animeId={animeId} titles={[props.title, props.subTitle || "", ...(props.languageAliases || [])].filter(Boolean)} />}
       </div>
+      {displayDetails && (
+        <div className="flex min-h-[76px] min-w-0 flex-col gap-1 px-0.5">
+          <h3 className="line-clamp-2 text-[12px] font-bold leading-[1.35] text-[#eeeaf9] sm:text-sm"><Link href={playHref} className="transition-colors hover:text-[#c4b5fd]">{props.title}</Link></h3>
+          <div className="mt-auto flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 pt-0.5 text-[10px] font-medium text-[#8f879f] sm:text-[11px]">
+            {props.format && <span>{props.format}</span>}
+            {!!props.episodes && <span>{props.episodes} eps</span>}
+            {props.statusLabel && <span>{props.statusLabel}</span>}
+          </div>
+          {props.subTitle && <p className="line-clamp-1 text-[10px] text-[#8f879f] sm:text-[11px]">{props.subTitle}</p>}
+        </div>
+      )}
     </article>
   );
 };
