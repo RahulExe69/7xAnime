@@ -131,6 +131,8 @@ const VideoPlayerSection = () => {
   const [manualProviderPlaybackFailed, setManualProviderPlaybackFailed] = useState(false);
   const [playbackSourceIndex, setPlaybackSourceIndex] = useState(0);
   const [lastPlayerError, setLastPlayerError] = useState<string | null>(null);
+  const [streamResolutionTimedOut, setStreamResolutionTimedOut] = useState(false);
+  const [streamRetryKey, setStreamRetryKey] = useState(0);
   const [providerPlaybackOutcomes, setProviderPlaybackOutcomes] = useState<Record<string, "playing" | "failed">>({});
   const attemptedSourceIdsRef = useRef<Set<string>>(new Set());
   const externalEmbedFrameRef = useRef<HTMLIFrameElement | null>(null);
@@ -145,6 +147,7 @@ const VideoPlayerSection = () => {
     data: episodeData,
     isLoading: isLoadingData,
     isError: isEpisodeDataError,
+    refetch: retryEpisodeData,
   } = useGetEpisodeData(activeEpisodeId, !useFallback && !isHindiMode);
 
   const hasPlayableSources = Array.isArray(episodeData?.sources) &&
@@ -153,6 +156,29 @@ const VideoPlayerSection = () => {
     );
   const streamRequestFailed = isEpisodeDataError ||
     (!!episodeData && !hasPlayableSources);
+
+  // Never leave the video area in an endless loading state. Provider requests
+  // may finish later, but the viewer gets a usable retry/fallback action quickly.
+  useEffect(() => {
+    setStreamResolutionTimedOut(false);
+    if (
+      !activeEpisodeId ||
+      useFallback ||
+      isHindiMode ||
+      !isLoadingData ||
+      streamRequestFailed
+    ) return;
+
+    const timeoutId = window.setTimeout(() => setStreamResolutionTimedOut(true), 15000);
+    return () => window.clearTimeout(timeoutId);
+  }, [
+    activeEpisodeId,
+    useFallback,
+    isHindiMode,
+    isLoadingData,
+    streamRequestFailed,
+    streamRetryKey,
+  ]);
 
   const [autoSkip, setAutoSkip] = useState<boolean>(true);
 
@@ -569,8 +595,16 @@ const VideoPlayerSection = () => {
   const selectFallbackServer = (category?: "sub" | "dub") => {
     if (category) setPreferredCategory(category);
     setIsHindiMode(false);
+    setStreamResolutionTimedOut(false);
     setUseFallback(true);
   };
+
+  const retryStreamResolution = () => {
+    setStreamResolutionTimedOut(false);
+    setStreamRetryKey((previous) => previous + 1);
+    void retryEpisodeData();
+  };
+
   const selectHindiMode = () => {
     if (!hindiStreams.length) return;
     setUseFallback(false);
@@ -882,7 +916,7 @@ const VideoPlayerSection = () => {
     );
   }
 
-  if (!activeEpisodeId || (isLoadingData && !streamRequestFailed)) {
+  if (!activeEpisodeId || (!useFallback && isLoadingData && !streamRequestFailed && !streamResolutionTimedOut)) {
     return (
       <div className="space-y-3">
         {playerHeader}
@@ -894,6 +928,26 @@ const VideoPlayerSection = () => {
           <span className="h-7 w-7 animate-spin rounded-full border-2 border-violet-400/25 border-t-violet-300" />
           <span>{activeEpisodeId ? "Finding a playable stream…" : "Preparing episode…"}</span>
         </div>
+        {playerControls}
+      </div>
+    );
+  }
+
+  if (streamResolutionTimedOut && isLoadingData && !useFallback && !isHindiMode) {
+    return (
+      <div className="space-y-3">
+        {playerHeader}
+        <Alert className="rounded-2xl border-amber-300/15 bg-amber-300/[0.04] text-zinc-200">
+          <AlertCircle className="h-4 w-4 text-amber-300" />
+          <AlertTitle className="font-bold">This server is taking too long</AlertTitle>
+          <AlertDescription className="mt-1 flex flex-col gap-3 text-sm text-zinc-400">
+            The stream request has not returned a playable source yet. You can retry this server or open MegaPlay now; you don't need to wait for the request to finish.
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" onClick={() => selectFallbackServer()}>Open Server 1 · MegaPlay</Button>
+              <Button size="sm" variant="secondary" onClick={retryStreamResolution}>Retry this server</Button>
+            </div>
+          </AlertDescription>
+        </Alert>
         {playerControls}
       </div>
     );
