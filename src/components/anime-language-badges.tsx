@@ -1,9 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
-import { useQuery } from "react-query";
 import { useGetAllEpisodes } from "@/query/get-all-episodes";
-import { hasHindiDubForAnime } from "@/lib/hindi-dub";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -13,7 +11,7 @@ type Props = {
 };
 
 /** Loads metadata only as the poster approaches the viewport; no guessed badges. */
-export default function AnimeLanguageBadges({ animeId, titles, className }: Props) {
+export default function AnimeLanguageBadges({ animeId, className }: Props) {
   const hostRef = useRef<HTMLDivElement>(null);
   const [nearViewport, setNearViewport] = useState(false);
 
@@ -38,24 +36,13 @@ export default function AnimeLanguageBadges({ animeId, titles, className }: Prop
   }, []);
 
   const { data: episodesData } = useGetAllEpisodes(nearViewport ? animeId : "");
-  const hindiQuery = useQuery({
-    queryKey: ["HINDI_BADGE_AVAILABILITY", animeId, ...titles],
-    queryFn: () => hasHindiDubForAnime(titles),
-    enabled: nearViewport && !!animeId && titles.some((title) => title.trim().length > 0),
-    staleTime: 1000 * 60 * 60 * 8,
-    retry: 0,
-    refetchOnWindowFocus: false,
-  });
-
   const providers = episodesData?.rawResponse?.providers;
   const hasSub = !!providers && Object.values(providers).some((provider: any) => (provider?.episodes?.sub || []).length > 0);
   const hasEnglish = !!providers && Object.values(providers).some((provider: any) => (provider?.episodes?.dub || []).length > 0);
-  const hasHindi = hindiQuery.data === true;
 
   const languages = [
     hasSub ? "SUB" : null,
     hasEnglish ? "ENGLISH" : null,
-    hasHindi ? "HINDI" : null,
   ].filter((language): language is string => !!language);
 
   return (
