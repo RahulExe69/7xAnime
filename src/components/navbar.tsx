@@ -36,7 +36,6 @@ const NavBar = () => {
   const { y } = useScrollPosition();
   const isHeaderFixed = true;
   const isHeaderSticky = y > 0;
-  if (pathname?.replace(/\\/+$/, "") === ROUTES.WATCH) return null;
   useEffect(() => {
     const refreshAuth = async () => {
       if (isLocalBackendEnabled()) {
@@ -76,6 +75,8 @@ const NavBar = () => {
     };
     refreshAuth();
   }, []);
+
+  if (pathname === ROUTES.WATCH || pathname === `${ROUTES.WATCH}/`) return null;
 
   return (
     <div

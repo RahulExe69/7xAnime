@@ -180,9 +180,9 @@ const EpisodePlaylist = ({
 
   return (
     episodes && (
-      <div className="col-span-1 flex w-full flex-col gap-0 overflow-hidden rounded-2xl border border-white/10 bg-[#101018] min-h-[320px] max-h-[70vh] lg:min-h-[500px]">
-        <div className="h-fit border-b border-white/[0.07] bg-white/[0.035] px-4 py-4">
-          <h3 className="text-base font-semibold tracking-tight">Episode Playlist</h3>
+      <div id="episode-list" className="col-span-1 flex w-full scroll-mt-3 flex-col gap-0 overflow-hidden rounded-2xl border border-white/10 bg-[#101018] min-h-[260px] max-h-[58vh] lg:min-h-[500px] lg:max-h-[calc(100vh-7rem)]">
+        <div className="sticky top-0 z-10 h-fit border-b border-white/[0.07] bg-[#14131c] px-3 py-3 sm:px-4 sm:py-4">
+          <h3 className="text-sm font-bold tracking-tight text-white sm:text-base">Episodes</h3>
           <span className="text-sm font-thin">{title}</span>
           <div className="flex flex-row w-full items-center justify-between gap-2 mt-2">
             <Input

@@ -7,7 +7,7 @@ import { usePathname } from "next/navigation";
 
 const Footer = () => {
   const pathname = usePathname();
-  if (pathname?.replace(/\\/+$/, "") === "/anime/watch") return null;
+  if (pathname === "/anime/watch" || pathname === "/anime/watch/") return null;
 
   return (
     <footer className="mt-10 flex w-full flex-col items-center space-y-5 border-t border-white/5 bg-[#09090f] p-6 text-center">

@@ -84,6 +84,12 @@ APK artifact is a development build until search, episode lists, extraction, sub
 HLS playback, and watch-progress restore are tested on a real Android device; a green
 build proves packaging, not upstream stream availability.
 
+## App guide
+
+- [Playback server mapping](docs/SERVERS.md) explains what each numbered server slot uses.
+- The Android back button navigates the in-app route history first; on Home, a deliberate double press exits.
+- Anime cards include a one-tap Watch action, while the details page remains available for synopsis and related series.
+
 ## Support
 
 Join the Discord server: <https://discord.gg/6yAJ3XDHTt>
