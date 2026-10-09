@@ -318,7 +318,7 @@ async def local_provider_status():
         "loadedCount": len(available),
         "providerCount": len(ACTIVE_PROVIDER_ALLOWLIST),
         "providers": providers,
-        "note": "Module-loaded status is not a live guarantee for every anime or episode. Attempt metrics are collected as you select or play providers. AniXo and Megavid are manual-only embed routes and are excluded from Auto until playback is verified. HLS, MP4, and embed URLs are supported; DASH-only results are skipped until a DASH engine is available.",
+        "note": "Module-loaded status is not a live guarantee for every anime or episode. Attempt metrics are collected as you select or play providers. AniXo, Megavid, Cosmic, and AnimeParadise are manual-only until device playback is verified; AnimeParadise catalogue lookup is triggered only when selected. Cosmic wraps MegaPlay. HLS, MP4, and embed URLs are supported; DASH-only results are skipped until a DASH engine is available.",
     }
 
 
