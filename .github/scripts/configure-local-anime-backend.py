@@ -405,8 +405,8 @@ def copy_python_source() -> None:
             fail("Could not append AnimeNoSub to Kuhi's provider ranking.")
         ranking_block = ranking_block.replace('"animeonsen"', '"animeonsen", "animenosub"', 1)
 
-    # These documented iframe integrations are selectable manually, but are
-    # intentionally filtered out of the Auto race in local_api.py.
+    # These added adapters are selectable manually during verification; local_api.py
+    # excludes them from Auto so route construction cannot masquerade as playback.
     for provider_name in ("anixo", "megavid", "animeparadise", "cosmic"):
         if f'"{provider_name}"' not in ranking_block:
             ranking_block = ranking_block.rstrip().rstrip(",") + f', "{provider_name}"'
