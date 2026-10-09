@@ -451,6 +451,35 @@ class LocalAnimeApiTests(unittest.TestCase):
 
         asyncio.run(exercise())
 
+    def test_animeparadise_maps_documented_search_and_episode_payloads(self) -> None:
+        payloads = [
+            {"data": [{
+                "_id": "ap-series-9",
+                "title": "Título japonés",
+                "alternativeTitle": {"english": "Test Series"},
+            }]},
+            {"data": [
+                {"uid": "ap-uid-1", "number": 1, "title": "Episode 1"},
+                {"uid": "ap-special", "number": 1.5, "title": "Special"},
+                {"uid": "ap-uid-2", "number": 2, "title": "Episode 2"},
+            ]},
+        ]
+
+        async def exercise() -> None:
+            with patch.object(
+                animeparadise, "_get_json", new=AsyncMock(side_effect=payloads)
+            ) as get_json:
+                results = await animeparadise.search("Test Series")
+                episodes = await animeparadise.episode_catalogue("ap-series-9")
+
+            self.assertEqual(results, [{"slug": "ap-series-9", "text": "Test Series"}])
+            self.assertEqual([item["number"] for item in episodes], [1, 2])
+            self.assertEqual(episodes[0]["uid"], "ap-uid-1")
+            self.assertEqual(get_json.await_args_list[0].args, ("/search", {"q": "Test Series", "limit": 20}))
+            self.assertEqual(get_json.await_args_list[1].args, ("/anime/ap-series-9/episode",))
+
+        asyncio.run(exercise())
+
     def test_animeparadise_resolves_signed_hls_and_subtitles_without_network(self) -> None:
         context = {
             "media": {"id": 21, "episodes": 12, "title": {"english": "Test Series"}},
