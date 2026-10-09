@@ -1,5 +1,6 @@
 package com.sevenx.anime;
 
+import android.graphics.Bitmap;
 import android.net.Uri;
 import android.util.Log;
 import android.webkit.WebResourceRequest;
@@ -7,6 +8,8 @@ import android.webkit.WebResourceResponse;
 import android.webkit.WebView;
 import com.getcapacitor.Bridge;
 import com.getcapacitor.BridgeWebViewClient;
+import io.github.edsuns.adfilter.AdFilter;
+import io.github.edsuns.adfilter.FilterResult;
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
@@ -132,7 +135,33 @@ public final class StreamingNavigationWebViewClient extends BridgeWebViewClient 
             Log.d(TAG, "Blocked ad resource: " + url.getHost());
             return blockedResponse();
         }
+
+        // Filter-list engine is additive to the conservative host denylist above.
+        // If initialization or a downloaded list is unavailable, let the request
+        // continue rather than risking a broken player.
+        if (view != null && request != null) {
+            try {
+                FilterResult result = AdFilter.Companion.get().shouldIntercept(view, request);
+                if (result != null && result.getResourceResponse() != null) {
+                    String host = url == null ? "" : url.getHost();
+                    Log.d(TAG, "Blocked filter-list resource: " + host);
+                    return result.getResourceResponse();
+                }
+            } catch (RuntimeException error) {
+                Log.w(TAG, "Filter-list engine unavailable; using conservative fallback only", error);
+            }
+        }
         return super.shouldInterceptRequest(view, request);
+    }
+
+    @Override
+    public void onPageStarted(WebView view, String url, Bitmap favicon) {
+        super.onPageStarted(view, url, favicon);
+        try {
+            AdFilter.Companion.get().performScript(view, url);
+        } catch (RuntimeException error) {
+            Log.w(TAG, "Filter-list cosmetic/scriptlet injection unavailable", error);
+        }
     }
 
     private static boolean isExternalTopLevel(Uri url) {
