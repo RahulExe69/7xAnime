@@ -52,7 +52,7 @@ export default function AnimeShelf({ title, items = [], loading = false, icon, e
             : Math.max(1, anime.episodes || 1);
           const episodeLabel = mode === "new" ? `EP ${latestEpisode}` : nextEpisode ? `EP ${nextEpisode}` : null;
           const statusLabel = anime.seasonYear ? String(anime.seasonYear) : null;
-          return <div key={anime.id} className={mode === "new" ? "w-[38%] shrink-0 snap-start sm:w-[28%] md:w-[22%] lg:w-[16%]" : "w-[35%] shrink-0 snap-start sm:w-[28%] md:w-[22%] lg:w-[16%]"}>
+          return <div key={anime.id} className="w-[42vw] max-w-[11.5rem] shrink-0 snap-start sm:w-[28vw] md:w-[22vw] lg:w-[16vw]">
             <AnimeCard
               title={titleText}
               languageAliases={[anime.title?.native || "", anime.title?.romaji || ""].filter((alias) => alias && alias !== titleText)}
