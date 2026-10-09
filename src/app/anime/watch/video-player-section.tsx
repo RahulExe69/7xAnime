@@ -12,7 +12,7 @@ import { useQuery } from "react-query";
 import { getHindiDubStreams } from "@/lib/hindi-dub";
 import { ArrowLeft, Captions, Mic, AlertCircle } from "lucide-react";
 import Link from "next/link";
-import { getProviderDisplayName, getServerProviderTitle, isProviderSelectable } from "@/lib/server-map";
+import { getProviderDisplayName, getServerProviderTitle, isProviderSelectable, KUHI_PROVIDER_ORDER } from "@/lib/server-map";
 import { Switch } from "@/components/ui/switch";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -218,21 +218,44 @@ const VideoPlayerSection = () => {
 
   const automaticCandidates = useMemo(() => {
     const candidates: Array<{ id: string; category: "dub" | "sub" }> = [];
+    if (isLocalBackendEnabled()) {
+      // Include every allowlisted manual route, even when that server does not
+      // contribute a catalogue. On a detected failure, continue to the next
+      // server automatically; SUB-only sources are switched to SUB explicitly.
+      const orderedProviders = [
+        ...KUHI_PROVIDER_ORDER,
+        ...providerNames.filter((name) => !KUHI_PROVIDER_ORDER.includes(name as (typeof KUHI_PROVIDER_ORDER)[number])),
+      ];
+      for (const providerName of orderedProviders) {
+        const category = isProviderSelectable(providerName, preferredCategory)
+          ? preferredCategory
+          : isProviderSelectable(providerName, preferredCategory === "sub" ? "dub" : "sub")
+            ? (preferredCategory === "sub" ? "dub" : "sub")
+            : preferredCategory;
+        const providerEpisodes = rawProviders[providerName]?.episodes?.[category] || [];
+        const episode = providerEpisodes.find((item) => Number(item.number) === currentEpNumber);
+        const id = episode?.id ||
+          `watch/${providerName}/${animeIdParam}/${category}/${providerName}-${currentEpNumber}`;
+        if (id && !candidates.some((candidate) => candidate.id === id)) {
+          candidates.push({ id, category });
+        }
+      }
+      return candidates;
+    }
+
     for (const category of ["dub", "sub"] as const) {
       for (const providerName of providerNames) {
         const providerEpisodes = rawProviders[providerName]?.episodes?.[category] || [];
         if (!providerEpisodes.length) continue;
         const episode = providerEpisodes.find((item) => Number(item.number) === currentEpNumber);
-        const id = episode?.id || (isLocalBackendEnabled()
-          ? `watch/${providerName}/${animeIdParam}/${category}/${providerName}-${currentEpNumber}`
-          : "");
+        const id = episode?.id || "";
         if (id && !candidates.some((candidate) => candidate.id === id)) {
           candidates.push({ id, category });
         }
       }
     }
     return candidates;
-  }, [providerNames, rawProviders, currentEpNumber, animeIdParam]);
+  }, [providerNames, rawProviders, currentEpNumber, animeIdParam, preferredCategory]);
 
   useEffect(() => {
     attemptedSourceIdsRef.current.clear();
@@ -266,11 +289,9 @@ const VideoPlayerSection = () => {
     const requestFailed = streamRequestFailed;
     if (!requestFailed) return;
 
-    // A manually chosen provider is strict. Keep the failure visible so the
-    // viewer can compare another source instead of silently cycling through all
-    // sources and ending up at Server 1 every time.
-    if (hasManualProviderSelection) return;
-
+    // If a manually selected server returns no source, advance to the next
+    // allowlisted server rather than leaving the viewer on a dead-end error.
+    // The failed option remains visible so it can still be retried manually.
     // The local "auto" route has already raced every bundled stream provider.
     // If that race returned no source, trying the same providers sequentially
     // can add another long wait per host; move to Server 1 instead.
@@ -480,14 +501,18 @@ const VideoPlayerSection = () => {
   const handleProviderSelect = (pName: string, category: "sub" | "dub") => {
     setIsHindiMode(false);
     setUseFallback(false);
-    setPreferredCategory(category);
-    const pData = rawProviders[pName]?.episodes?.[category] || [];
+    const resolvedCategory = isProviderSelectable(pName, category)
+      ? category
+      : isProviderSelectable(pName, "sub")
+        ? "sub"
+        : "dub";
+    setPreferredCategory(resolvedCategory);
+    const pData = rawProviders[pName]?.episodes?.[resolvedCategory] || [];
     const targetEp = pData.find((ep) => Number(ep.number) === currentEpNumber);
-    // Episode catalogues can be incomplete even when a source can play the
-    // requested episode. The local adapter accepts the trailing episode number
-    // and lets the selected provider try extraction directly.
+    // URL-only routes can play even when they do not contribute an episode
+    // catalogue; the native adapter validates the requested episode on demand.
     const targetId = targetEp?.id || (isLocalBackendEnabled()
-      ? `watch/${pName}/${animeIdParam}/${category}/${pName}-${currentEpNumber}`
+      ? `watch/${pName}/${animeIdParam}/${resolvedCategory}/${pName}-${currentEpNumber}`
       : "");
     if (targetId) {
       attemptedSourceIdsRef.current.delete(targetId);
@@ -509,19 +534,14 @@ const VideoPlayerSection = () => {
   const serverProviderNames = isLocalBackendEnabled()
     ? (localProviderStatus?.providers.filter((item) => item.moduleLoaded).map((item) => item.id) || availableProviderNames)
     : availableProviderNames;
-  const selectableServerProviderNames = serverProviderNames.filter(
-    (providerName) => isProviderSelectable(providerName, activeCategory),
-  );
-
-  // Hide providers that failed for this exact anime/episode/audio selection.
-  // Global failure counters are diagnostic only: a source can fail on one
-  // episode and still work elsewhere.
+  // Keep every loaded server visible. SUB-only sources (AnimeParadise and
+  // NontonGo) remain discoverable while ENGLISH is selected and switch to SUB
+  // when tapped; a failure changes the status tint, never removes the button.
+  const selectableServerProviderNames = serverProviderNames;
   const failedServerProviderNames = selectableServerProviderNames.filter(
     (providerName) => providerPlaybackOutcomes[providerName] === "failed",
   );
-  const visibleServerProviderNames = selectableServerProviderNames.filter(
-    (providerName) => providerPlaybackOutcomes[providerName] !== "failed",
-  );
+  const visibleServerProviderNames = selectableServerProviderNames;
 
   useEffect(() => {
     if (!isLocalBackendEnabled() || !hasManualProviderSelection || isLoadingData) return;
@@ -640,8 +660,9 @@ const VideoPlayerSection = () => {
     }
     if (hasManualProviderSelection) {
       setManualProviderPlaybackFailed(true);
-      return;
     }
+    // Try the next server on detected playback failure. If no candidates remain,
+    // advanceAfterSourceFailure opens Server 1 (MegaPlay) as the final fallback.
     advanceAfterSourceFailure();
   }, [advanceAfterSourceFailure, currentProviderName, episodeData?.provider, episodeData?.sources, hasManualProviderSelection, playbackSourceIndex]);
 
@@ -759,25 +780,32 @@ const VideoPlayerSection = () => {
             <Button size="sm" title="Server 1 — MegaPlay" aria-label="Server 1 — MegaPlay" onClick={() => selectFallbackServer()} className={`h-10 min-w-12 rounded-xl px-2.5 text-xs font-extrabold transition ${activeServerNumber === 1 && (useFallback || isFallbackActive) ? "bg-[#ff2f9d] text-white" : "border border-white/[0.08] bg-white/[0.035] text-zinc-300 hover:border-[#ff2f9d]/30 hover:bg-[#ff2f9d]/10"}`}>
               <span className="flex flex-col items-center gap-0.5 leading-none"><span>1</span><span className="text-[8px] font-semibold opacity-80">MegaPlay</span></span>
             </Button>
-            {visibleServerProviderNames.map((providerName, index) => (
-              <Button key={`${activeCategory}-${providerName}`} size="sm" title={getServerProviderTitle(visibleServerProviderNames, providerName)} aria-label={getServerProviderTitle(visibleServerProviderNames, providerName)} onClick={() => handleProviderSelect(providerName, activeCategory)} className={`h-10 min-w-12 rounded-xl px-2.5 text-xs font-extrabold transition ${currentProviderName === providerName && !useFallback && !isHindiMode ? "bg-[#ff2f9d] text-white" : "border border-white/[0.08] bg-white/[0.035] text-zinc-300 hover:border-[#ff2f9d]/30 hover:bg-[#ff2f9d]/10"}`}>
-                <span className="flex flex-col items-center gap-0.5 leading-none"><span>{index + 2}</span><span className="text-[8px] font-semibold opacity-80">{getProviderDisplayName(providerName)}</span></span>
-              </Button>
-            ))}
+            {visibleServerProviderNames.map((providerName, index) => {
+              const supportsAudio = isProviderSelectable(providerName, activeCategory);
+              const failed = providerPlaybackOutcomes[providerName] === "failed";
+              const serverName = getProviderDisplayName(providerName);
+              return (
+                <Button
+                  key={`${activeCategory}-${providerName}`}
+                  size="sm"
+                  title={supportsAudio ? getServerProviderTitle(visibleServerProviderNames, providerName) : `${serverName} supports SUB only; tap to switch audio`}
+                  aria-label={supportsAudio ? getServerProviderTitle(visibleServerProviderNames, providerName) : `${serverName}, SUB only; tap to switch audio`}
+                  onClick={() => handleProviderSelect(providerName, activeCategory)}
+                  className={`h-10 min-w-12 rounded-xl px-2.5 text-xs font-extrabold transition ${currentProviderName === providerName && !useFallback && !isHindiMode ? "bg-[#ff2f9d] text-white" : failed ? "border border-rose-400/35 bg-rose-400/[0.06] text-zinc-300 hover:border-rose-300/60" : "border border-white/[0.08] bg-white/[0.035] text-zinc-300 hover:border-[#ff2f9d]/30 hover:bg-[#ff2f9d]/10"}`}
+                >
+                  <span className="flex flex-col items-center gap-0.5 leading-none">
+                    <span>{index + 2}</span>
+                    <span className="text-[8px] font-semibold opacity-80">{serverName}</span>
+                    {!supportsAudio && <span className="text-[7px] font-bold text-amber-300">SUB only</span>}
+                    {failed && <span className="text-[7px] font-bold text-rose-300">Retry</span>}
+                  </span>
+                </Button>
+              );
+            })}
             {failedServerProviderNames.length > 0 && (
-              <Button
-                size="sm"
-                variant="ghost"
-                title="Show servers that failed for this episode so they can be retried"
-                onClick={() => setProviderPlaybackOutcomes((previous) => {
-                  const updated = { ...previous };
-                  for (const providerName of failedServerProviderNames) delete updated[providerName];
-                  return updated;
-                })}
-                className="h-9 rounded-xl px-3 text-[11px] font-semibold text-zinc-500 hover:text-zinc-200"
-              >
-                Retry failed ({failedServerProviderNames.length})
-              </Button>
+              <span className="self-center px-1 text-[10px] text-zinc-500" role="status">
+                Auto-switch tried {failedServerProviderNames.length}; failed servers remain available to retry.
+              </span>
             )}
             {isLocalBackendEnabled() && !nativeCatalogueComplete && availableProviderNames.length === 0 && (
               <span className="px-2 text-xs text-zinc-500" role="status">Finding servers…</span>
