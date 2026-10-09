@@ -407,7 +407,7 @@ def copy_python_source() -> None:
     # intentionally filtered out of the Auto race in local_api.py.
     for provider_name in ("anixo", "megavid"):
         if f'"{provider_name}"' not in ranking_block:
-            ranking_block = ranking_block.rstrip() + f', "{provider_name}"'
+            ranking_block = ranking_block.rstrip().rstrip(",") + f', "{provider_name}"'
     race_text = race_text[:ranking_match.start(1)] + ranking_block + race_text[ranking_match.end(1):]
 
     slow_cleanup = "await asyncio.wait(pending, timeout=8.0)"
