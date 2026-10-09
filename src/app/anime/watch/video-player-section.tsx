@@ -111,10 +111,14 @@ const VideoPlayerSection = () => {
   const [isHindiMode, setIsHindiMode] = useState<boolean>(false);
   const [selectedHindiServer, setSelectedHindiServer] = useState<number>(0);
   const [manualProviderPlaybackFailed, setManualProviderPlaybackFailed] = useState(false);
+  const [playbackSourceIndex, setPlaybackSourceIndex] = useState(0);
+  const [lastPlayerError, setLastPlayerError] = useState<string | null>(null);
   const attemptedSourceIdsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     setManualProviderPlaybackFailed(false);
+    setPlaybackSourceIndex(0);
+    setLastPlayerError(null);
   }, [activeEpisodeId]);
 
   const {
@@ -499,13 +503,24 @@ const VideoPlayerSection = () => {
     updateEpisodeUrl(targetId, currentEpNumber);
   };
 
-  const handlePlayerError = useCallback(() => {
+  const handlePlayerError = useCallback((detail?: string) => {
+    // One provider may expose multiple distinct stream servers. Exhaust those
+    // before declaring the provider broken or moving away from an Auto winner.
+    const nextSourceIndex = playbackSourceIndex + 1;
+    if (episodeData?.sources?.[nextSourceIndex]?.url) {
+      setLastPlayerError(detail || null);
+      setPlaybackSourceIndex(nextSourceIndex);
+      setManualProviderPlaybackFailed(false);
+      return;
+    }
+
+    setLastPlayerError(detail || null);
     if (hasManualProviderSelection) {
       setManualProviderPlaybackFailed(true);
       return;
     }
     advanceAfterSourceFailure();
-  }, [advanceAfterSourceFailure, hasManualProviderSelection]);
+  }, [advanceAfterSourceFailure, episodeData?.sources, hasManualProviderSelection, playbackSourceIndex]);
 
   const playerAnimeInfo = useMemo(
     () => ({
@@ -688,7 +703,7 @@ const VideoPlayerSection = () => {
           <AlertTitle className="font-bold">{getProviderDisplayName(failedProvider)} could not play this episode</AlertTitle>
           <AlertDescription className="mt-1 flex flex-col gap-3 text-sm text-zinc-400">
             {episodeData?.providerError || (manualProviderPlaybackFailed
-              ? "The provider returned a stream, but playback failed in the player."
+              ? `Playback failed: ${lastPlayerError || "the provider returned a stream that the player could not play."}`
               : "This provider returned no playable stream for this episode. It has not been silently replaced with another provider.")}
             <div className="flex flex-wrap gap-2">
               <Button size="sm" variant="secondary" onClick={selectAutomaticServer}>Try Auto</Button>
@@ -718,8 +733,9 @@ const VideoPlayerSection = () => {
             height="100%"
             allow="autoplay; fullscreen; picture-in-picture; encrypted-media"
             allowFullScreen
-            sandbox="allow-scripts allow-same-origin allow-forms allow-presentation"
+            sandbox={isLocalBackendEnabled() ? undefined : "allow-scripts allow-same-origin allow-forms allow-presentation"}
             referrerPolicy="strict-origin-when-cross-origin"
+            onError={() => handlePlayerError("MegaPlay embedded player failed to load.")}
             className="absolute inset-0 h-full w-full border-0"
           />
         </div>
@@ -728,7 +744,7 @@ const VideoPlayerSection = () => {
     );
   }
 
-  const firstResolvedSource = episodeData?.sources?.[0];
+  const firstResolvedSource = episodeData?.sources?.[playbackSourceIndex];
   if (episodeData && firstResolvedSource?.type === "embed" && firstResolvedSource.url) {
     const embedProvider = episodeData.provider || currentProviderName;
     return (
@@ -743,13 +759,14 @@ const VideoPlayerSection = () => {
             height="100%"
             allow="autoplay; fullscreen; picture-in-picture; encrypted-media"
             allowFullScreen
-            sandbox="allow-scripts allow-same-origin allow-forms allow-presentation"
+            sandbox={isLocalBackendEnabled() ? undefined : "allow-scripts allow-same-origin allow-forms allow-presentation"}
             referrerPolicy="strict-origin-when-cross-origin"
+            onError={() => handlePlayerError("Embedded provider player failed to load.")}
             className="absolute inset-0 h-full w-full border-0"
           />
         </div>
         <p className="text-xs text-zinc-500">
-          Embedded source: {getProviderDisplayName(embedProvider)}. External popups and top-level redirects are blocked.
+          Embedded source: {getProviderDisplayName(embedProvider)}. External top-level navigation is blocked by Android.
         </p>
         {playerControls}
       </div>
@@ -773,12 +790,29 @@ const VideoPlayerSection = () => {
     );
   }
 
+  const selectedPlaybackSource = episodeData.sources[playbackSourceIndex];
+  if (!selectedPlaybackSource?.url) {
+    return (
+      <div className="space-y-3">
+        {playerHeader}
+        <Alert className="rounded-2xl border-white/[0.08] bg-[#101018] text-zinc-200">
+          <AlertCircle className="h-4 w-4 text-[#ff70bd]" />
+          <AlertTitle className="font-bold">No more streams from this provider</AlertTitle>
+          <AlertDescription className="mt-1 text-sm text-zinc-400">
+            Try Auto or select another server.
+          </AlertDescription>
+        </Alert>
+        {playerControls}
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-3">
       {playerHeader}
       <VideoPlayer
-        key={episodeData.sources[0].url}
-        episodeInfo={episodeData}
+        key={selectedPlaybackSource.url}
+        episodeInfo={{ ...episodeData, sources: [selectedPlaybackSource] }}
         serversData={{
           episodeId: activeEpisodeId,
           episodeNo: String(currentEpNumber),
