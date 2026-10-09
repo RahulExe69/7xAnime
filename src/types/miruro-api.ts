@@ -272,7 +272,10 @@ export interface EpisodeResponse {
 export interface StreamSourceItem {
   url: string;
   type: string;
-  quality: string;
+  quality?: string;
+  referer?: string;
+  headers?: Record<string, string>;
+  server?: string;
 }
 
 export interface SubtitleItem {
