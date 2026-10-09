@@ -95,7 +95,7 @@ const AnimeEpisodes = ({ animeId }: Props) => {
             <Select onValueChange={handleRangeChange} value={selectedRange}>
               <SelectTrigger className="w-[180px]">
                 <SelectValue
-                  className="text-white"
+                  className="text-[#625d79] dark:text-white"
                   placeholder="Select Range"
                 />
               </SelectTrigger>
@@ -114,7 +114,7 @@ const AnimeEpisodes = ({ animeId }: Props) => {
             <Search className="absolute inset-y-0 left-2 m-auto h-4 w-4" />
             <Input
               placeholder="Search for episode..."
-              className=" w-full pl-8 text-white border-white"
+              className="w-full rounded-xl border-[#dedbea] bg-white pl-8 text-[#211e38] placeholder:text-[#8a849e] dark:border-[#393449] dark:bg-[#201d2a] dark:text-white dark:placeholder:text-[#858096]"
               onChange={handleSearch}
             />
           </div>
@@ -130,7 +130,7 @@ const AnimeEpisodes = ({ animeId }: Props) => {
           />
         ))}
         {!episodes.length && !isLoading && (
-          <div className="lg:col-span-5 col-span-2 sm:col-span-3 md:col-span-4 xl:col-span-6 2xl:col-span-7 flex items-center justify-center py-10 bg-slate-900 rounded-md">
+          <div className="lg:col-span-5 col-span-2 sm:col-span-3 md:col-span-4 xl:col-span-6 2xl:col-span-7 flex items-center justify-center py-10 rounded-2xl border border-[#dedbea] bg-white text-[#77728f] dark:border-[#302c40] dark:bg-[#191724] dark:text-zinc-400">
             No Episodes
           </div>
         )}
@@ -139,7 +139,7 @@ const AnimeEpisodes = ({ animeId }: Props) => {
             <div
               key={idx}
               className={cn([
-                "h-[6.25rem] rounded-lg cursor-pointer w-full flex items-center justify-center animate-pulse bg-slate-800",
+                "h-[6.25rem] rounded-lg cursor-pointer w-full flex items-center justify-center animate-pulse bg-[#e9e7f2] dark:bg-[#2b273b]",
                 "self-center justify-self-center",
               ])}
             ></div>

@@ -337,7 +337,7 @@ const VideoPlayerSection = () => {
   const currentProviderName = cleanParts[1] || providerNames[0] || "auto";
   const activeCategory = cleanParts[3] === "dub" ? "dub" : preferredCategory;
   const activeServerLabel = isHindiMode
-    ? `Server${selectedHindiServer + 2}`
+    ? (hindiStreams.length ? `Server${selectedHindiServer + 2}` : "Hindi Dub")
     : useFallback || isFallbackActive
       ? "Server1"
       : getServerLabel(providerNames, currentProviderName);

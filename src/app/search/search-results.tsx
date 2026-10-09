@@ -103,9 +103,9 @@ const SearchResults = () => {
   };
 
   return (
-    <div className="mx-auto flex min-h-[75vh] w-full max-w-[1600px] flex-col gap-6 px-4 pb-16 pt-28 sm:gap-8 md:px-6 lg:pt-32 lg:px-8">
-      <div className="flex flex-col gap-5 rounded-2xl border border-white/[0.07] bg-white/[0.035] p-4 backdrop-blur-sm sm:p-6">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div className="flex items-center gap-2"><Search className="h-5 w-5 text-violet-300" /><p className="text-lg font-semibold">Find your next anime</p></div><span className="text-xs text-zinc-500">Search by title or narrow it down with filters</span></div><SearchBar className="max-w-2xl" showFilterButton={false} /><p className="text-sm font-semibold text-zinc-300">Refine results</p>
+    <div className="mx-auto flex min-h-[75vh] w-full max-w-[1600px] flex-col gap-6 px-4 pb-16 pt-28 text-[#211e38] sm:gap-8 md:px-6 lg:pt-32 lg:px-8 dark:text-white">
+      <div className="flex flex-col gap-5 rounded-2xl border border-[#dedbea] bg-white p-4 shadow-[0_5px_20px_rgba(37,25,81,0.035)] sm:p-6 dark:border-[#302c40] dark:bg-[#191724]">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div className="flex items-center gap-2"><Search className="h-5 w-5 text-[#604bd3] dark:text-[#b6a8ff]" /><p className="text-lg font-semibold">Find your next anime</p></div><span className="text-xs text-[#77728f] dark:text-[#a39db9]">Search by title or narrow it down with filters</span></div><SearchBar className="max-w-2xl" showFilterButton={false} /><p className="text-sm font-semibold text-[#5f5a73] dark:text-zinc-300">Refine results</p>
         <div className="flex flex-wrap gap-3">
           <Select
             options={types}
@@ -160,11 +160,11 @@ const SearchResults = () => {
                 key={genre.value}
                 size="sm"
                 className={cn(
-                  "rounded-full border border-white/10 bg-white/[0.03] hover:border-violet-400/60 hover:text-violet-200 hover:bg-violet-500/10",
-                  "data-[state=on]:border-violet-400/60 data-[state=on]:text-white data-[state=on]:bg-violet-500/30",
+                  "rounded-full border border-[#dedbea] bg-[#f8f7fd] text-[#625d79] hover:border-[#8b79e3] hover:text-[#604bd3] hover:bg-[#eeeafb] dark:border-[#393449] dark:bg-[#201d2a] dark:text-[#c7c1dc] dark:hover:bg-[#302b42]",
+                  "data-[state=on]:border-[#8b79e3] data-[state=on]:text-[#4935bd] data-[state=on]:bg-[#e5e0fb] dark:data-[state=on]:border-[#8b79e3] dark:data-[state=on]:text-white dark:data-[state=on]:bg-violet-500/30",
                   filters.genres?.split(",").includes(genre.value)
-                    ? "bg-violet-500/30 text-white"
-                    : "text-slate-300",
+                    ? "bg-[#e5e0fb] text-[#4935bd] dark:bg-violet-500/30 dark:text-white"
+                    : "text-[#625d79] dark:text-slate-300",
                 )}
               >
                 {genre.label}
@@ -175,7 +175,7 @@ const SearchResults = () => {
         <div className="flex items-center gap-2 mt-4">
           <Button
             size="sm"
-            className="w-[6.25rem] rounded-xl bg-violet-500 text-white hover:bg-violet-400"
+            className="w-[6.25rem] rounded-xl bg-[#604bd3] text-white hover:bg-[#5140c4]"
             onClick={applyFilters}
           >
             Filter
@@ -206,17 +206,17 @@ const SearchResults = () => {
             return (
               <div
                 key={idx}
-                className="aspect-[2/3] w-full rounded-2xl animate-pulse bg-white/[0.06]"
+                className="aspect-[2/3] w-full rounded-2xl animate-pulse bg-[#e9e7f2] dark:bg-white/[0.06]"
               ></div>
             );
           })}
         </div>
       )}
       {!isLoading && searchResults?.animes?.length === 0 && (
-        <div className="flex flex-col items-center justify-center rounded-2xl border border-white/[0.07] bg-white/[0.025] px-5 py-12 text-center">
+        <div className="flex flex-col items-center justify-center rounded-2xl border border-[#dedbea] bg-white px-5 py-12 text-center dark:border-[#302c40] dark:bg-[#191724]">
           <SearchX className="mb-3 h-8 w-8 text-violet-300" />
-          <h3 className="text-base font-semibold text-zinc-100">No anime found</h3>
-          <p className="mt-1 max-w-sm text-sm text-zinc-400">Try a different title or loosen a few filters.</p>
+          <h3 className="text-base font-semibold text-[#211e38] dark:text-white">No anime found</h3>
+          <p className="mt-1 max-w-sm text-sm text-[#77728f] dark:text-zinc-400">Try a different title or loosen a few filters.</p>
         </div>
       )}
       <div className="grid w-full grid-cols-2 content-start gap-x-3 gap-y-5 sm:grid-cols-3 sm:gap-4 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7">
@@ -227,6 +227,7 @@ const SearchResults = () => {
               format={anime.type}
               poster={anime.poster}
               href={ROUTES.animeDetails(anime.id)}
+              quickWatchHref={ROUTES.watchAnime(anime.id)}
               className="self-center justify-self-center"
               showGenre={false}
             />

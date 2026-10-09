@@ -61,7 +61,7 @@ function AnimeSchedule() {
         className="w-full flex flex-col md:flex-row gap-6"
       >
         {/* Vertical Tabs List */}
-        <TabsList className="flex h-auto w-full shrink-0 flex-row items-stretch justify-start gap-2 overflow-x-auto rounded-xl border border-white/[0.07] bg-white/[0.025] p-2 md:h-fit md:w-56 md:flex-col">
+        <TabsList className="flex h-auto w-full shrink-0 flex-row items-stretch justify-start gap-2 overflow-x-auto rounded-xl border border-[#dedbea] bg-white p-2 md:h-fit md:w-56 md:flex-col dark:border-[#302c40] dark:bg-[#191724]">
           {daysOfWeek.map((day) => {
             const dateObj = getDateForWeekday(day);
             const isToday = day === currentDay;
@@ -70,7 +70,7 @@ function AnimeSchedule() {
               <TabsTrigger
                 key={day}
                 value={day}
-                className="shrink-0 flex items-center justify-between px-4 py-3 rounded-lg text-left transition-all data-[state=active]:bg-[#8b5cf6] data-[state=active]:text-white hover:bg-slate-800/60"
+                className="shrink-0 flex items-center justify-between px-4 py-3 rounded-lg text-left transition-all data-[state=active]:bg-[#604bd3] data-[state=active]:text-white text-[#625d79] hover:bg-[#f0eef9] dark:text-zinc-300 dark:hover:bg-white/5"
               >
                 <div className="flex flex-col items-start">
                   <span className="font-bold text-sm uppercase tracking-wider">
@@ -84,7 +84,7 @@ function AnimeSchedule() {
                   </span>
                 </div>
                 {isToday && (
-                  <Badge className="bg-yellow-500/20 text-yellow-300 border border-yellow-500/40 text-[10px] ml-2">
+                  <Badge className="bg-[#e3f4e9] text-[#21985a] border border-[#c4e7d0] dark:bg-yellow-500/20 dark:text-yellow-300 dark:border-yellow-500/40 text-[10px] ml-2">
                     Today
                   </Badge>
                 )}
@@ -114,7 +114,7 @@ function AnimeSchedule() {
                       return (
                         <div
                           key={`${anime.id}-${anime.episode}-${idx}`}
-                          className="flex flex-row gap-3 p-3 bg-secondary/40 border border-slate-800/60 hover:border-slate-700 rounded-xl hover:bg-secondary/70 transition group relative overflow-hidden"
+                          className="flex flex-row gap-3 p-3 bg-white border border-[#dedbea] hover:border-[#8b73ed]/60 rounded-xl hover:bg-[#fbfaff] shadow-sm transition group relative overflow-hidden dark:bg-[#191724] dark:border-[#332f47] dark:hover:border-[#7565ce] dark:hover:bg-[#211e30]"
                         >
                           {/* Small Poster Thumbnail */}
                           {anime.poster ? (
@@ -128,7 +128,7 @@ function AnimeSchedule() {
                               />
                             </div>
                           ) : (
-                            <div className="h-24 w-16 shrink-0 bg-slate-800 rounded-lg flex items-center justify-center">
+                            <div className="h-24 w-16 shrink-0 bg-[#ebe9f4] dark:bg-[#2b273b] rounded-lg flex items-center justify-center">
                               <Clock className="h-6 w-6 text-gray-500" />
                             </div>
                           )}
@@ -136,11 +136,11 @@ function AnimeSchedule() {
                           {/* Info Column */}
                           <div className="flex flex-col justify-between flex-1 min-w-0 py-0.5">
                             <div className="flex flex-col gap-1">
-                              <span className="text-xs text-gray-400 flex items-center gap-1 font-medium">
+                              <span className="text-xs text-[#77728f] dark:text-[#aaa5c0] flex items-center gap-1 font-medium">
                                 <Clock className="h-3 w-3 text-[#8b5cf6]" />
                                 {timeFormatted}
                               </span>
-                              <h3 className="text-sm font-bold text-white line-clamp-2 leading-snug">
+                              <h3 className="text-sm font-bold text-[#28243f] dark:text-white line-clamp-2 leading-snug">
                                 {anime.name}
                               </h3>
                             </div>
@@ -152,7 +152,7 @@ function AnimeSchedule() {
                               <Link href={ROUTES.animeDetails(anime.id)}>
                                 <Button
                                   size="sm"
-                                  className="h-7 text-xs bg-slate-800 hover:bg-[#8b5cf6] text-white px-2.5 rounded-lg flex items-center gap-1 transition"
+                                  className="h-7 text-xs bg-[#604bd3] hover:bg-[#5140c4] text-white px-2.5 rounded-lg flex items-center gap-1 transition"
                                 >
                                   <Play className="h-3 w-3 fill-current" /> Details
                                 </Button>
@@ -179,21 +179,21 @@ const LoadingSkeleton = () => {
       {[1, 2, 3, 4, 5, 6].map((idx) => (
         <div
           key={idx}
-          className="flex flex-row gap-3 p-3 bg-secondary/30 border border-slate-800/60 rounded-xl animate-pulse"
+          className="flex flex-row gap-3 p-3 bg-white border border-[#dedbea] dark:bg-[#191724] dark:border-[#332f47] rounded-xl animate-pulse"
         >
           {/* Poster Skeleton */}
-          <div className="h-24 w-16 shrink-0 bg-slate-800 rounded-lg"></div>
+          <div className="h-24 w-16 shrink-0 bg-[#e9e7f2] dark:bg-[#2b273b] rounded-lg"></div>
 
           {/* Lines Skeleton */}
           <div className="flex flex-col justify-between flex-1 min-w-0 py-0.5">
             <div className="flex flex-col gap-2">
-              <div className="h-3 w-16 bg-slate-800 rounded"></div>
-              <div className="h-4 w-4/5 bg-slate-800 rounded"></div>
+              <div className="h-3 w-16 bg-[#e9e7f2] dark:bg-[#2b273b] rounded"></div>
+              <div className="h-4 w-4/5 bg-[#e9e7f2] dark:bg-[#2b273b] rounded"></div>
             </div>
 
             <div className="flex items-center justify-between gap-2 mt-2">
-              <div className="h-5 w-12 bg-slate-800 rounded-full"></div>
-              <div className="h-7 w-16 bg-slate-800 rounded-lg"></div>
+              <div className="h-5 w-12 bg-[#e9e7f2] dark:bg-[#2b273b] rounded-full"></div>
+              <div className="h-7 w-16 bg-[#e9e7f2] dark:bg-[#2b273b] rounded-lg"></div>
             </div>
           </div>
         </div>

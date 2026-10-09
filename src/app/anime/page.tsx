@@ -103,7 +103,7 @@ const PageContent = () => {
   return isLoading || !anime ? (
     <Loading />
   ) : (
-    <div className="relative z-10 w-full pb-8">
+    <div className="relative z-10 w-full pb-8 text-[#211e38] dark:text-white">
       <div className="relative h-[26vh] min-h-[190px] w-full overflow-hidden md:h-[34vh] md:min-h-[280px]">
         <Image
           src={
@@ -150,17 +150,17 @@ const PageContent = () => {
           </div>
         </div>
         <Tabs defaultValue="overview" className="w-full">
-          <TabsList className="flex h-fit w-full items-center justify-start gap-1 overflow-x-auto rounded-xl border border-white/[0.06] bg-white/[0.025] p-1 text-base">
+          <TabsList className="flex h-fit w-full items-center justify-start gap-1 overflow-x-auto rounded-xl border border-[#dedbea] bg-white p-1 text-base dark:border-[#302c40] dark:bg-[#191724]">
             <TabsTrigger
               value="overview"
-              className="rounded-lg px-3 py-2 text-sm font-semibold sm:text-base"
+              className="rounded-lg px-3 py-2 text-sm font-semibold text-[#625d79] data-[state=active]:bg-[#eae6fb] data-[state=active]:text-[#604bd3] dark:text-zinc-300 dark:data-[state=active]:bg-[#30294a] dark:data-[state=active]:text-[#c5baff] sm:text-base"
             >
               Overview
             </TabsTrigger>
 
             <TabsTrigger
               value="episodes"
-              className="md:text-2xl text-lg font-semibold"
+              className="md:text-2xl text-lg font-semibold text-[#625d79] data-[state=active]:text-[#604bd3] dark:text-zinc-300 dark:data-[state=active]:text-[#c5baff]"
             >
               Episodes
             </TabsTrigger>
@@ -213,7 +213,7 @@ const PageContent = () => {
             </div>
             <div className="col-span-4 flex flex-col gap-3">
               <h3 className="text-xl font-semibold">Description</h3>
-              <div className="text-sm leading-7 text-zinc-300">
+              <div className="text-sm leading-7 text-[#625d79] dark:text-zinc-300">
                 {parse(anime.anime.info.description || "")}
               </div>
             </div>
@@ -235,6 +235,7 @@ const PageContent = () => {
                       poster={relation.poster}
                       className="self-center justify-self-center"
                       href={ROUTES.animeDetails(relation.id)}
+                      quickWatchHref={ROUTES.watchAnime(relation.id)}
                     />
                   )
                 );
