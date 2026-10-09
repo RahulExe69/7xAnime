@@ -268,10 +268,18 @@ def patch_adblock_dependency() -> None:
     """Add the Android-native EasyList-compatible engine to the generated app module."""
     path = ANDROID / "app/build.gradle"
     text = path.read_text(encoding="utf-8")
-    dependency = "implementation 'com.github.Edsuns.AdblockAndroid:ad-filter:v0.9.1'"
-    if dependency in text:
+    dependency_coordinate = "com.github.Edsuns.AdblockAndroid:ad-filter:v0.9.1"
+    if dependency_coordinate in text:
         return
 
+    # AdblockAndroid's published POM still declares Anko artifacts from the retired
+    # JCenter repository. A source search of the filter module finds no Anko usage;
+    # exclude that unused legacy group so modern Gradle builds remain resolvable.
+    dependency = (
+        "implementation('" + dependency_coordinate + "') {\n"
+        "        exclude group: 'org.jetbrains.anko'\n"
+        "    }"
+    )
     match = re.search(r"(?m)^\s*dependencies\s*\{", text)
     if not match:
         fail("Could not locate app dependencies block for the WebView filter engine.")
