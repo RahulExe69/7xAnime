@@ -12,11 +12,14 @@ import android.view.WindowManager;
 import android.webkit.ConsoleMessage;
 import android.webkit.JsPromptResult;
 import android.webkit.JsResult;
+import android.webkit.PermissionRequest;
 import android.webkit.WebChromeClient;
 import android.webkit.WebView;
 import android.os.Message;
 import android.net.Uri;
 import android.widget.FrameLayout;
+import android.widget.FrameLayout.LayoutParams;
+import android.view.Gravity;
 import com.getcapacitor.Bridge;
 import com.getcapacitor.BridgeWebChromeClient;
 
@@ -32,6 +35,7 @@ public final class StreamingWebChromeClient extends BridgeWebChromeClient {
     private View customView;
     private WebChromeClient.CustomViewCallback customViewCallback;
     private ViewGroup contentContainer;
+    private FrameLayout fullscreenRoot;
     private WebView webView;
     private int previousOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED;
     private int previousSystemUiVisibility = 0;
@@ -93,6 +97,19 @@ public final class StreamingWebChromeClient extends BridgeWebChromeClient {
         return super.onJsPrompt(view, url, message, defaultValue, result);
     }
 
+    @Override
+    public void onPermissionRequest(PermissionRequest request) {
+        String origin = request == null || request.getOrigin() == null
+            ? ""
+            : request.getOrigin().toString();
+        if (!isAppOrigin(origin)) {
+            Log.d(TAG, "Denied web permission request from " + safeHost(origin));
+            if (request != null) request.deny();
+            return;
+        }
+        super.onPermissionRequest(request);
+    }
+
     private static String safeHost(String rawUrl) {
         try {
             String host = Uri.parse(rawUrl).getHost();
@@ -126,17 +143,25 @@ public final class StreamingWebChromeClient extends BridgeWebChromeClient {
         contentContainer = activity.findViewById(android.R.id.content);
 
         if (webView != null) webView.setVisibility(View.GONE);
+        fullscreenRoot = new FrameLayout(activity);
+        fullscreenRoot.setBackgroundColor(Color.BLACK);
+        fullscreenRoot.addView(
+            customView,
+            new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+            )
+        );
+        installSwipeToClose(fullscreenRoot);
         if (contentContainer != null) {
-            customView.setBackgroundColor(Color.BLACK);
             contentContainer.addView(
-                customView,
+                fullscreenRoot,
                 new FrameLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.MATCH_PARENT
                 )
             );
         }
-        installSwipeToClose(customView);
 
         activity.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
         window.addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
@@ -151,24 +176,42 @@ public final class StreamingWebChromeClient extends BridgeWebChromeClient {
         Log.d(TAG, "Entered native video fullscreen");
     }
 
-    private void installSwipeToClose(View view) {
-        view.setOnTouchListener((touchedView, event) -> {
+    private int dp(Activity activity, int value) {
+        return Math.round(value * activity.getResources().getDisplayMetrics().density);
+    }
+
+    private void installSwipeToClose(FrameLayout root) {
+        Activity activity = getBridgeActivity();
+        if (activity == null) return;
+
+        // The fullscreen custom view may consume touch events itself. Add a
+        // narrow edge rail so a downward swipe can always leave native fullscreen
+        // without putting a transparent overlay over the player's normal controls.
+        View gestureRail = new View(activity);
+        gestureRail.setBackgroundColor(Color.TRANSPARENT);
+        gestureRail.setClickable(true);
+        gestureRail.setOnTouchListener((touchedView, event) -> {
             if (event.getAction() == MotionEvent.ACTION_DOWN) {
-                swipeStartX = event.getX();
-                swipeStartY = event.getY();
-                return false;
+                swipeStartX = event.getRawX();
+                swipeStartY = event.getRawY();
+                return true;
             }
             if (event.getAction() == MotionEvent.ACTION_UP) {
-                float dx = event.getX() - swipeStartX;
-                float dy = event.getY() - swipeStartY;
-                if (dy > 96f && Math.abs(dx) < 120f) {
-                    // YouTube-style swipe down exits native fullscreen.
+                float dx = event.getRawX() - swipeStartX;
+                float dy = event.getRawY() - swipeStartY;
+                if (dy > dp(activity, 64) && Math.abs(dx) < dp(activity, 120)) {
                     onHideCustomView();
-                    return true;
                 }
+                return true;
             }
-            return false;
+            return true;
         });
+        FrameLayout.LayoutParams railParams = new FrameLayout.LayoutParams(
+            dp(activity, 24),
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            Gravity.RIGHT | Gravity.TOP
+        );
+        root.addView(gestureRail, railParams);
     }
 
     /** Let MainActivity consume Back before leaving the episode while fullscreen. */
@@ -183,7 +226,9 @@ public final class StreamingWebChromeClient extends BridgeWebChromeClient {
         Activity activity = getBridgeActivity();
         if (activity == null || customView == null) return;
 
-        if (contentContainer != null) {
+        if (contentContainer != null && fullscreenRoot != null) {
+            contentContainer.removeView(fullscreenRoot);
+        } else if (contentContainer != null) {
             contentContainer.removeView(customView);
         }
         if (webView != null) webView.setVisibility(View.VISIBLE);
@@ -206,6 +251,7 @@ public final class StreamingWebChromeClient extends BridgeWebChromeClient {
         customView = null;
         customViewCallback = null;
         contentContainer = null;
+        fullscreenRoot = null;
         webView = null;
         if (callback != null) callback.onCustomViewHidden();
         Log.d(TAG, "Exited native video fullscreen");
