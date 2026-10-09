@@ -582,6 +582,29 @@ class LocalAnimeApiTests(unittest.TestCase):
 
         asyncio.run(exercise())
 
+    def test_manual_yomi_embed_route_skips_slow_metadata_context(self) -> None:
+        async def exercise() -> None:
+            with (
+                patch.object(local_api.provider_race, "providers", return_value=[("megaflix", megaflix)]),
+                patch.object(
+                    local_api, "_get_local_provider_context",
+                    new=AsyncMock(side_effect=AssertionError("manual embeds must not wait on metadata")),
+                ) as context_lookup,
+                patch.object(local_api.provider_race, "record_latency"),
+            ):
+                response = self.client.get(
+                    "/watch/megaflix/21/dub/megaflix-43",
+                    headers=self.auth,
+                )
+
+            self.assertEqual(response.status_code, 200, response.text)
+            payload = response.json()
+            self.assertEqual(payload["providerStatus"], "ok")
+            self.assertEqual(payload["streams"][0]["url"], "https://www.megaflix.buzz/stream/ani/21/43/dub")
+            context_lookup.assert_not_awaited()
+
+        asyncio.run(exercise())
+
     def test_auto_race_does_not_call_parked_or_manual_embed_providers(self) -> None:
         attempted = []
 
