@@ -30,10 +30,10 @@ const EpisodePlaylist = ({
   const searchParams = useSearchParams();
 
   const episodeId = searchParams.get("episode");
-
+  const episodeNumberParam = searchParams.get("ep");
   const isLatestEpisode = searchParams.get("type");
 
-  const { setSelectedEpisode } = useAnimeStore();
+  const { selectedEpisode, setSelectedEpisode } = useAnimeStore();
 
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const episodeRefs = useRef<(HTMLDivElement | null)[]>([]);
@@ -52,21 +52,44 @@ const EpisodePlaylist = ({
     React.useState<Episode[]>(filtered);
 
   useEffect(() => {
-    if (
-      (!episodeId || !episodeId.includes("ep")) &&
-      !!episodes &&
-      !!episodes.episodes.length
-    ) {
-      if (!!isLatestEpisode) {
-        setSelectedEpisode(
-          episodes.episodes[episodes.episodes.length - 1].episodeId as string,
-        );
-      } else {
-        setSelectedEpisode(episodes.episodes[0].episodeId as string);
-      }
+    if (!episodes?.episodes?.length) return;
+
+    // Route parameters are authoritative. Never guess from the characters in a
+    // provider's episode slug (some IDs end in "12", not "episode-12").
+    if (episodeId) {
+      setSelectedEpisode(episodeId);
+      return;
     }
-    //eslint-disable-next-line
-  }, [episodes]);
+
+    if (episodeNumberParam) {
+      const requestedEpisode = episodes.episodes.find(
+        (episode) => episode.number === Number(episodeNumberParam),
+      );
+      if (requestedEpisode?.episodeId) {
+        setSelectedEpisode(requestedEpisode.episodeId);
+      }
+      return;
+    }
+
+    const currentSelectionBelongsToThisAnime = episodes.episodes.some(
+      (episode) => episode.episodeId === selectedEpisode,
+    );
+    if (currentSelectionBelongsToThisAnime) return;
+
+    const fallbackEpisode = isLatestEpisode
+      ? episodes.episodes[episodes.episodes.length - 1]
+      : episodes.episodes[0];
+    if (fallbackEpisode?.episodeId) {
+      setSelectedEpisode(fallbackEpisode.episodeId);
+    }
+  }, [
+    episodes,
+    episodeId,
+    episodeNumberParam,
+    isLatestEpisode,
+    selectedEpisode,
+    setSelectedEpisode,
+  ]);
 
   useEffect(() => {
     if (!episodes || currentGroup === "") return;
@@ -79,8 +102,12 @@ const EpisodePlaylist = ({
   }, [episodes, currentGroup]);
 
   useEffect(() => {
-    const episodeIndex = episodes?.episodes.findIndex(
-      (episode) => episode.episodeId === episodeId,
+    const episodeIndex = episodes?.episodes.findIndex((episode) =>
+      episodeId
+        ? episode.episodeId === episodeId
+        : episodeNumberParam
+          ? episode.number === Number(episodeNumberParam)
+          : false,
     );
 
     if (
@@ -104,7 +131,7 @@ const EpisodePlaylist = ({
       }
     }
     //eslint-disable-next-line
-  }, [animeId, episodes]);
+  }, [animeId, episodes, episodeId, episodeNumberParam]);
 
   const handleOnSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!episodes) return;
@@ -153,16 +180,16 @@ const EpisodePlaylist = ({
 
   return (
     episodes && (
-      <div className="col-span-1 flex flex-col w-full gap-5 border-[.0313rem] border-secondary rounded-md overflow-hidden min-h-[20vh] sm:min-h-[30vh] md:min-h-[40vh] lg:min-h-[60vh] max-h-[500px]">
-        <div className="h-fit bg-[#18181a] px-5 py-3">
-          <h3 className="text-lg font-semibold"> Episode Playlist</h3>
+      <div id="episode-list" className="col-span-1 flex w-full scroll-mt-3 flex-col gap-0 overflow-hidden rounded-2xl border border-white/10 bg-[#101018] min-h-[260px] max-h-[58vh] lg:min-h-[500px] lg:max-h-[calc(100vh-7rem)]">
+        <div className="sticky top-0 z-10 h-fit border-b border-white/[0.07] bg-[#14131c] px-3 py-3 sm:px-4 sm:py-4">
+          <h3 className="text-sm font-bold tracking-tight text-white sm:text-base">Episodes</h3>
           <span className="text-sm font-thin">{title}</span>
           <div className="flex flex-row w-full items-center justify-between gap-2 mt-2">
             <Input
               placeholder="Search Episode"
               value={search}
               onChange={handleOnSearchChange}
-              className="w-1/2"
+              className="min-w-0 w-1/2 rounded-xl"
             />
             <Select
               value={currentGroup}
@@ -175,7 +202,7 @@ const EpisodePlaylist = ({
         </div>
         <div
           ref={scrollContainerRef}
-          className={`flex flex-col flex-grow gap-1 px-2 pb-3 overflow-y-auto`}
+          className="flex flex-grow flex-col gap-1 overflow-y-auto px-2 pb-3"
         >
           {filteredEpisodes &&
             filteredEpisodes.map((episode, idx) => (
@@ -204,7 +231,7 @@ const PlaylistSkeleton = () => {
       {[1, 1, 1, 1, 1, 1, 1, 1, 1].map((_, idx) => {
         return (
           <div
-            className="flex gap-5 items-center w-full relative !min-h-16 rounded-md  animate-pulse bg-slate-800"
+            className="relative flex min-h-16 w-full animate-pulse items-center gap-4 rounded-xl bg-white/[0.05]"
             key={idx}
           ></div>
         );

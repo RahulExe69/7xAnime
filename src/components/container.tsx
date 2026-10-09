@@ -4,6 +4,7 @@ import React, { ReactNode } from "react";
 type Props = {
   children?: ReactNode;
   className?: string;
+  id?: string;
 };
 
 const Container = (props: Props) => {

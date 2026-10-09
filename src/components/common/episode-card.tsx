@@ -68,9 +68,9 @@ const EpisodeCard = ({
       >
         <div
           className={cn([
-            "h-[5.25rem] rounded-lg cursor-pointer w-full flex items-center justify-center bg-secondary md:text-base text-xs font-semibold transition-all",
-            isSelected && "bg-[#e9376b] text-white shadow-md font-bold",
-            !isSelected && hasWatchedEpisode && "bg-slate-900 text-gray-400",
+            "h-[5.25rem] rounded-lg cursor-pointer w-full flex items-center justify-center border border-[#dedbea] bg-[#f8f7fd] text-[#625d79] md:text-base text-xs font-semibold transition-all hover:bg-[#eeeafb] dark:border-[#332f47] dark:bg-[#201d2a] dark:text-[#c7c1dc] dark:hover:bg-[#302b42]",
+            isSelected && "bg-[#ff2f9d] text-white shadow-md font-bold",
+            !isSelected && hasWatchedEpisode && "bg-[#eeeaf7] text-[#b0a9bf] dark:bg-slate-900 dark:text-gray-400",
           ])}
         >
           {`Episode ${props.episode.number}`}
@@ -86,10 +86,10 @@ const EpisodeCard = ({
           className={cn([
             "flex gap-3 items-center justify-between w-full h-fit rounded-lg p-2.5 transition-all cursor-pointer text-xs md:text-sm font-medium",
             isSelected
-              ? "bg-[#e9376b] text-white font-bold shadow-md ring-1 ring-[#e9376b]/50"
+              ? "bg-[#ff2f9d] text-white font-bold shadow-md ring-1 ring-[#ff2f9d]/40"
               : hasWatchedEpisode
-                ? "bg-slate-900/80 text-gray-400 hover:bg-slate-800"
-                : "bg-secondary/40 text-gray-300 hover:bg-secondary/70 hover:text-white",
+                ? "bg-[#eeeaf7] text-[#b0a9bf] hover:bg-[#e5e0f3] dark:bg-slate-900/80 dark:text-gray-400 dark:hover:bg-slate-800"
+                : "border border-[#e2deee] bg-[#f8f7fd] text-[#625d79] hover:bg-[#eeeafb] hover:text-[#403a5e] dark:border-[#332f47] dark:bg-[#201d2a] dark:text-gray-300 dark:hover:bg-[#302b42] dark:hover:text-white",
           ])}
         >
           <div className="flex items-center gap-2 min-w-0">

@@ -1,24 +1,22 @@
+"use client";
+
 import React from "react";
-import { DiscordLogoIcon, GitHubLogoIcon } from "@radix-ui/react-icons";
+import Link from "next/link";
 import Image from "next/image";
+import { usePathname } from "next/navigation";
 
 const Footer = () => {
+  const pathname = usePathname();
+  if (pathname === "/anime/watch" || pathname === "/anime/watch/") return null;
+
   return (
-    <footer className="w-full bg-base-300 shadow-xl p-5 flex flex-col items-center space-y-5">
-      <Image src="/icon.png" alt="logo" width="100" height="100" suppressHydrationWarning />
-      <div className="flex space-x-5 items-center">
-        <a href="https://github.com/Dovakiin0/Kitsune" target="_blank">
-            <GitHubLogoIcon suppressHydrationWarning width="25" height="25" />
-        </a>
-        <a href="https://discord.gg/6yAJ3XDHTt" target="_blank">
-            <DiscordLogoIcon suppressHydrationWarning width="25" height="25" />
-        </a>
-      </div>
-      <p className="text-sm text-gray-300">
-        Kitsune does not store any files on the server, we only link to the
-        media which is hosted on 3rd party services.
-      </p>
-      <p className="text-sm text-gray-300">&copy; Kitsune</p>
+    <footer className="mt-16 flex w-full flex-col items-center gap-4 border-t border-white/[0.07] bg-[#0d0c14] px-5 py-8 text-center">
+      <Link href="/" aria-label="7xAnime home" className="inline-flex">
+        <Image src="/brand/7xanime-lockup.svg" alt="7xAnime" width={190} height={48} unoptimized className="h-10 w-[170px] object-contain" />
+      </Link>
+      <p className="max-w-xl text-xs leading-relaxed text-[#817991]">7xAnime links to third-party media sources; streaming files are not hosted by this app.</p>
+      <a href="https://github.com/RahulExe69/7xAnime" target="_blank" rel="noreferrer" className="text-xs font-semibold text-[#bdb2f3] transition hover:text-white">Source code</a>
+      <p className="text-[11px] text-[#686176]">© 7xAnime</p>
     </footer>
   );
 };

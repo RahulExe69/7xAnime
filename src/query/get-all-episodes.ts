@@ -1,5 +1,5 @@
 import { GET_ALL_EPISODES } from "@/constants/query-keys";
-import { api } from "@/lib/api";
+import { api, isLocalBackendEnabled } from "@/lib/api";
 import { Episode, IEpisodes } from "@/types/episodes";
 import { EpisodeResponse } from "@/types/miruro-api";
 import { useQuery } from "react-query";
@@ -45,11 +45,13 @@ const fetchAniListEpisodesFallback = async (
         const epNum = i + 1;
         return {
           title: `Episode ${epNum}`,
-          episodeId: `${epNum}`,
+          episodeId: isLocalBackendEnabled()
+            ? `watch/auto/${animeId}/sub/episode-${epNum}`
+            : `${epNum}`,
           number: epNum,
           isFiller: false,
           hasSub: true,
-          hasDub: true,
+          hasDub: false,
         };
       },
     );
@@ -63,11 +65,13 @@ const fetchAniListEpisodesFallback = async (
     console.error("AniList fallback error:", err);
     const fallbackEpisodes: Episode[] = Array.from({ length: 12 }, (_, i) => ({
       title: `Episode ${i + 1}`,
-      episodeId: `${i + 1}`,
+      episodeId: isLocalBackendEnabled()
+        ? `watch/auto/${animeId}/sub/episode-${i + 1}`
+        : `${i + 1}`,
       number: i + 1,
       isFiller: false,
       hasSub: true,
-      hasDub: true,
+      hasDub: false,
     }));
     return {
       totalEpisodes: 12,
@@ -109,17 +113,20 @@ const getAllEpisodes = async (animeId: string): Promise<IEpisodesData> => {
 
       for (const pName of providerNames) {
         const pData = data.providers[pName]?.episodes;
-        const subMatch = pData?.sub?.find((e) => e.number === epNum);
         const dubMatch = pData?.dub?.find((e) => e.number === epNum);
+        const subMatch = pData?.sub?.find((e) => e.number === epNum);
 
-        if (subMatch) {
-          epDetail = subMatch;
-          fallbackId = subMatch.id;
-          break;
-        }
-        if (dubMatch && !epDetail) {
+        // Prefer an English dub for the episode list's default selection.
+        // Keep a SUB candidate as a fallback while continuing to look for DUB
+        // on other providers before committing to it.
+        if (dubMatch) {
           epDetail = dubMatch;
           fallbackId = dubMatch.id;
+          break;
+        }
+        if (subMatch && !epDetail) {
+          epDetail = subMatch;
+          fallbackId = subMatch.id;
         }
       }
 
@@ -157,5 +164,9 @@ export const useGetAllEpisodes = (animeId: string) => {
     queryFn: () => getAllEpisodes(animeId),
     queryKey: [GET_ALL_EPISODES, animeId],
     enabled: !!animeId,
+    staleTime: 1000 * 60 * 15,
+    cacheTime: 1000 * 60 * 30,
+    refetchOnWindowFocus: false,
+    retry: 0,
   });
 };

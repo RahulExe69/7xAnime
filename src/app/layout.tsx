@@ -1,13 +1,13 @@
 import "./globals.css";
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import localFont from "next/font/local";
 
 import NavBar from "@/components/navbar";
 import Footer from "@/components/footer";
+import NativeBackHandler from "@/components/native-back-handler";
 import Script from "next/script";
 import QueryProvider from "@/providers/query-provider";
-import { PublicEnvScript } from "next-runtime-env";
-
 import { ThemeProvider } from "@/components/theme-provider";
 
 import { Toaster } from "@/components/ui/sonner";
@@ -23,8 +23,8 @@ const geistSans = localFont({
 //   weight: "100 900",
 // });
 
-const APP_NAME = "Kitsune";
-const APP_DEFAULT_TITLE = "Kitsune | Anime Streaming";
+const APP_NAME = "7xAnime";
+const APP_DEFAULT_TITLE = "7xAnime | Anime Streaming";
 const APP_DESCRIPTION = "Stream your favourite anime with ease and no ads";
 
 export const metadata: Metadata = {
@@ -73,19 +73,22 @@ export default function RootLayout({
 
           gtag('config', 'G-X9RZ58XPH1');`}
         </Script>
-        <PublicEnvScript />
-        <link rel="icon" href="/icon.png" type="image/png" sizes="192x192" />
+        <link rel="icon" href="/brand/7xanime-mark.svg" type="image/svg+xml" sizes="any" />
       </head>
       <body
-        className={`${geistSans.className} antialiased max-w-[100vw] overflow-x-hidden`}
+        className={`${geistSans.className} antialiased max-w-[100vw] overflow-x-clip bg-background text-foreground`}
       >
         <ThemeProvider
           attribute="class"
           defaultTheme="dark"
-          enableSystem
+          forcedTheme="dark"
+          enableSystem={false}
           disableTransitionOnChange
         >
           <QueryProvider>
+            <Suspense fallback={null}>
+              <NativeBackHandler />
+            </Suspense>
             <NavBar />
             {children}
             <Footer />

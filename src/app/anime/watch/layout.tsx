@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useGetAnimeDetails } from "@/query/get-anime-details";
-import React, { ReactNode, useEffect, useMemo, useState } from "react";
+import React, { ReactNode, Suspense, useEffect, useState } from "react";
 import AnimeCarousel from "@/components/anime-carousel";
 import { IAnime } from "@/types/anime";
 import useBookMarks from "@/hooks/use-get-bookmark";
@@ -31,27 +31,23 @@ type Props = {
   children: ReactNode;
 };
 
-const Layout = (props: Props) => {
+const Layout = (props: Props) => (
+  <Suspense fallback={<Loading />}>
+    <LayoutContent {...props} />
+  </Suspense>
+);
+
+const LayoutContent = (props: Props) => {
   const searchParams = useSearchParams();
   const { setAnime, setSelectedEpisode } = useAnimeStore();
   const router = useRouter();
 
-  const currentAnimeId = useMemo(
-    () => searchParams.get("anime"),
-    [searchParams],
-  );
+  const currentAnimeId = searchParams.get("anime");
+  const animeId = currentAnimeId;
   const episodeId = searchParams.get("episode");
 
   const epNumberParam = searchParams.get("ep");
   const currentEpNum = epNumberParam ? Number(epNumberParam) : 1;
-
-  const [animeId, setAnimeId] = useState<string | null>(currentAnimeId);
-
-  useEffect(() => {
-    if (currentAnimeId !== animeId) {
-      setAnimeId(currentAnimeId);
-    }
-  }, [currentAnimeId, animeId]);
 
   const { data: anime, isLoading } = useGetAnimeDetails(animeId as string);
 
@@ -62,8 +58,11 @@ const Layout = (props: Props) => {
   }, [anime, setAnime]);
 
   useEffect(() => {
+    // Derive animeId directly from the URL; mirroring it in local state can
+    // briefly leave an old/null ID during navigation and redirect a valid
+    // Start Watching transition back to the homepage.
     if (!animeId && typeof window !== "undefined") {
-      router.push(ROUTES.HOME);
+      router.replace(ROUTES.HOME);
     }
   }, [animeId, router]);
 
@@ -145,6 +144,7 @@ const Layout = (props: Props) => {
           if (typeof window !== "undefined") {
             const url = new URL(window.location.href);
             url.searchParams.set("episode", matchedEp.episodeId);
+            url.searchParams.delete("ep");
             window.history.replaceState({}, "", url.toString());
           }
         }
@@ -156,8 +156,8 @@ const Layout = (props: Props) => {
 
   return (
     anime?.anime.info && (
-      <Container className="mt-[6.5rem] space-y-10 pb-20">
-        <div className="grid lg:grid-cols-4 grid-cols-1 gap-y-5 gap-x-10 h-auto w-full">
+      <Container className="mt-3 space-y-5 pb-12 sm:mt-5 md:mt-6 md:space-y-7">
+        <div className="grid w-full grid-cols-1 gap-4 lg:grid-cols-4 lg:gap-5">
           <div className="lg:col-span-3 col-span-1 lg:mb-0">
             {props.children}
           </div>
@@ -176,26 +176,26 @@ const Layout = (props: Props) => {
             />
           )}
         </div>
-        <div className="flex md:flex-row flex-col gap-5 -mt-5">
+        <div className="flex flex-col gap-3 rounded-2xl border border-white/[0.07] bg-[#101018] p-3 sm:flex-row sm:items-start sm:gap-4">
           <AnimeCard
             title={anime?.anime.info.name}
             poster={anime?.anime.info.poster}
             subTitle={anime?.anime.moreInfo.aired}
             displayDetails={false}
-            className="!h-full !rounded-sm"
-            href={ROUTES.ANIME_DETAILS + "/" + anime?.anime.info.id}
+            className="!rounded-xl"
+            href={ROUTES.animeDetails(anime?.anime.info.id || "")}
           />
-          <div className="flex flex-col gap-2">
+          <div className="flex min-w-0 flex-col gap-3">
             <Select
               placeholder="Add to list"
               value={selected}
               options={SelectOptions}
               onChange={handleSelect}
             />
-            <h1 className="text-2xl md:font-black font-extrabold z-[100]">
+            <h1 className="z-[100] text-xl font-bold tracking-tight sm:text-2xl">
               {anime?.anime.info.name}
             </h1>
-            <p>{parse(anime?.anime.info.description as string)}</p>
+            <p className="line-clamp-3 text-sm leading-6 text-zinc-300">{parse(anime?.anime.info.description as string)}</p>
           </div>
         </div>
 
@@ -218,4 +218,5 @@ const Layout = (props: Props) => {
     )
   );
 };
+
 export default Layout;

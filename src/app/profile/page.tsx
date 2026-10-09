@@ -1,12 +1,12 @@
 "use client";
 
-import React, { useRef } from "react";
+import React, { Suspense, useRef } from "react";
 import Container from "@/components/container";
 import Avatar from "@/components/common/avatar";
 import { useAuthStore } from "@/store/auth-store";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { useParams } from "next/navigation";
 import { pb } from "@/lib/pocketbase";
+import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import Image from "next/image";
 import CoverImage from "@/assets/cover.png";
@@ -26,10 +26,9 @@ export type TargetProfileUser = {
   created: string;
 };
 
-function ProfilePage() {
-  const params = useParams();
-  const rawUsername = params?.username as string;
-  const username = rawUsername ? decodeURIComponent(rawUsername) : "";
+function ProfilePageContent() {
+  const searchParams = useSearchParams();
+  const username = searchParams.get("username") || "";
 
   const { auth, setAuth } = useAuthStore();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -107,24 +106,24 @@ function ProfilePage() {
 
   return (
     <>
-      <div className="w-full h-48 md:h-64 lg:h-72 relative">
+      <div className="relative h-36 w-full overflow-hidden sm:h-44 md:h-56">
         <Image
           src={CoverImage.src}
           alt="cover"
           fill
-          className="object-cover"
+          className="object-cover opacity-80"
           priority
           placeholder="blur"
           blurDataURL={CoverImage.blurDataURL}
         />
       </div>
 
-      <Container className="min-h-[70vh] mt-10 flex flex-col md:flex-row justify-around gap-8 md:gap-4">
+      <Container className="relative z-10 -mt-12 flex min-h-[70vh] flex-col gap-6 pb-16 sm:-mt-16 md:-mt-20 md:flex-row md:items-start md:gap-8">
         {/* User Sidebar Info */}
-        <div className="flex flex-col items-center gap-4 w-full md:w-1/3">
+        <div className="flex w-full flex-col items-center gap-4 rounded-2xl border border-white/[0.08] bg-[#101018]/95 p-5 shadow-xl shadow-black/20 backdrop-blur-xl md:w-1/3">
           <div className="relative group rounded-full overflow-hidden shrink-0">
             <Avatar
-              className="w-[150px] h-[150px] cursor-pointer"
+              className="h-28 w-28 cursor-pointer sm:h-32 sm:w-32"
               username={targetUser.username}
               url={targetUser.avatar}
               collectionID={targetUser.collectionId}
@@ -159,9 +158,9 @@ function ProfilePage() {
           )}
 
           <div className="flex flex-col items-center">
-            <h2 className="text-xl font-bold text-white">@{targetUser.username}</h2>
+            <h2 className="text-lg font-bold tracking-tight text-white">@{targetUser.username}</h2>
             {isOwner && (
-              <span className="text-[11px] font-semibold text-[#e9376b] bg-[#e9376b]/10 px-2.5 py-0.5 rounded-full border border-[#e9376b]/20 mt-1">
+              <span className="text-[11px] font-semibold text-violet-200 bg-violet-500/10 px-2.5 py-0.5 rounded-full border border-violet-400/20 mt-1">
                 Your Profile
               </span>
             )}
@@ -169,7 +168,7 @@ function ProfilePage() {
         </div>
 
         {/* User Activity & Lists Section */}
-        <div className="w-full md:w-2/3">
+        <div className="w-full min-w-0 md:w-2/3">
           <div className="w-full">
             {isOwner && (
               <div className="float-right flex gap-2 items-center mb-2">
@@ -179,12 +178,12 @@ function ProfilePage() {
             )}
 
             <Tabs defaultValue="watching" className="w-full">
-              <TabsList className="grid w-full grid-cols-1 sm:grid-cols-5">
-                <TabsTrigger value="watching">Watching</TabsTrigger>
-                <TabsTrigger value="plan-to-watch">Plan To Watch</TabsTrigger>
-                <TabsTrigger value="on-hold">On Hold</TabsTrigger>
-                <TabsTrigger value="completed">Completed</TabsTrigger>
-                <TabsTrigger value="dropped">Dropped</TabsTrigger>
+              <TabsList className="grid h-auto w-full grid-cols-2 gap-1 rounded-xl border border-white/[0.06] bg-white/[0.03] p-1 sm:grid-cols-5">
+                <TabsTrigger className="rounded-lg px-2 py-2 text-xs sm:text-sm" value="watching">Watching</TabsTrigger>
+                <TabsTrigger className="rounded-lg px-2 py-2 text-xs sm:text-sm" value="plan-to-watch">Plan To Watch</TabsTrigger>
+                <TabsTrigger className="rounded-lg px-2 py-2 text-xs sm:text-sm" value="on-hold">On Hold</TabsTrigger>
+                <TabsTrigger className="rounded-lg px-2 py-2 text-xs sm:text-sm" value="completed">Completed</TabsTrigger>
+                <TabsTrigger className="rounded-lg px-2 py-2 text-xs sm:text-sm" value="dropped">Dropped</TabsTrigger>
               </TabsList>
 
               <TabsContent value="watching" className="mt-4">
@@ -211,6 +210,14 @@ function ProfilePage() {
         </div>
       </Container>
     </>
+  );
+}
+
+function ProfilePage() {
+  return (
+    <Suspense fallback={<Loading />}>
+      <ProfilePageContent />
+    </Suspense>
   );
 }
 

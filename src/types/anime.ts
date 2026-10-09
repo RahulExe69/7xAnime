@@ -87,4 +87,5 @@ export interface SearchAnimeParams {
   language?: string;
   sort?: string;
   genres?: string; // Comma-separated: "isekai,shounen"
+  collection?: string; // Curated homepage collection loaded from its real API endpoint
 }

@@ -1,14 +1,19 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAnimeStore } from "@/store/anime-store";
 import dynamic from "next/dynamic";
 
-const KitsunePlayer = dynamic(() => import("@/components/kitsune-player"), {
+const VideoPlayer = dynamic(() => import("@/components/video-player"), {
   ssr: false,
 });
 import { useGetEpisodeData } from "@/query/get-episode-data";
-import { Captions, Mic, AlertCircle, Tv } from "lucide-react";
+import { useQuery } from "react-query";
+import { getHindiDubStreams } from "@/lib/hindi-dub";
+import { ArrowLeft, Captions, Mic, AlertCircle } from "lucide-react";
+import Link from "next/link";
+import { ROUTES } from "@/constants/routes";
+import { getServerProviderTitle } from "@/lib/server-map";
 import { Switch } from "@/components/ui/switch";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -17,7 +22,16 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useGetAllEpisodes } from "@/query/get-all-episodes";
 
 import useBookMarks from "@/hooks/use-get-bookmark";
-import { useGetSourceAvailable } from "@/query/get-source-available";
+import { isLocalBackendEnabled } from "@/lib/api";
+import { saveLocalWatchProgress } from "@/lib/local-watch-progress";
+
+const updateEpisodeUrl = (episodeId: string, episodeNumber: number) => {
+  if (typeof window === "undefined") return;
+  const url = new URL(window.location.href);
+  url.searchParams.set("episode", episodeId);
+  url.searchParams.set("ep", String(episodeNumber));
+  window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+};
 
 const VideoPlayerSection = () => {
   const searchParams = useSearchParams();
@@ -26,38 +40,52 @@ const VideoPlayerSection = () => {
   const episodeIdParam = searchParams.get("episode") || "";
   const { selectedEpisode, setSelectedEpisode, anime } = useAnimeStore();
 
-  const { data: isSourceAvailable } = useGetSourceAvailable();
   const { data: allEpisodesData } = useGetAllEpisodes(animeIdParam);
+  const [preferredCategory, setPreferredCategory] = useState<"sub" | "dub">("dub");
 
-  // Match episode number from ?ep= parameter if present
+  const rawProviders = useMemo(
+    () => allEpisodesData?.rawResponse?.providers || {},
+    [allEpisodesData?.rawResponse?.providers],
+  );
+  const providerNames = useMemo(() => Object.keys(rawProviders), [rawProviders]);
+
   const targetEpByNumber = epParam && allEpisodesData?.episodes
-    ? allEpisodesData.episodes.find((e) => e.number === Number(epParam))
+    ? allEpisodesData.episodes.find((episode) => episode.number === Number(epParam))
     : null;
-
-  // Resolve active episode ID prioritizing ?ep= parameter
-  const activeEpisodeId =
-    targetEpByNumber?.episodeId ||
-    selectedEpisode ||
-    episodeIdParam ||
-    allEpisodesData?.episodes?.[0]?.episodeId ||
-    "";
-
-  // Sync selectedEpisode in store with ?ep= parameter if provided
-  useEffect(() => {
-    if (targetEpByNumber?.episodeId && selectedEpisode !== targetEpByNumber.episodeId) {
-      setSelectedEpisode(targetEpByNumber.episodeId);
+  const preferredEpisodeId = useMemo(() => {
+    if (episodeIdParam) return "";
+    const requestedNumber = Math.max(1, Number(epParam) || 1);
+    for (const providerName of providerNames) {
+      const candidate = rawProviders[providerName]?.episodes?.[preferredCategory]
+        ?.find((episode) => episode.number === requestedNumber);
+      if (candidate?.id) return candidate.id;
     }
-  }, [targetEpByNumber?.episodeId, selectedEpisode, setSelectedEpisode]);
+    return "";
+  }, [episodeIdParam, epParam, preferredCategory, providerNames, rawProviders]);
 
-  const isPrimaryDisabled = isSourceAvailable === false;
+  // Resolve the requested episode in the preferred language before fetching a
+  // stream, so an available English dub does not briefly load the SUB episode.
+  const activeEpisodeId = episodeIdParam || preferredEpisodeId ||
+    (epParam ? targetEpByNumber?.episodeId || "" : allEpisodesData?.episodes?.[0]?.episodeId || "");
+
+  useEffect(() => {
+    if (activeEpisodeId && selectedEpisode !== activeEpisodeId) {
+      setSelectedEpisode(activeEpisodeId);
+    }
+  }, [activeEpisodeId, selectedEpisode, setSelectedEpisode]);
 
   const [useFallback, setUseFallback] = useState<boolean>(false);
+  const [isHindiMode, setIsHindiMode] = useState<boolean>(false);
+  const [selectedHindiServer, setSelectedHindiServer] = useState<number>(0);
+  const attemptedSourceIdsRef = useRef<Set<string>>(new Set());
 
-  const { data: episodeData, isLoading: isLoadingData } =
-    useGetEpisodeData(activeEpisodeId, !isPrimaryDisabled && !useFallback);
+  const {
+    data: episodeData,
+    isLoading: isLoadingData,
+    isError: isEpisodeDataError,
+  } = useGetEpisodeData(activeEpisodeId, !useFallback && !isHindiMode);
 
   const [autoSkip, setAutoSkip] = useState<boolean>(true);
-  const [preferredCategory, setPreferredCategory] = useState<"sub" | "dub">("sub");
 
   const { createOrUpdateBookMark, syncWatchProgress } = useBookMarks({
     animeID: animeIdParam,
@@ -69,89 +97,118 @@ const VideoPlayerSection = () => {
   const lastSyncedTimeRef = React.useRef<number>(0);
 
   useEffect(() => {
-    setUseFallback(false);
-  }, [activeEpisodeId]);
-
-  useEffect(() => {
     const storedSkip = localStorage.getItem("autoSkip");
     if (storedSkip !== null) setAutoSkip(storedSkip === "true");
-
-    const storedCategory = localStorage.getItem("preferredCategory");
-    if (storedCategory === "sub" || storedCategory === "dub") {
-      setPreferredCategory(storedCategory);
-    }
   }, []);
+
+
 
   function onHandleAutoSkipChange(value: boolean) {
     setAutoSkip(value);
     localStorage.setItem("autoSkip", JSON.stringify(value));
   }
 
-  // Extract dynamic providers from EpisodeResponse
-  const rawProviders = allEpisodesData?.rawResponse?.providers || {};
-  const providerNames = Object.keys(rawProviders);
-
   // Extract current episode number from activeEpisodeId
-  const currentEpNumber =
-    allEpisodesData?.episodes?.find((e) => e.episodeId === activeEpisodeId)?.number || 1;
+  const activeEpisodeNumberFromList = allEpisodesData?.episodes?.find(
+    (episode) => episode.episodeId === activeEpisodeId,
+  )?.number;
+  const activeEpisodeSlug = activeEpisodeId.split("/").pop() || "";
+  const activeEpisodeNumberFromSlug = Number(activeEpisodeSlug.match(/(\d+)$/)?.[1]) || 0;
+  const currentEpNumber = activeEpisodeNumberFromList || activeEpisodeNumberFromSlug || Math.max(1, Number(epParam) || 1);
+
+  const automaticCandidates = useMemo(() => {
+    const candidates: Array<{ id: string; category: "dub" | "sub" }> = [];
+    for (const category of ["dub", "sub"] as const) {
+      for (const providerName of providerNames) {
+        const episode = rawProviders[providerName]?.episodes?.[category]
+          ?.find((item) => item.number === currentEpNumber);
+        if (episode?.id && !candidates.some((candidate) => candidate.id === episode.id)) {
+          candidates.push({ id: episode.id, category });
+        }
+      }
+    }
+    return candidates;
+  }, [providerNames, rawProviders, currentEpNumber]);
+
+  useEffect(() => {
+    attemptedSourceIdsRef.current.clear();
+    setUseFallback(false);
+    setIsHindiMode(false);
+    setSelectedHindiServer(0);
+    setPreferredCategory("dub");
+  }, [animeIdParam, currentEpNumber]);
+
+  useEffect(() => {
+    if (activeEpisodeId) attemptedSourceIdsRef.current.add(activeEpisodeId);
+  }, [activeEpisodeId]);
+
+  const advanceAfterSourceFailure = useCallback(() => {
+    if (activeEpisodeId) attemptedSourceIdsRef.current.add(activeEpisodeId);
+    const next = automaticCandidates.find((candidate) => !attemptedSourceIdsRef.current.has(candidate.id));
+    if (next) {
+      attemptedSourceIdsRef.current.add(next.id);
+      setUseFallback(false);
+      setIsHindiMode(false);
+      setPreferredCategory(next.category);
+      setSelectedEpisode(next.id);
+      updateEpisodeUrl(next.id, currentEpNumber);
+      return;
+    }
+    setUseFallback(true);
+  }, [activeEpisodeId, automaticCandidates, currentEpNumber, setSelectedEpisode]);
+
+  useEffect(() => {
+    if (!activeEpisodeId || isHindiMode || useFallback || isLoadingData) return;
+        const requestFailed = isEpisodeDataError || (!!episodeData && !episodeData.sources?.length);
+    if (requestFailed) advanceAfterSourceFailure();
+  }, [activeEpisodeId, advanceAfterSourceFailure, episodeData, isEpisodeDataError, isHindiMode, isLoadingData, useFallback]);
+  const animeTitleOptions = useMemo(
+    () => [...new Set([
+      anime?.anime?.info?.name || "",
+      anime?.anime?.moreInfo?.japanese || "",
+    ].map((title) => title.trim()).filter(Boolean))],
+    [anime?.anime?.info?.name, anime?.anime?.moreInfo?.japanese],
+  );
+  const {
+    data: hindiDubData,
+    isLoading: isLoadingHindi,
+
+  } = useQuery({
+    queryKey: ["HINDI_DUB_STREAMS", animeIdParam, currentEpNumber, animeTitleOptions],
+    queryFn: () => getHindiDubStreams(animeTitleOptions, currentEpNumber),
+    enabled: !!animeTitleOptions.length && !!currentEpNumber,
+    retry: 0,
+    staleTime: 1000 * 60 * 10,
+  });
+  const hindiStreams = hindiDubData?.streams || [];
 
   // Check sub/dub availability for this episode
-  const hasSub = providerNames.some(
-    (p) => (rawProviders[p]?.episodes?.sub?.length || 0) > 0,
-  );
-  const hasDub = providerNames.some(
-    (p) => (rawProviders[p]?.episodes?.dub?.length || 0) > 0,
-  );
+  const hasSub = providerNames.some((p) => (rawProviders[p]?.episodes?.sub || []).some((episode) => episode.number === currentEpNumber));
+  const hasDub = providerNames.some((p) => (rawProviders[p]?.episodes?.dub || []).some((episode) => episode.number === currentEpNumber));
 
   const handleCategoryChange = (cat: "sub" | "dub") => {
+    setIsHindiMode(false);
+    setUseFallback(false);
     setPreferredCategory(cat);
-    localStorage.setItem("preferredCategory", cat);
 
     // Switch active episode to the first available server of that category for current episode
     if (providerNames.length > 0) {
       for (const pName of providerNames) {
         const pData = rawProviders[pName]?.episodes?.[cat] || [];
-        const targetEp = pData.find((ep: any) => ep.number === currentEpNumber) || pData[0];
+        const targetEp = pData.find((ep: any) => ep.number === currentEpNumber);
         if (targetEp?.id) {
           setSelectedEpisode(targetEp.id);
+          attemptedSourceIdsRef.current.delete(targetEp.id);
+          updateEpisodeUrl(targetEp.id, currentEpNumber);
           break;
         }
       }
     }
   };
 
-  // Synchronize activeEpisodeId category with preferredCategory ("sub" or "dub")
-  useEffect(() => {
-    if (!providerNames.length || !allEpisodesData?.rawResponse?.providers) return;
-
-    const cleanParts = activeEpisodeId.replace(/^\//, "").split("/");
-    const activeCat = cleanParts[3] === "dub" ? "dub" : "sub";
-
-    // If active episode category does not match preferredCategory, switch to preferredCategory if available
-    if (activeCat !== preferredCategory) {
-      for (const pName of providerNames) {
-        const pData = rawProviders[pName]?.episodes?.[preferredCategory] || [];
-        const targetEp = pData.find((ep: any) => ep.number === currentEpNumber);
-        if (targetEp?.id) {
-          setSelectedEpisode(targetEp.id);
-          break;
-        }
-      }
-    }
-  }, [
-    currentEpNumber,
-    preferredCategory,
-    providerNames,
-    rawProviders,
-    activeEpisodeId,
-    setSelectedEpisode,
-    allEpisodesData,
-  ]);
-
-  const isFallbackActive =
-    isSourceAvailable === false ||
-    useFallback ||
-    (!isLoadingData && (!episodeData || !episodeData.sources?.length));
+  const isFallbackActive = !isHindiMode && (
+    useFallback
+  );
 
   // Listen to postMessage events from Fallback Player iframe (megaplay.buzz / megacloud)
   useEffect(() => {
@@ -163,6 +220,7 @@ const VideoPlayerSection = () => {
     let isMounted = true;
 
     const initBookmark = async () => {
+      if (isLocalBackendEnabled()) return;
       const animeName = anime?.anime?.info?.name || "Anime";
       const poster = anime?.anime?.info?.poster || "";
       const bId = await createOrUpdateBookMark(
@@ -213,7 +271,17 @@ const VideoPlayerSection = () => {
         if (isComplete || Math.abs(now - lastSyncedTimeRef.current) >= 10) {
           lastSyncedTimeRef.current = now;
 
-          if (fallbackBookmarkIdRef.current) {
+          if (isLocalBackendEnabled()) {
+            saveLocalWatchProgress({
+              animeId: animeIdParam || anime?.anime?.info?.id || "0",
+              episodeId: activeEpisodeId,
+              episodeNumber: Number(currentEpNumber) || 1,
+              animeTitle: anime?.anime?.info?.name || "Anime",
+              poster: anime?.anime?.info?.poster || "",
+              current: currentTime,
+              duration: duration,
+            });
+          } else if (fallbackBookmarkIdRef.current) {
             const recordId = await syncWatchProgress(
               fallbackBookmarkIdRef.current,
               fallbackWatchedRecordIdRef.current,
@@ -250,24 +318,166 @@ const VideoPlayerSection = () => {
   ]);
 
   const handleProviderSelect = (pName: string, category: "sub" | "dub") => {
+    setIsHindiMode(false);
+    setUseFallback(false);
     setPreferredCategory(category);
-    localStorage.setItem("preferredCategory", category);
-
     const pData = rawProviders[pName]?.episodes?.[category] || [];
-    const targetEp = pData.find((ep: any) => ep.number === currentEpNumber) || pData[0];
+    const targetEp = pData.find((ep: any) => ep.number === currentEpNumber);
     if (targetEp?.id) {
+      attemptedSourceIdsRef.current.delete(targetEp.id);
       setSelectedEpisode(targetEp.id);
+      updateEpisodeUrl(targetEp.id, currentEpNumber);
     }
   };
 
-  // Cleanly extract active provider and category regardless of leading slash e.g. "watch/kiwi/178005/sub/slug"
   const cleanParts = activeEpisodeId.replace(/^\//, "").split("/");
-  const currentProviderName = cleanParts[1] || providerNames[0] || "kiwi";
-  const activeCategory = cleanParts[3] === "dub" ? "dub" : preferredCategory;
+  const currentProviderName = cleanParts[1] || providerNames[0] || "auto";
+  const activeCategory = cleanParts[3] === "dub" ? "dub" : cleanParts[3] === "sub" ? "sub" : preferredCategory;
+  const availableProviderNames = providerNames.filter((providerName) =>
+    (rawProviders[providerName]?.episodes?.[activeCategory] || []).some((episode) => episode.number === currentEpNumber),
+  );
+  const selectedProviderIndex = availableProviderNames.indexOf(currentProviderName);
+  const fallbackServerNumber = 1;
+  const activeServerNumber = isHindiMode
+    ? selectedHindiServer + 1
+    : useFallback || isFallbackActive
+      ? fallbackServerNumber
+      : selectedProviderIndex >= 0 ? selectedProviderIndex + 2 : 1;
+  const activeServerLabel = `Server ${activeServerNumber}`;
+
+  const selectFallbackServer = (category?: "sub" | "dub") => {
+    if (category) setPreferredCategory(category);
+    setIsHindiMode(false);
+    setUseFallback(true);
+  };
+  const selectHindiMode = () => {
+    if (!hindiStreams.length) return;
+    setUseFallback(false);
+    setSelectedHindiServer(0);
+    setIsHindiMode(true);
+  };
+
+  const playerControls = (
+    <div className="flex w-full flex-col gap-3 rounded-2xl border border-white/[0.07] bg-[#101018] p-3 sm:p-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-1.5 rounded-xl border border-white/[0.08] bg-black/20 p-1">
+          <Button size="sm" variant="ghost" disabled={!hasSub} onClick={() => handleCategoryChange("sub")} className={`h-8 rounded-lg px-3 text-xs font-bold transition ${!isHindiMode && activeCategory === "sub" ? "bg-[#ff2f9d] text-white hover:bg-[#ff56ad]" : "text-zinc-400 hover:text-white"}`}>
+            <Captions className="mr-1.5 h-3.5 w-3.5" /> SUB
+          </Button>
+          <Button size="sm" variant="ghost" disabled={!hasDub} onClick={() => handleCategoryChange("dub")} className={`h-8 rounded-lg px-3 text-xs font-bold transition ${!isHindiMode && activeCategory === "dub" ? "bg-[#ff2f9d] text-white hover:bg-[#ff56ad]" : "text-zinc-400 hover:text-white"}`}>
+            <Mic className="mr-1.5 h-3.5 w-3.5" /> ENGLISH
+          </Button>
+          {hindiStreams.length > 0 && (
+            <Button size="sm" variant="ghost" onClick={selectHindiMode} className={`h-8 rounded-lg px-3 text-xs font-bold transition ${isHindiMode ? "bg-[#ff2f9d] text-white hover:bg-[#ff56ad]" : "text-zinc-400 hover:text-white"}`}>
+              <span className="mr-1.5">हिं</span> HINDI
+            </Button>
+          )}
+        </div>
+        <div className="flex items-center gap-2 rounded-xl border border-white/[0.08] bg-white/[0.025] px-3 py-2">
+          <Switch checked={autoSkip} onCheckedChange={onHandleAutoSkipChange} id="auto-skip" />
+          <label htmlFor="auto-skip" className="whitespace-nowrap text-xs font-medium text-zinc-300">Auto skip</label>
+        </div>
+      </div>
+      <div className="flex min-w-0 flex-wrap items-center gap-2 border-t border-white/[0.06] pt-3">
+        <span className="mr-1 text-xs font-extrabold tracking-wide text-zinc-400">Server:</span>
+        {isHindiMode ? (
+          hindiStreams.map((stream, index) => (
+            <Button key={stream.embed} size="sm" title={`Server ${index + 1} — Hindi dub — ${stream.host}`} aria-label={`Server ${index + 1} — Hindi dub — ${stream.host}`} onClick={() => setSelectedHindiServer(index)} className={`h-9 min-w-9 rounded-xl px-3 text-xs font-extrabold transition ${activeServerNumber === index + 1 ? "bg-[#ff2f9d] text-white" : "border border-white/[0.08] bg-white/[0.035] text-zinc-300 hover:border-[#ff2f9d]/30 hover:bg-[#ff2f9d]/10"}`}>{index + 1}</Button>
+          ))
+        ) : (
+          <>
+            <Button size="sm" title="Server 1 — MegaPlay" aria-label="Server 1 — MegaPlay" onClick={() => selectFallbackServer()} className={`h-9 min-w-9 rounded-xl px-3 text-xs font-extrabold transition ${activeServerNumber === 1 && (useFallback || isFallbackActive) ? "bg-[#ff2f9d] text-white" : "border border-white/[0.08] bg-white/[0.035] text-zinc-300 hover:border-[#ff2f9d]/30 hover:bg-[#ff2f9d]/10"}`}>1</Button>
+            {availableProviderNames.map((providerName, index) => (
+              <Button key={`${activeCategory}-${providerName}`} size="sm" title={getServerProviderTitle(availableProviderNames, providerName)} aria-label={getServerProviderTitle(availableProviderNames, providerName)} onClick={() => handleProviderSelect(providerName, activeCategory)} className={`h-9 min-w-9 rounded-xl px-3 text-xs font-extrabold transition ${activeServerNumber === index + 2 ? "bg-[#ff2f9d] text-white" : "border border-white/[0.08] bg-white/[0.035] text-zinc-300 hover:border-[#ff2f9d]/30 hover:bg-[#ff2f9d]/10"}`}>{index + 2}</Button>
+            ))}
+          </>
+        )}
+      </div>
+    </div>
+  );
+  const playerHeader = (
+    <div className="flex min-w-0 items-center gap-3 rounded-2xl border border-white/[0.07] bg-[#101018] px-3 py-3 sm:px-4">
+      <Link
+        href={ROUTES.animeDetails(animeIdParam)}
+        aria-label="Back to anime details"
+        className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-white/10 bg-white/[0.04] text-zinc-200 transition hover:border-[#ff2f9d]/40 hover:bg-[#ff2f9d]/10 hover:text-white"
+      >
+        <ArrowLeft className="h-5 w-5" />
+      </Link>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-bold text-white sm:text-base">
+          {anime?.anime?.info?.name || "Now Playing"}
+        </p>
+        <p className="mt-0.5 truncate text-xs text-zinc-400">
+          Episode {currentEpNumber} <span className="px-1 text-zinc-600">·</span> {isHindiMode ? "HINDI" : activeCategory === "dub" ? "ENGLISH" : "SUB"} <span className="px-1 text-zinc-600">·</span> {activeServerLabel}
+        </p>
+      </div>
+      <Link
+        href="#episode-list"
+        className="shrink-0 rounded-lg px-2 py-2 text-xs font-semibold text-[#ff70bd] transition hover:bg-[#ff2f9d]/10 sm:px-3"
+      >
+        Episodes
+      </Link>
+    </div>
+  );
+
+  if (isHindiMode && isLoadingHindi) {
+    return (
+      <div className="space-y-3">
+        {playerHeader}
+        <div role="status" aria-live="polite" className="flex aspect-video w-full flex-col items-center justify-center gap-3 rounded-2xl border border-[#dedbea] bg-white text-sm text-[#716b87] dark:border-[#302c40] dark:bg-[#14121c] dark:text-zinc-400">
+          <span className="h-7 w-7 animate-spin rounded-full border-2 border-[#604bd3]/25 border-t-[#604bd3]" />
+          <span>Finding Hindi dub for episode {currentEpNumber}…</span>
+        </div>
+        <p className="text-xs text-[#77728f] dark:text-zinc-500">Hindi sources come from a community-maintained catalogue, so some anime or episodes may be missing.</p>
+      </div>
+    );
+  }
+
+  if (isHindiMode) {
+    const selectedHindi = hindiStreams[selectedHindiServer];
+    return (
+      <div className="flex w-full flex-col gap-3">
+        {playerHeader}
+        {selectedHindi ? (
+          <div className="relative aspect-video w-full overflow-hidden rounded-2xl border border-white/10 bg-black shadow-2xl shadow-black/40">
+            <iframe
+              key={selectedHindi.embed}
+              src={selectedHindi.embed}
+              title={`${hindiDubData?.matchedTitle || anime?.anime?.info?.name || "Anime"} episode ${currentEpNumber} Hindi dub via ${selectedHindi.host}`}
+              width="100%"
+              height="100%"
+              allow="autoplay; fullscreen; picture-in-picture; encrypted-media"
+              allowFullScreen
+              referrerPolicy="strict-origin-when-cross-origin"
+              className="absolute inset-0 h-full w-full border-0"
+            />
+          </div>
+        ) : (
+          <Alert className="rounded-2xl border-white/[0.08] bg-[#101018] text-zinc-200">
+            <AlertCircle className="h-4 w-4 text-[#ff70bd]" />
+            <AlertTitle className="font-bold">Hindi stream temporarily unavailable</AlertTitle>
+            <AlertDescription className="mt-1 text-sm text-zinc-400">This episode has no verified playable Hindi embed right now.</AlertDescription>
+          </Alert>
+        )}
+        {playerControls}
+      </div>
+    );
+  }
 
   if (!activeEpisodeId || isLoadingData) {
     return (
-      <div className="h-auto aspect-video lg:max-h-[calc(100vh-150px)] min-h-[20vh] sm:min-h-[30vh] md:min-h-[40vh] lg:min-h-[60vh] w-full animate-pulse bg-slate-800 rounded-xl"></div>
+      <div className="space-y-3">
+        {playerHeader}
+        <div
+        role="status"
+        aria-live="polite"
+        className="flex aspect-video w-full flex-col items-center justify-center gap-3 rounded-2xl border border-white/[0.06] bg-white/[0.035] text-sm text-zinc-400"
+      >
+        <span className="h-7 w-7 animate-spin rounded-full border-2 border-violet-400/25 border-t-violet-300" />
+        <span>{activeEpisodeId ? "Finding a playable stream…" : "Preparing episode…"}</span>
+        </div>
+      </div>
     );
   }
 
@@ -276,78 +486,27 @@ const VideoPlayerSection = () => {
     const fallbackAnimeId = animeIdParam || anime?.anime?.info?.id || "1";
     const fallbackEpId = currentEpNumber || "1";
     const fallbackSrc = `https://megaplay.buzz/stream/ani/${fallbackAnimeId}/${fallbackEpId}/${activeCategory}`;
-
     return (
-      <div className="flex flex-col gap-4 w-full">
-        <div className="relative w-full h-auto aspect-video min-h-[20vh] sm:min-h-[30vh] md:min-h-[40vh] lg:min-h-[60vh] max-h-[500px] lg:max-h-[calc(100vh-150px)] bg-black overflow-hidden rounded-xl border border-slate-800">
-          <iframe
-            key={`${fallbackAnimeId}-${fallbackEpId}-${activeCategory}`}
-            src={fallbackSrc}
-            width="100%"
-            height="100%"
-            allowFullScreen
-            className="w-full h-full border-0"
-          ></iframe>
+      <div className="flex w-full flex-col gap-3">
+        {playerHeader}
+        <div className="relative aspect-video w-full overflow-hidden rounded-2xl border border-white/10 bg-black shadow-2xl shadow-black/40">
+          <iframe key={`${fallbackAnimeId}-${fallbackEpId}-${activeCategory}`} src={fallbackSrc} title={`${anime?.anime?.info?.name || "Anime"} episode ${currentEpNumber}`} width="100%" height="100%" allowFullScreen className="absolute inset-0 h-full w-full border-0" />
         </div>
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-[#0f172a] rounded-xl border border-slate-800">
-          <div className="flex flex-wrap items-center gap-3">
-            <span className="text-xs font-bold text-gray-400 tracking-wider">CATEGORY:</span>
-            <Button
-              size="sm"
-              variant="ghost"
-              disabled={!hasSub}
-              onClick={() => handleCategoryChange("sub")}
-              className={`h-8 px-4 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition ${
-                activeCategory === "sub"
-                  ? "bg-[#e9376b] text-white hover:bg-[#e9376b]"
-                  : "bg-slate-800 text-gray-400 hover:bg-slate-700"
-              }`}
-            >
-              <Captions className="h-3.5 w-3.5" /> SUB
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              disabled={!hasDub}
-              onClick={() => handleCategoryChange("dub")}
-              className={`h-8 px-4 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition ${
-                activeCategory === "dub"
-                  ? "bg-green-600 text-white hover:bg-green-600"
-                  : "bg-slate-800 text-gray-400 hover:bg-slate-700"
-              }`}
-            >
-              <Mic className="h-3.5 w-3.5" /> DUB
-            </Button>
-          </div>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => setUseFallback(false)}
-            className="h-8 px-3 text-xs border-slate-700 bg-slate-800/80 hover:bg-slate-700 text-gray-200 flex items-center gap-1.5 shrink-0 self-start sm:self-auto"
-          >
-            <Tv className="h-3.5 w-3.5 text-blue-400" /> Try Primary Player
-          </Button>
-        </div>
-        <Alert variant="destructive" className="border-red-800/80 bg-red-950/40 text-red-300 rounded-xl">
-          <AlertCircle className="h-4 w-4 text-red-400" />
-          <AlertTitle className="font-bold">Fallback Video Player Activated</AlertTitle>
-          <AlertDescription className="text-xs text-red-300/80 mt-1">
-            The primary video stream is currently unavailable or encountered an error. A fallback player has been automatically loaded for your viewing convenience.
-          </AlertDescription>
-        </Alert>
+        {playerControls}
       </div>
     );
   }
 
   return (
-    <div>
-      <KitsunePlayer
-        key={episodeData.sources?.[0]?.url}
-        episodeInfo={episodeData}
+    <div className="space-y-3">
+      {playerHeader}
+      <VideoPlayer
+        key={episodeData?.sources?.[0]?.url}
+        episodeInfo={episodeData!}
         serversData={{
           episodeId: activeEpisodeId,
           episodeNo: String(currentEpNumber),
-          sub: providerNames.map((p, idx) => ({ serverId: idx + 1, serverName: p })),
+          sub: availableProviderNames.map((providerName, index) => ({ serverId: index + 2, serverName: `Server ${index + 2}` })),
           dub: [],
           raw: [],
         }}
@@ -358,85 +517,9 @@ const VideoPlayerSection = () => {
         }}
         subOrDub={activeCategory}
         autoSkip={autoSkip}
-        onError={() => setUseFallback(true)}
+        onError={advanceAfterSourceFailure}
       />
-      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 w-full p-5 bg-[#0f172a] border-t border-slate-800">
-        <div className="flex flex-col gap-3 w-full md:w-auto">
-          <div className="flex flex-wrap items-center gap-3">
-            <Captions className="text-red-400 h-4 w-4 shrink-0" />
-            <p className="font-bold text-xs text-gray-300 tracking-wider">SERVERS (SUB):</p>
-            {providerNames.map((pName) => {
-              const hasSub = (rawProviders[pName]?.episodes?.sub || []).length > 0;
-              if (!hasSub) return null;
-              const isActive =
-                currentProviderName.toLowerCase() === pName.toLowerCase() &&
-                activeCategory === "sub";
-
-              return (
-                <Button
-                  size="sm"
-                  key={`sub-${pName}`}
-                  className={`uppercase font-bold text-xs px-3 transition-all ${
-                    isActive
-                      ? "bg-[#e9376b] text-white shadow-md ring-2 ring-[#e9376b]/40 scale-105"
-                      : "bg-slate-800/80 text-gray-300 hover:bg-slate-700 hover:text-white"
-                  }`}
-                  onClick={() => handleProviderSelect(pName, "sub")}
-                >
-                  {pName}
-                </Button>
-              );
-            })}
-          </div>
-
-          {providerNames.some((p) => (rawProviders[p]?.episodes?.dub || []).length > 0) && (
-            <div className="flex flex-wrap items-center gap-3 mt-1">
-              <Mic className="text-green-400 h-4 w-4 shrink-0" />
-              <p className="font-bold text-xs text-gray-300 tracking-wider">SERVERS (DUB):</p>
-              {providerNames.map((pName) => {
-                const hasDub = (rawProviders[pName]?.episodes?.dub || []).length > 0;
-                if (!hasDub) return null;
-                const isActive =
-                  currentProviderName.toLowerCase() === pName.toLowerCase() &&
-                  activeCategory === "dub";
-
-                return (
-                  <Button
-                    size="sm"
-                    key={`dub-${pName}`}
-                    className={`uppercase font-bold text-xs px-3 transition-all ${
-                      isActive
-                        ? "bg-green-600 text-white shadow-md ring-2 ring-green-500/40 scale-105"
-                        : "bg-slate-800/80 text-gray-300 hover:bg-slate-700 hover:text-white"
-                    }`}
-                    onClick={() => handleProviderSelect(pName, "dub")}
-                  >
-                    {pName}
-                  </Button>
-                );
-              })}
-            </div>
-          )}
-        </div>
-        <div className="flex flex-wrap items-center gap-3 text-sm shrink-0 self-start md:self-auto">
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => setUseFallback(true)}
-            className="h-8 px-3 text-xs border-slate-700 bg-slate-800/80 hover:bg-slate-700 text-gray-200 flex items-center gap-1.5"
-          >
-            <Tv className="h-3.5 w-3.5 text-yellow-400" /> Switch to Fallback Player
-          </Button>
-          <div className="flex flex-row items-center space-x-2">
-            <Switch
-              checked={autoSkip}
-              onCheckedChange={(e) => onHandleAutoSkipChange(e)}
-              id="auto-skip"
-            />
-            <p>Auto Skip</p>
-          </div>
-        </div>
-      </div>
+      {playerControls}
     </div>
   );
 };

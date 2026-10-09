@@ -1,5 +1,6 @@
 import { pb } from "@/lib/pocketbase";
 import { useQuery } from "react-query";
+import { isLocalBackendEnabled } from "@/lib/api";
 
 export const GET_SOURCE_AVAILABLE_KEY = "GET_SOURCE_AVAILABLE";
 
@@ -20,6 +21,7 @@ export const useGetSourceAvailable = () => {
         return true; // Default to true on error so stream is attempted
       }
     },
+    enabled: !isLocalBackendEnabled(),
     staleTime: 1000 * 60 * 5,
     refetchOnWindowFocus: false,
   });

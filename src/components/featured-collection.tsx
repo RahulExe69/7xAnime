@@ -2,6 +2,7 @@ import React from "react";
 import Container from "./container";
 import FeaturedCollectionCard from "./featured-collection-card";
 import { MediaList } from "@/types/miruro-api";
+import SectionHeading from "./section-heading";
 
 type CategoryItem = {
   title: string;
@@ -17,7 +18,7 @@ const FeaturedCollection = ({ featuredAnime, loading }: Props) => {
   if (loading || !featuredAnime?.length) return <LoadingSkeleton />;
   return (
     <Container className="flex flex-col gap-5 items-center lg:items-start py-5">
-      <h5 className="text-2xl font-bold">Featured Collection</h5>
+      <SectionHeading eyebrow="Curated For You" title="Featured Collection" />
       <div className="grid w-full gap-5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
         {featuredAnime.map((category, idx) => (
           <FeaturedCollectionCard

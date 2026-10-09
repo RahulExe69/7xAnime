@@ -1,5 +1,6 @@
 import { pb } from "@/lib/pocketbase";
 import { useAuthStore } from "@/store/auth-store";
+import { isLocalBackendEnabled } from "@/lib/api";
 import { useQuery, useQueryClient } from "react-query";
 import { toast } from "sonner";
 
@@ -82,7 +83,7 @@ function useBookMarks({
         totalPages: res.totalPages,
       };
     },
-    enabled: populate && !!auth,
+    enabled: !isLocalBackendEnabled() && populate && !!auth,
     staleTime: 1000 * 60 * 5, // Cache results for 5 minutes
     refetchOnWindowFocus: false, // Prevent refetching when switching tabs
   });

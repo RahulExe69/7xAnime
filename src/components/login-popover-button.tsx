@@ -3,10 +3,14 @@ import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import Button from "./common/custom-button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import { Input } from "./ui/input";
-import DiscordIcon from "@/icons/discord";
+import GoogleIcon from "@/icons/google";
 import { pb } from "@/lib/pocketbase";
 import { toast } from "sonner";
+import { Bookmark, Compass, UserRound } from "lucide-react";
+import Link from "next/link";
+import { ROUTES } from "@/constants/routes";
 import { useAuthStore } from "@/store/auth-store";
+import { isLocalBackendEnabled } from "@/lib/api";
 
 type FormData = {
   username: string;
@@ -112,43 +116,91 @@ function LoginPopoverButton() {
     });
   };
 
-  const loginWithDiscord = async () => {
-    const res = await pb.collection("users").authWithOAuth2({
-      provider: "discord",
-    });
-
-    if (pb.authStore.isValid && pb.authStore.record) {
-      await pb.collection("users").update(pb.authStore.record?.id!, {
-        username: res.meta?.username,
+  const loginWithGoogle = async () => {
+    try {
+      const result = await pb.collection("users").authWithOAuth2({
+        provider: "google",
       });
+      const record = pb.authStore.record;
 
-      toast.success("Login successful", { style: { background: "green" } });
-      auth.setAuth({
-        id: pb.authStore.record.id,
-        email: pb.authStore.record.email,
-        username: pb.authStore.record.username,
-        avatar: pb.authStore.record.avatar,
-        collectionId: pb.authStore.record.collectionId,
-        collectionName: pb.authStore.record.collectionName,
-        autoSkip: pb.authStore.record.autoSkip,
-        created: pb.authStore.record.created,
+      if (pb.authStore.isValid && record) {
+        let username = record.username;
+
+        if (!username) {
+          const updated = await pb.collection("users").update(record.id, {
+            username:
+              result.meta?.username ||
+              result.meta?.name ||
+              record.email?.split("@")[0] ||
+              "7xAnimeUser",
+          });
+          username = updated.username;
+        }
+
+        toast.success("Google sign-in successful", {
+          style: { background: "green" },
+        });
+        auth.setAuth({
+          id: record.id,
+          email: record.email,
+          username,
+          avatar: record.avatar,
+          collectionId: record.collectionId,
+          collectionName: record.collectionName,
+          autoSkip: record.autoSkip,
+          created: record.created,
+        });
+        clearForm();
+      }
+    } catch (error) {
+      console.error("Google sign-in error:", error);
+      toast.error("Google sign-in is not configured on the PocketBase server yet.", {
+        style: { background: "red" },
       });
     }
   };
+
+  if (isLocalBackendEnabled()) {
+    return (
+      <Popover>
+        <PopoverTrigger asChild>
+          <button type="button" aria-label="Guest profile" title="Guest profile" className="relative grid h-9 w-9 shrink-0 place-items-center rounded-full border border-white/10 bg-white/[0.04] text-[#d7cfea] transition hover:border-[#ff2f9d]/45 hover:bg-white/[0.08] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff2f9d]">
+            <UserRound className="h-5 w-5" aria-hidden="true" />
+            <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-[#100e19] bg-amber-400" />
+          </button>
+        </PopoverTrigger>
+        <PopoverContent align="end" side="bottom" className="mt-2 w-64 rounded-2xl border-white/10 bg-[#171421] p-4 text-white shadow-2xl shadow-black/40">
+          <div className="flex items-center gap-3">
+            <div className="grid h-10 w-10 place-items-center rounded-full bg-[#ff2f9d]/15 text-[#ff8bc8]"><UserRound className="h-5 w-5" /></div>
+            <div className="min-w-0"><p className="font-bold">Guest profile</p><p className="text-xs text-zinc-400">No account signed in</p></div>
+          </div>
+          <p className="mt-3 text-xs leading-relaxed text-zinc-400">Your watch progress is stored on this device.</p>
+          <div className="mt-3 flex flex-col gap-1 border-t border-white/[0.08] pt-3">
+            <Link href={ROUTES.SEARCH} className="flex items-center gap-2 rounded-lg px-2.5 py-2 text-sm font-medium transition hover:bg-white/[0.06]"><Compass className="h-4 w-4" /> Explore anime</Link>
+            <Link href="/library" className="flex items-center gap-2 rounded-lg px-2.5 py-2 text-sm font-medium transition hover:bg-white/[0.06]"><Bookmark className="h-4 w-4" /> My list</Link>
+          </div>
+        </PopoverContent>
+      </Popover>
+    );
+  }
 
   return (
     <Popover>
       <PopoverTrigger asChild>
         <Button
+          type="button"
           variant="outline"
-          className="bg-white text-md text-black hover:bg-gray-200 hover:text-black transition-all duration-300"
+          aria-label="Sign in or open profile"
+          title="Sign in"
+          className="grid h-9 w-9 place-items-center rounded-full border-white/10 bg-white/[0.04] p-0 text-zinc-200 transition hover:border-[#ff2f9d]/40 hover:bg-[#ff2f9d]/10 hover:text-white"
         >
-          Login
+          <UserRound className="h-5 w-5" aria-hidden="true" />
+          <span className="sr-only">Sign in</span>
         </Button>
       </PopoverTrigger>
       <PopoverContent
         side="bottom"
-        className="bg-black bg-opacity-50 backdrop-blur-sm w-[300px] mt-4 mr-4 p-4"
+        className="w-[300px] rounded-2xl border-white/10 bg-[#171421] text-white shadow-2xl shadow-black/40"
       >
         <Tabs
           defaultValue={tabValue}
@@ -200,12 +252,12 @@ function LoginPopoverButton() {
             <hr className="text-white text-xs text-center" />
             <Button
               variant="default"
-              className="bg-blue-600 hover:bg-blue-800 text-white w-full text-xs"
+              className="w-full bg-white text-xs text-black hover:bg-gray-100"
               size="sm"
-              onClick={loginWithDiscord}
+              onClick={loginWithGoogle}
             >
-              <DiscordIcon className="mr-2" />
-              Login with Discord
+              <GoogleIcon className="mr-2 h-4 w-4" />
+              Login with Google
             </Button>
           </TabsContent>
           <TabsContent value="signup" className="flex flex-col gap-2">
@@ -265,12 +317,12 @@ function LoginPopoverButton() {
             <hr className="text-white text-xs text-center" />
             <Button
               variant="default"
-              className="bg-blue-600 hover:bg-blue-800 text-white w-full text-xs"
+              className="w-full bg-white text-xs text-black hover:bg-gray-100"
               size="sm"
-              onClick={loginWithDiscord}
+              onClick={loginWithGoogle}
             >
-              <DiscordIcon className="mr-2" />
-              Signup with Discord
+              <GoogleIcon className="mr-2 h-4 w-4" />
+              Continue with Google
             </Button>
           </TabsContent>
         </Tabs>

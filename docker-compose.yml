@@ -1,16 +1,61 @@
 services:
-  kitsune:
-    image: dovakiin0/kitsune:latest
+  web:
+    build:
+      context: .
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:8000
+        NEXT_PUBLIC_POCKETBASE_URL: http://localhost:8090
+        NEXT_PUBLIC_PROXY_URL: http://localhost:4040
     ports:
-      - "3000:3000"
-    environment:
-      - NEXT_PUBLIC_POCKETBASE_URL=http://localhost:8090
-      - NEXT_PUBLIC_PROXY_URL=http://localhost:4040
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+      pocketbase:
+        condition: service_healthy
+      proxy:
+        condition: service_started
+    restart: unless-stopped
+
+  api:
+    build:
+      context: ./miruro-api
+    ports:
+      - "127.0.0.1:8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/').read()"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+  pocketbase:
+    build:
+      context: ./pocketbase
+    ports:
+      - "127.0.0.1:8090:8090"
+    env_file:
+      - .env.backend
+    volumes:
+      - pb_data:/pb_data
+      - ./docs/pb.json:/pb_collections.json:ro
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8090/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    restart: unless-stopped
 
   proxy:
     image: dovakiin0/proxy-m3u8:latest
     ports:
-      - "4040:4040"
+      - "127.0.0.1:4040:4040"
     environment:
-      - PORT=4040
-      - CORS_DOMAIN=localhost:3000
+      PORT: "4040"
+      CORS_DOMAIN: "localhost:3000"
+    restart: unless-stopped
+
+volumes:
+  pb_data:

@@ -8,6 +8,7 @@ import BlurFade from "./ui/blur-fade";
 import { useGetRecentAnime } from "@/query/get-recent-anime";
 import Button from "./common/custom-button";
 import { ArrowLeft, ArrowRight } from "lucide-react";
+import SectionHeading from "./section-heading";
 
 type Props = {
   loading?: boolean;
@@ -20,14 +21,24 @@ const LatestEpisodesAnime = ({ loading: initialLoading }: Props) => {
   const episodesList = data?.results || [];
   const hasNextPage = data?.hasNextPage ?? false;
 
-  if (isLoading || isFetching || initialLoading || !episodesList.length) {
+  if (isLoading || isFetching || initialLoading) {
     return <LoadingSkeleton />;
   }
 
+  if (!episodesList.length) {
+    return (
+      <Container className="py-7 sm:py-9">
+        <div className="rounded-2xl border border-white/[0.07] bg-white/[0.025] px-4 py-8 text-center text-sm text-zinc-400">
+          No recent releases are available right now.
+        </div>
+      </Container>
+    );
+  }
+
   return (
-    <Container className="flex flex-col gap-5 py-10 items-center lg:items-start lg:mt-[-10.125rem] z-20">
-      <h5 className="text-2xl font-bold text-white">Recent Releases</h5>
-      <div className="grid lg:grid-cols-5 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-7 w-full gap-5 content-center">
+    <Container className="relative z-20 flex flex-col gap-4 py-7 items-center lg:items-start lg:mt-[-7rem] sm:gap-5 sm:py-9">
+      <SectionHeading eyebrow="Just Added" title="Recent Releases" />
+      <div className="grid w-full grid-cols-2 content-start gap-x-3 gap-y-5 sm:grid-cols-3 sm:gap-4 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7">
         {episodesList.map((anime, idx) => {
           const title =
             anime.title?.english || anime.title?.romaji || anime.title?.native || "Untitled";
@@ -74,14 +85,14 @@ const LatestEpisodesAnime = ({ loading: initialLoading }: Props) => {
 
 const LoadingSkeleton = () => {
   return (
-    <Container className="flex flex-col gap-5 py-10 items-center lg:items-start lg:mt-[-10.125rem] z-20 ">
+    <Container className="relative z-20 flex flex-col gap-4 py-7 items-center lg:items-start lg:mt-[-7rem] sm:gap-5 sm:py-9">
       <div className="h-10 w-[15.625rem] animate-pulse bg-slate-700"></div>
-      <div className="grid lg:grid-cols-5 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-7 w-full gap-5 content-center">
+      <div className="grid w-full grid-cols-2 content-start gap-x-3 gap-y-5 sm:grid-cols-3 sm:gap-4 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7">
         {[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1].map((_, idx) => {
           return (
             <div
               key={idx}
-              className="rounded-xl h-[15.625rem] min-w-[10.625rem] max-w-[12.625rem] md:h-[18.75rem] md:max-w-[12.5rem] animate-pulse bg-slate-700"
+              className="aspect-[2/3] w-full rounded-2xl animate-pulse bg-white/[0.06]"
             ></div>
           );
         })}

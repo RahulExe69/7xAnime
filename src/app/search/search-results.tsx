@@ -1,10 +1,11 @@
 "use client";
 
 import React from "react";
+import SearchBar from "@/components/search-bar";
+import { Search, SearchX } from "lucide-react";
 import { ROUTES } from "@/constants/routes";
 import AnimeCard from "@/components/anime-card";
 
-import BlurFade from "@/components/ui/blur-fade";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useGetSearchAnimeResults } from "@/query/get-search-results";
 import Pagination from "@/components/common/pagination";
@@ -24,11 +25,22 @@ import Button from "@/components/common/custom-button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { cn } from "@/lib/utils";
 
+const COLLECTION_TITLES: Record<string, string> = {
+  new: "New Today",
+  "currently-airing": "Currently Airing",
+  trending: "Trending Now",
+  popular: "All-Time Popular",
+  upcoming: "Coming Next Season",
+  "top-airing": "Top Rated Airing Now",
+  completed: "Top Completed Series",
+};
+
 const SearchResults = () => {
   const params = useAnimeSearchParams();
   const router = useRouter();
   const searchParams = useSearchParams();
   const displayPhrase = params.q.replace(/^"+|"+$/g, "").trim();
+  const collectionTitle = params.collection ? COLLECTION_TITLES[params.collection] : undefined;
 
   const { data: searchResults, isLoading } = useGetSearchAnimeResults(params);
 
@@ -101,9 +113,9 @@ const SearchResults = () => {
   };
 
   return (
-    <div className="flex flex-col gap-10 mt-28 lg:mt-36 pb-20 min-h-[75vh]">
-      <div className="bg-slate-800 bg-opacity-50 backdrop-blur-sm rounded-lg p-5 flex flex-col gap-5">
-        <p className="text-lg font-semibold">Filters</p>
+    <div className="mx-auto flex min-h-[75vh] w-full max-w-[1600px] flex-col gap-6 px-4 pb-16 pt-28 text-[#211e38] sm:gap-8 md:px-6 lg:pt-32 lg:px-8 dark:text-white">
+      <div className="flex flex-col gap-5 rounded-2xl border border-[#dedbea] bg-white p-4 shadow-[0_5px_20px_rgba(37,25,81,0.035)] sm:p-6 dark:border-[#302c40] dark:bg-[#191724]">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div className="flex items-center gap-2"><Search className="h-5 w-5 text-[#604bd3] dark:text-[#b6a8ff]" /><p className="text-lg font-semibold">{collectionTitle ? `Browse ${collectionTitle}` : "Find your next anime"}</p></div><span className="text-xs text-[#77728f] dark:text-[#a39db9]">{collectionTitle ? `Curated list: ${collectionTitle}` : "Search by title or narrow it down with filters"}</span></div><SearchBar className="max-w-2xl" showFilterButton={false} /><p className="text-sm font-semibold text-[#5f5a73] dark:text-zinc-300">Refine results</p>
         <div className="flex flex-wrap gap-3">
           <Select
             options={types}
@@ -158,11 +170,11 @@ const SearchResults = () => {
                 key={genre.value}
                 size="sm"
                 className={cn(
-                  "border border-slate-700 hover:border-[#e9376b] hover:text-[#e9376b] hover:bg-transparent",
-                  "data-[state=on]:border-[#e9376b] data-[state=on]:text-white data-[state=on]:bg-[#e9376b]",
+                  "rounded-full border border-[#dedbea] bg-[#f8f7fd] text-[#625d79] hover:border-[#8b79e3] hover:text-[#604bd3] hover:bg-[#eeeafb] dark:border-[#393449] dark:bg-[#201d2a] dark:text-[#c7c1dc] dark:hover:bg-[#302b42]",
+                  "data-[state=on]:border-[#8b79e3] data-[state=on]:text-[#4935bd] data-[state=on]:bg-[#e5e0fb] dark:data-[state=on]:border-[#8b79e3] dark:data-[state=on]:text-white dark:data-[state=on]:bg-violet-500/30",
                   filters.genres?.split(",").includes(genre.value)
-                    ? "bg-[#e9376b] text-white"
-                    : "text-slate-300",
+                    ? "bg-[#e5e0fb] text-[#4935bd] dark:bg-violet-500/30 dark:text-white"
+                    : "text-[#625d79] dark:text-slate-300",
                 )}
               >
                 {genre.label}
@@ -173,7 +185,7 @@ const SearchResults = () => {
         <div className="flex items-center gap-2 mt-4">
           <Button
             size="sm"
-            className="w-[6.25rem] hover:bg-[#e9376b] bg-[#e9376b] text-white"
+            className="w-[6.25rem] rounded-xl bg-[#604bd3] text-white hover:bg-[#5140c4]"
             onClick={applyFilters}
           >
             Filter
@@ -188,40 +200,45 @@ const SearchResults = () => {
           </Button>
         </div>
       </div>
-      <div className="text-2xl font-semibold">
-        {displayPhrase === "" ? (
-          "Filter Results"
-        ) : (
+      <div className="text-xl font-semibold tracking-tight sm:text-2xl">
+        {collectionTitle || (displayPhrase === "" ? "Filter Results" : (
           <>
             Search Results for{" "}
             <span className="font-[800]">&quot;{params.q}&quot;</span>
           </>
-        )}
+        ))}
       </div>
       {isLoading && (
-        <div className="grid lg:grid-cols-5 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-7 w-full gap-5 content-center">
+        <div className="grid w-full grid-cols-2 content-start gap-x-3 gap-y-5 sm:grid-cols-3 sm:gap-4 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7">
           {[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1].map((_, idx) => {
             return (
               <div
                 key={idx}
-                className="rounded-xl h-[15.625rem] min-w-[10.625rem] max-w-[12.625rem] md:h-[18.75rem] md:max-w-[12.5rem] animate-pulse bg-slate-700"
+                className="aspect-[2/3] w-full rounded-2xl animate-pulse bg-[#e9e7f2] dark:bg-white/[0.06]"
               ></div>
             );
           })}
         </div>
       )}
-      <div className="grid lg:grid-cols-5 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-7 w-full gap-5 content-center">
-        {searchResults?.animes.map((anime, idx) => (
-          <BlurFade key={idx} delay={idx * 0.05} inView>
-            <AnimeCard
-              title={anime.name}
-              format={anime.type}
-              poster={anime.poster}
-              href={`${ROUTES.ANIME_DETAILS}/${anime.id}`}
-              className="self-center justify-self-center"
-              showGenre={false}
-            />
-          </BlurFade>
+      {!isLoading && searchResults?.animes?.length === 0 && (
+        <div className="flex flex-col items-center justify-center rounded-2xl border border-[#dedbea] bg-white px-5 py-12 text-center dark:border-[#302c40] dark:bg-[#191724]">
+          <SearchX className="mb-3 h-8 w-8 text-violet-300" />
+          <h3 className="text-base font-semibold text-[#211e38] dark:text-white">No anime found</h3>
+          <p className="mt-1 max-w-sm text-sm text-[#77728f] dark:text-zinc-400">Try a different title or loosen a few filters.</p>
+        </div>
+      )}
+      <div className="grid w-full grid-cols-2 content-start gap-x-3 gap-y-5 sm:grid-cols-3 sm:gap-4 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7">
+        {searchResults?.animes.map((anime) => (
+          <AnimeCard
+            key={anime.id}
+            title={anime.name}
+            format={anime.type}
+            poster={anime.poster}
+            href={ROUTES.animeDetails(anime.id)}
+            quickWatchHref={ROUTES.watchAnime(anime.id)}
+            className="w-full min-w-0"
+            showGenre={false}
+          />
         ))}
       </div>
       {searchResults && searchResults.totalPages && (

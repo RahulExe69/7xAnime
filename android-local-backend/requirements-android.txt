@@ -1,0 +1,5 @@
+# Keep these pinned to the Pydantic v1 line: pydantic-core is not needed.
+fastapi==0.99.1
+pydantic==1.10.19
+uvicorn==0.30.6
+httpx==0.27.2

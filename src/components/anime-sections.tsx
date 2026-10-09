@@ -10,6 +10,7 @@ import { ROUTES } from "@/constants/routes";
 
 import Button from "./common/custom-button";
 import { ArrowLeft, ArrowRight } from "lucide-react";
+import SectionHeading from "./section-heading";
 
 type Props = {
   animeList: MediaList[];
@@ -28,11 +29,21 @@ const AnimeSections = ({
   hasNextPage = false,
   onPageChange,
 }: Props) => {
-  if (loading || !animeList?.length) return <LoadingSkeleton />;
+  if (loading) return <LoadingSkeleton />;
+  if (!animeList?.length) {
+    return (
+      <Container className="flex flex-col gap-4 py-7 sm:py-9">
+        <SectionHeading eyebrow="Explore the archive" title={sectionTitle} />
+        <div className="w-full rounded-2xl border border-white/[0.07] bg-white/[0.025] px-4 py-8 text-center text-sm text-zinc-400">
+          No anime to display right now. Try again in a little while.
+        </div>
+      </Container>
+    );
+  }
   return (
-    <Container className="flex flex-col gap-5 py-10 items-center lg:items-start ">
-      <h5 className="text-2xl font-bold text-white">{sectionTitle}</h5>
-      <div className="grid lg:grid-cols-5 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-7 w-full gap-5 content-center">
+    <Container id={sectionTitle.toLowerCase().includes("trending") ? "trending" : undefined} className="scroll-mt-24 flex flex-col items-center gap-4 py-7 sm:gap-5 sm:py-9 lg:items-start">
+      <SectionHeading eyebrow="Explore the archive" title={sectionTitle} />
+      <div className="grid w-full grid-cols-2 content-start gap-x-3 gap-y-5 sm:grid-cols-3 sm:gap-4 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7">
         {animeList.map((anime, idx) => {
           const title =
             anime.title?.english || anime.title?.romaji || anime.title?.native || "Untitled";
@@ -47,7 +58,8 @@ const AnimeSections = ({
                 score={anime.averageScore}
                 poster={poster}
                 className="self-center justify-self-center"
-                href={`${ROUTES.ANIME_DETAILS}/${anime.id}`}
+                href={ROUTES.animeDetails(anime.id)}
+                quickWatchHref={ROUTES.watchAnime(anime.id)}
               />
             </BlurFade>
           );
@@ -58,16 +70,16 @@ const AnimeSections = ({
           <Button
             onClick={() => onPageChange(Math.max(page - 1, 1))}
             disabled={page <= 1}
-            className="rounded-full bg-slate-800 border border-slate-700 h-9 w-9 p-0 hover:bg-slate-700 disabled:opacity-40"
+            className="h-9 w-9 rounded-full border border-white/10 bg-white/5 p-0 hover:bg-violet-500/15 disabled:opacity-40"
           >
-            <ArrowLeft className="text-white h-4 w-4" />
+            <ArrowLeft className="h-4 w-4 text-white" />
           </Button>
           <Button
             onClick={() => onPageChange(page + 1)}
             disabled={!hasNextPage}
-            className="rounded-full bg-slate-800 border border-slate-700 h-9 w-9 p-0 hover:bg-slate-700 disabled:opacity-40"
+            className="h-9 w-9 rounded-full border border-white/10 bg-white/5 p-0 hover:bg-violet-500/15 disabled:opacity-40"
           >
-            <ArrowRight className="text-white h-4 w-4" />
+            <ArrowRight className="h-4 w-4 text-white" />
           </Button>
         </div>
       )}
@@ -77,14 +89,14 @@ const AnimeSections = ({
 
 const LoadingSkeleton = () => {
   return (
-    <Container className="flex flex-col gap-5 py-10 items-center lg:items-start ">
+    <Container className="flex flex-col gap-4 py-7 items-center lg:items-start sm:gap-5 sm:py-9">
       <div className="h-10 w-[15.625rem] animate-pulse bg-slate-700"></div>
-      <div className="grid lg:grid-cols-5 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-7 w-full gap-5 content-center">
+      <div className="grid w-full grid-cols-2 content-start gap-x-3 gap-y-5 sm:grid-cols-3 sm:gap-4 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7">
         {[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1].map((_, idx) => {
           return (
             <div
               key={idx}
-              className="rounded-xl h-[15.625rem] min-w-[10.625rem] max-w-[12.625rem] md:h-[18.75rem] md:max-w-[12.5rem] animate-pulse bg-slate-700"
+              className="aspect-[2/3] w-full rounded-2xl animate-pulse bg-white/[0.06]"
             ></div>
           );
         })}

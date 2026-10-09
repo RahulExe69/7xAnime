@@ -1,9 +1,9 @@
 "use client";
-import React from "react";
+import React, { Suspense } from "react";
 import VideoPlayerSection from "./video-player-section";
 
 const page = () => {
-  return <VideoPlayerSection />;
+  return <Suspense fallback={<div className="min-h-[60vh]" />}><VideoPlayerSection /></Suspense>;
 };
 
 export default page;

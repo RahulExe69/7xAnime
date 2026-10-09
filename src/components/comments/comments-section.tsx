@@ -8,6 +8,7 @@ import Avatar from "@/components/common/avatar";
 import { Button } from "@/components/ui/button";
 import { formatDistanceToNow } from "date-fns";
 import LoginPopoverButton from "@/components/login-popover-button";
+import { isLocalBackendEnabled } from "@/lib/api";
 
 type Props = {
   animeId: string;
@@ -64,6 +65,17 @@ const CommentsSection = ({ animeId, animeTitle, episodeNumber }: Props) => {
 
   const comments = data?.pages.flatMap((page) => page.comments) || [];
   const totalComments = data?.pages[0]?.totalItems || 0;
+
+  if (isLocalBackendEnabled()) {
+    return (
+      <div className="my-6 rounded-xl border border-white/10 bg-white/[0.03] p-4">
+        <h3 className="text-sm font-semibold text-zinc-200">Community comments</h3>
+        <p className="mt-1 text-xs leading-5 text-zinc-400">
+          Comments require a shared server and are unavailable in this standalone build. Anime browsing and playback work independently in guest mode.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-4 w-full py-6 bg-[#0f172a]/30 p-5 rounded-2xl border border-slate-800">

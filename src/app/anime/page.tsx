@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { Suspense, useEffect, useState } from "react";
 import Image from "next/image";
 
 import parse from "html-react-parser";
@@ -24,8 +24,8 @@ import {
   Heart,
   TvMinimalPlay,
 } from "lucide-react";
-import { useParams } from "next/navigation";
 import { useGetAnimeDetails } from "@/query/get-anime-details";
+import { useSearchParams } from "next/navigation";
 import Loading from "@/app/loading";
 import { useAuthStore } from "@/store/auth-store";
 import { toast } from "sonner";
@@ -59,8 +59,10 @@ const SelectOptions: ISelectOptions[] = [
   },
 ];
 
-const Page = () => {
-  const { slug } = useParams();
+const PageContent = () => {
+  const searchParams = useSearchParams();
+  const slug = searchParams.get("id") || "";
+
   const { data: anime, isLoading } = useGetAnimeDetails(slug as string);
   const { auth } = useAuthStore();
   const { bookmarks, createOrUpdateBookMark } = useBookMarks({
@@ -101,8 +103,8 @@ const Page = () => {
   return isLoading || !anime ? (
     <Loading />
   ) : (
-    <div className="w-full z-50">
-      <div className="h-[30vh] md:h-[40vh] w-full relative ">
+    <div className="relative z-10 w-full pb-8 text-[#211e38] dark:text-white">
+      <div className="relative h-[26vh] min-h-[190px] w-full overflow-hidden md:h-[34vh] md:min-h-[280px]">
         <Image
           src={
             anime.anime.info.bannerImage || anime.anime.info.poster
@@ -110,31 +112,31 @@ const Page = () => {
           alt={anime.anime.info.name}
           height={100}
           width={100}
-          className="h-full w-full object-cover"
+          className="h-full w-full object-cover opacity-80"
           unoptimized
         />
 
         <WatchTrailer
           videoHref={anime.anime.info.promotionalVideos[0]?.source}
         />
-        <div className="absolute h-full w-full inset-0 m-auto bg-gradient-to-r from-slate-900 to-transparent"></div>
+        <div className="absolute inset-0 m-auto h-full w-full bg-gradient-to-r from-[#09090f]/95 via-[#09090f]/45 to-transparent"></div>
       </div>
-      <Container className="z-50 md:space-y-10 pb-20">
-        <div className="flex md:mt-[-9.375rem] mt-[-6.25rem] md:flex-row flex-col md:items-end md:gap-20 gap-10 ">
+      <Container className="relative z-10 -mt-16 space-y-7 pb-16 md:-mt-24 md:space-y-8">
+        <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:gap-6 md:gap-8">
           <AnimeCard
             title={anime.anime.info.name}
             poster={anime.anime.info.poster}
-            href={`${ROUTES.ANIME_DETAILS}/${anime.anime.info.id}`}
+            href={ROUTES.animeDetails(anime.anime.info.id)}
             displayDetails={false}
             variant="lg"
             className="shrink-0"
           />
-          <div className="flex flex-col md:gap-5 gap-2 pb-16">
-            <h1 className="md:text-5xl text-2xl md:font-black font-extrabold z-[9]">
+          <div className="flex min-w-0 flex-col gap-3 pb-2 sm:pb-4">
+            <h1 className="z-[9] text-2xl font-extrabold leading-tight tracking-tight sm:text-3xl md:text-4xl">
               {anime.anime.info.name}
             </h1>
-            <div className="flex items-center gap-5">
-              <WatchButton />
+            <div className="flex flex-wrap items-center gap-3">
+              <WatchButton animeId={anime.anime.info.id} />
               {auth && (
                 <Select
                   placeholder="Add to list"
@@ -148,17 +150,17 @@ const Page = () => {
           </div>
         </div>
         <Tabs defaultValue="overview" className="w-full">
-          <TabsList className="flex items-center justify-start w-fit text-2xl h-fit">
+          <TabsList className="flex h-fit w-full items-center justify-start gap-1 overflow-x-auto rounded-xl border border-[#dedbea] bg-white p-1 text-base dark:border-[#302c40] dark:bg-[#191724]">
             <TabsTrigger
               value="overview"
-              className="md:text-2xl text-lg font-semibold"
+              className="rounded-lg px-3 py-2 text-sm font-semibold text-[#625d79] data-[state=active]:bg-[#eae6fb] data-[state=active]:text-[#604bd3] dark:text-zinc-300 dark:data-[state=active]:bg-[#30294a] dark:data-[state=active]:text-[#c5baff] sm:text-base"
             >
               Overview
             </TabsTrigger>
 
             <TabsTrigger
               value="episodes"
-              className="md:text-2xl text-lg font-semibold"
+              className="md:text-2xl text-lg font-semibold text-[#625d79] data-[state=active]:text-[#604bd3] dark:text-zinc-300 dark:data-[state=active]:text-[#c5baff]"
             >
               Episodes
             </TabsTrigger>
@@ -182,11 +184,11 @@ const Page = () => {
 
           <TabsContent
             value="overview"
-            className="w-full grid md:grid-cols-5 grid-cols-1 gap-x-20 gap-y-5 mt-10"
+            className="mt-6 grid w-full grid-cols-1 gap-x-10 gap-y-7 md:grid-cols-5 md:gap-y-5"
           >
-            <div className="col-span-1 flex flex-col gap-5 w-full">
+            <div className="col-span-1 flex w-full flex-col gap-4">
               <h3 className="text-xl font-semibold">Details</h3>
-              <div className="grid grid-cols-2 w-full md:text-base text-xs gap-y-2 gap-x-20 md:gap-x-0">
+              <div className="grid w-full grid-cols-[90px_minmax(0,1fr)] gap-x-3 gap-y-2 text-xs sm:text-sm md:grid-cols-2 md:gap-x-2">
                 <h3>Aired</h3>
                 <span>{anime.anime.moreInfo.aired}</span>
 
@@ -209,9 +211,9 @@ const Page = () => {
                 <span>{anime.anime.moreInfo.studios}</span>
               </div>
             </div>
-            <div className="col-span-4 flex flex-col gap-5">
+            <div className="col-span-4 flex flex-col gap-3">
               <h3 className="text-xl font-semibold">Description</h3>
-              <div className="md:text-base text-xs leading-6 text-gray-300">
+              <div className="text-sm leading-7 text-[#625d79] dark:text-zinc-300">
                 {parse(anime.anime.info.description || "")}
               </div>
             </div>
@@ -219,10 +221,10 @@ const Page = () => {
 
           <TabsContent
             value="relations"
-            className="w-full flex flex-col gap-5 "
+            className="flex w-full flex-col gap-4"
           >
             <h3 className="text-xl font-semibold">Relations</h3>
-            <div className="grid lg:grid-cols-5 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-7 w-full gap-5 content-center">
+            <div className="grid w-full grid-cols-2 content-start gap-x-3 gap-y-5 sm:grid-cols-3 sm:gap-4 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7">
               {anime.seasons.map((relation, idx) => {
                 return (
                   !relation.isCurrent && (
@@ -232,7 +234,8 @@ const Page = () => {
                       subTitle={relation.title}
                       poster={relation.poster}
                       className="self-center justify-self-center"
-                      href={`${ROUTES.ANIME_DETAILS}/${relation.id}`}
+                      href={ROUTES.animeDetails(relation.id)}
+                      quickWatchHref={ROUTES.watchAnime(relation.id)}
                     />
                   )
                 );
@@ -249,7 +252,7 @@ const Page = () => {
               className="w-full flex flex-col gap-5 "
             >
               <h3 className="text-xl font-semibold">Anime Characters</h3>
-              <div className="grid lg:grid-cols-5 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-7 w-full gap-5 content-center">
+              <div className="grid w-full grid-cols-2 content-start gap-x-3 gap-y-5 sm:grid-cols-3 sm:gap-4 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7">
                 {anime.anime.info.charactersVoiceActors.map(
                   (character, idx) => {
                     return (
@@ -278,5 +281,11 @@ const Page = () => {
   );
   //eslint-disable-next-line
 };
+
+const Page = () => (
+  <Suspense fallback={<Loading />}>
+    <PageContent />
+  </Suspense>
+);
 
 export default Page;

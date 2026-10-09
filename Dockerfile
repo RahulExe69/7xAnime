@@ -14,6 +14,16 @@ RUN  npm install
 # 2. Rebuild the source code only when needed
 FROM base AS builder
 WORKDIR /app
+
+# Public browser endpoints are embedded by Next.js at build time.
+# Compose supplies localhost values for local development; production builds
+# must pass the real public HTTPS endpoint URLs as build args.
+ARG NEXT_PUBLIC_API_URL=http://localhost:8000
+ARG NEXT_PUBLIC_POCKETBASE_URL=http://localhost:8090
+ARG NEXT_PUBLIC_PROXY_URL=http://localhost:4040
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_POCKETBASE_URL=$NEXT_PUBLIC_POCKETBASE_URL
+ENV NEXT_PUBLIC_PROXY_URL=$NEXT_PUBLIC_PROXY_URL
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
@@ -25,11 +35,9 @@ RUN npm run build
 FROM base AS runner
 WORKDIR /app
 
-LABEL org.opencontainers.image.title="Kitsune" \
-  org.opencontainers.image.description="Anime streaming app" \
-  org.opencontainers.image.maintainer="dovakiin0@kitsunee.online" \
-  org.opencontainers.image.source="https://github.com/dovakiin0/Kitsune.git" \
-  org.opencontainers.image.vendor="kitsunee.online"
+LABEL org.opencontainers.image.title="7xAnime" \
+  org.opencontainers.image.description="7xAnime web app" \
+  org.opencontainers.image.source="https://github.com/RahulExe69/7xAnime"
 
 RUN addgroup -g 1001 -S nodejs
 RUN adduser -S nextjs -u 1001

@@ -10,6 +10,7 @@ export const useAnimeSearchParams = (): SearchAnimeParams => {
 
     return {
       q: get("q") ?? "",
+      collection: get("collection"),
       page: searchParams.get("page") ? parseInt(searchParams.get("page")!) : 1,
       type: get("type"),
       status: get("status"),

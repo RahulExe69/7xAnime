@@ -1,109 +1,37 @@
 "use client";
 
-import ContinueWatching from "@/components/continue-watching";
-import FeaturedCollection from "@/components/featured-collection";
+import React from "react";
 import { useGetSpotlightAnime } from "@/query/get-spotlight-anime";
 import { useGetRecentAnime } from "@/query/get-recent-anime";
-import { useGetPopularAnime } from "@/query/get-popular-anime";
-import { useGetTrendingAnime } from "@/query/get-trending-anime";
-import { useGetUpcomingAnime } from "@/query/get-upcoming-anime";
 import dynamic from "next/dynamic";
+import AnimeShelf from "@/components/anime-shelf";
+import ContinueWatching from "@/components/continue-watching";
+import DeferredAnimeShelf from "@/components/deferred-anime-shelf";
+import DeferredMount from "@/components/deferred-mount";
 
-// Dynamically import components
 const HeroSection = dynamic(() => import("@/components/hero-section"));
-const LatestEpisodesAnime = dynamic(
-  () => import("@/components/latest-episodes-section"),
-);
 const AnimeSchedule = dynamic(() => import("@/components/anime-schedule"));
-const AnimeSections = dynamic(() => import("@/components/anime-sections"));
-
-import React, { useState, useMemo } from "react";
-
-import RecentCommentsSection from "@/components/recent-comments-section";
+const RecentCommentsSection = dynamic(() => import("@/components/recent-comments-section"));
 
 export default function Home() {
-  const [trendingPage, setTrendingPage] = useState(1);
-  const [upcomingPage, setUpcomingPage] = useState(1);
-
-  const { data: spotlightList = [], isLoading: isLoadingSpotlight } =
-    useGetSpotlightAnime();
-  const { data: recentRes, isLoading: isLoadingRecent } = useGetRecentAnime();
-  const { data: popularRes, isLoading: isLoadingPopular } =
-    useGetPopularAnime();
-  const { data: trendingRes, isLoading: isLoadingTrending } =
-    useGetTrendingAnime(trendingPage, 14);
-  const { data: upcomingRes, isLoading: isLoadingUpcoming } =
-    useGetUpcomingAnime(upcomingPage, 14);
-
-  const recentList = recentRes?.results || [];
-  const popularList = popularRes?.results || [];
-  const trendingList = trendingRes?.results || [];
-  const upcomingList = upcomingRes?.results || [];
-
-  // Store first 3 records into dedicated variables so pagination page changes in other sections don't re-trigger FeaturedCollection
-  const featuredFavoriteList = useMemo(
-    () => popularList.slice(0, 3),
-    [popularList.length > 0 ? popularList[0]?.id : null],
-  );
-  const featuredPopularList = useMemo(
-    () => popularList.slice(3, 6),
-    [popularList.length > 0 ? popularList[0]?.id : null],
-  );
-  const featuredRecentList = useMemo(
-    () => recentList.slice(0, 3),
-    [recentList.length > 0 ? recentList[0]?.id : null],
-  );
+  const { data: spotlightList = [], isLoading: loadingSpotlight } = useGetSpotlightAnime();
+  const { data: recentRes, isLoading: loadingRecent } = useGetRecentAnime(1, 18);
 
   return (
-    <div className="flex flex-col bg-[#121212]">
-      <HeroSection
-        spotlightAnime={spotlightList}
-        isDataLoading={isLoadingSpotlight}
-      />
-
-      <LatestEpisodesAnime loading={isLoadingRecent} />
-
-      <ContinueWatching loading={false} />
-
-      <FeaturedCollection
-        loading={isLoadingPopular || isLoadingRecent}
-        featuredAnime={[
-          {
-            title: "Most Favorite Anime",
-            anime: featuredFavoriteList,
-          },
-          {
-            title: "Most Popular Anime",
-            anime: featuredPopularList,
-          },
-          {
-            title: "Recent Completed Anime",
-            anime: featuredRecentList,
-          },
-        ]}
-      />
-
-      <AnimeSections
-        title="Trending Anime"
-        animeList={trendingList}
-        loading={isLoadingTrending}
-        page={trendingPage}
-        hasNextPage={trendingRes?.hasNextPage}
-        onPageChange={(p) => setTrendingPage(p)}
-      />
-
-      <AnimeSchedule />
-
-      <RecentCommentsSection />
-
-      <AnimeSections
-        title="Upcoming Animes"
-        animeList={upcomingList}
-        loading={isLoadingUpcoming}
-        page={upcomingPage}
-        hasNextPage={upcomingRes?.hasNextPage}
-        onPageChange={(p) => setUpcomingPage(p)}
-      />
-    </div>
+    <main className="min-h-screen overflow-x-clip bg-[#0c0b12] pb-10 text-white">
+      <div id="continue-watching" className="scroll-mt-20">
+        <ContinueWatching loading={false} />
+      </div>
+      <HeroSection spotlightAnime={spotlightList} isDataLoading={loadingSpotlight} />
+      <AnimeShelf title="New Today" eyebrow="Recently updated" mode="new" viewAllHref="/search?collection=new" items={recentRes?.results || []} loading={loadingRecent} />
+      <DeferredAnimeShelf collection="currently-airing" title="Currently Airing" eyebrow="On the air" viewAllHref="/search?collection=currently-airing" />
+      <DeferredAnimeShelf collection="trending" title="Trending Now" eyebrow="Popular this week" viewAllHref="/search?collection=trending" />
+      <DeferredAnimeShelf collection="popular" title="All-Time Popular" eyebrow="Fan favourites" viewAllHref="/search?collection=popular" />
+      <DeferredAnimeShelf collection="upcoming" title="Coming Next Season" eyebrow="Up next" viewAllHref="/search?collection=upcoming" />
+      <DeferredAnimeShelf collection="top-airing" title="Top Rated Airing Now" eyebrow="Highest rated this season" viewAllHref="/search?collection=top-airing" />
+      <DeferredAnimeShelf collection="completed" title="Top Completed Series" eyebrow="Worth catching up on" viewAllHref="/search?collection=completed" />
+      <DeferredMount minHeight="480px"><div className="mt-4"><AnimeSchedule /></div></DeferredMount>
+      <DeferredMount minHeight="240px"><RecentCommentsSection /></DeferredMount>
+    </main>
   );
 }

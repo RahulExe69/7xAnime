@@ -11,7 +11,7 @@ import Container from "./container";
 import { Button } from "./ui/button";
 
 import React from "react";
-import { ArrowLeft, ArrowRight } from "lucide-react";
+import { ArrowLeft, ArrowRight, Play } from "lucide-react";
 
 import { ROUTES } from "@/constants/routes";
 import { ButtonLink } from "./common/button-link";
@@ -25,35 +25,53 @@ type IHeroSectionProps = {
 
 const HeroSection = (props: IHeroSectionProps) => {
   const [api, setApi] = React.useState<CarouselApi>();
+  const [selectedSlide, setSelectedSlide] = React.useState(0);
+
+  React.useEffect(() => {
+    if (!api) return;
+    const updateSelected = () => setSelectedSlide(api.selectedScrollSnap());
+    updateSelected();
+    api.on("select", updateSelected);
+    api.on("reInit", updateSelected);
+    return () => {
+      api.off("select", updateSelected);
+      api.off("reInit", updateSelected);
+    };
+  }, [api]);
 
   if (props.isDataLoading || !props.spotlightAnime?.length)
     return <LoadingSkeleton />;
 
   return (
-    <div className="h-[80vh] w-full relative">
-      <Carousel className="w-full" setApi={setApi} opts={{ loop: true }}>
-        <CarouselContent>
+    <div className="relative h-[62svh] min-h-[420px] max-h-[600px] w-full overflow-hidden md:h-[76vh] md:min-h-[540px] md:max-h-[720px]">
+      <Carousel className="h-full w-full" setApi={setApi} opts={{ loop: true }}>
+        <CarouselContent className="h-full">
           {props.spotlightAnime.map((anime, index) => (
-            <CarouselItem key={anime.id || index}>
+            <CarouselItem key={anime.id || index} className="h-full">
               <HeroCarouselItem anime={anime} />
             </CarouselItem>
           ))}
         </CarouselContent>
       </Carousel>
-      <div className="absolute hidden md:flex items-center gap-5 right-10 3xl:bottom-10 bottom-24 z-50 isolate">
+      <div className="absolute bottom-3 left-1/2 z-50 flex -translate-x-1/2 items-center gap-2 md:bottom-5">
+        {props.spotlightAnime.map((anime, index) => (
+          <button key={anime.id || index} type="button" aria-label={`Show spotlight ${index + 1}`} aria-current={selectedSlide === index ? "true" : undefined} onClick={() => api?.scrollTo(index)} className={`h-2 rounded-full transition-all duration-200 ${selectedSlide === index ? "w-7 bg-[#ff2f9d]" : "w-2 bg-[#77728f]/30 hover:bg-[#77728f]/55 dark:bg-white/25 dark:hover:bg-white/50"}`} />
+        ))}
+      </div>
+      <div className="absolute hidden md:flex items-center gap-5 right-10 3xl:bottom-10 bottom-20 z-50 isolate">
         <Button
           onClick={() => {
             api?.scrollPrev();
           }}
-          className="rounded-full bg-transparent border border-white h-10 w-10 hover:bg-slate-500"
+          className="h-10 w-10 rounded-full border border-white/20 bg-black/40 text-white backdrop-blur hover:bg-[#ff2f9d]"
         >
-          <ArrowLeft className="text-white shrink-0" />
+          <ArrowLeft className="shrink-0" />
         </Button>
         <Button
           onClick={() => api?.scrollNext()}
           className="rounded-full bg-transparent border border-white h-10 w-10 hover:bg-slate-500"
         >
-          <ArrowRight className="text-white shrink-0" />
+          <ArrowRight className="shrink-0" />
         </Button>
       </div>
     </div>
@@ -71,34 +89,34 @@ const HeroCarouselItem = ({ anime }: { anime: MediaList }) => {
 
   return (
     <div
-      className="w-full bg-cover bg-no-repeat bg-center h-[80vh] relative"
+      className="relative h-[62svh] min-h-[420px] max-h-[600px] w-full bg-cover bg-center bg-no-repeat md:h-[76vh] md:min-h-[540px] md:max-h-[720px]"
       style={{ backgroundImage: `url(${bgImage})` }}
     >
       {/* Gradient Overlay */}
-      <div className="absolute h-full w-full inset-0 m-auto bg-gradient-to-r from-slate-900 via-slate-900/80 to-transparent z-10"></div>
-      <div className="absolute h-full w-full inset-0 m-auto bg-gradient-to-t from-slate-900 via-slate-900/40 to-transparent z-10"></div>
+      <div className="absolute h-full w-full inset-0 m-auto bg-gradient-to-r from-black/75 via-black/40 to-transparent z-10"></div>
+      <div className="absolute h-full w-full inset-0 m-auto bg-gradient-to-t from-[#0b0a10] via-[#0b0a10]/30 to-transparent z-10"></div>
 
       {/* Content Section */}
-      <div className="w-full h-[calc(100%-5.25rem)] relative z-20">
-        <Container className="w-full h-full flex flex-col justify-end md:justify-center pb-10">
-          <div className="space-y-3 lg:w-[45vw]">
-            <h1 className="text-3xl md:text-5xl font-black text-white line-clamp-2">
+      <div className="relative z-20 h-full w-full">
+        <Container className="flex h-full w-full flex-col justify-end pb-12 pt-24 md:justify-center md:pb-10 md:pt-20">
+          <div className="max-w-2xl space-y-3 md:space-y-4 lg:w-[48vw]">
+            <h1 className="line-clamp-3 max-w-[13ch] text-[2rem] font-black leading-[1.08] tracking-[-0.035em] text-white drop-shadow-2xl sm:max-w-[16ch] sm:text-4xl md:line-clamp-2 md:text-5xl lg:text-6xl">
               {title}
             </h1>
 
             <div className="flex flex-wrap items-center gap-2 text-xs">
               {anime.format && (
-                <Badge className="bg-[#e9376b] text-white font-bold">
+                <Badge className="border-0 bg-[#ff2f9d] text-white font-semibold">
                   {anime.format}
                 </Badge>
               )}
               {anime.seasonYear && (
-                <Badge variant="outline" className="text-gray-300 border-gray-600">
+                <Badge variant="outline" className="text-gray-100 border-white/35">
                   {anime.season ? `${anime.season} ` : ""}{anime.seasonYear}
                 </Badge>
               )}
               {!!anime.averageScore && (
-                <Badge variant="secondary" className="bg-yellow-500/20 text-yellow-300 border border-yellow-500/40">
+                <Badge variant="secondary" className="bg-black/40 text-yellow-200 border border-yellow-300/30">
                   ⭐ {anime.averageScore}% Score
                 </Badge>
               )}
@@ -109,12 +127,19 @@ const HeroCarouselItem = ({ anime }: { anime: MediaList }) => {
               ))}
             </div>
 
-            <div className="flex items-center gap-5 !mt-6">
+            <div className="!mt-6 flex flex-wrap items-center gap-3">
               <ButtonLink
-                href={`${ROUTES.ANIME_DETAILS}/${anime.id}`}
-                className="h-10 text-md bg-[#e9376b] text-white hover:bg-[#e9376b]"
+                href={ROUTES.watchAnime(anime.id)}
+                LeftIcon={Play}
+                className="h-12 rounded-xl bg-[#ff2f9d] px-5 text-sm font-bold text-white shadow-lg shadow-[#ff2f9d]/25 transition hover:bg-[#e51e86]"
               >
-                Learn More
+                Watch Now
+              </ButtonLink>
+              <ButtonLink
+                href={ROUTES.animeDetails(anime.id)}
+                className="h-12 rounded-xl border border-white/30 bg-black/20 px-5 text-sm font-semibold text-white backdrop-blur transition hover:bg-black/35"
+              >
+                View Details
               </ButtonLink>
             </div>
           </div>
@@ -126,21 +151,21 @@ const HeroCarouselItem = ({ anime }: { anime: MediaList }) => {
 
 const LoadingSkeleton = () => {
   return (
-    <div className="h-[80vh] w-full relative">
-      <div className="w-full h-[calc(100%-5.25rem)] mt-[5.25rem] relative z-20">
-        <Container className="w-full h-full flex flex-col justify-end md:justify-center pb-10">
+    <div className="relative h-[62svh] min-h-[420px] max-h-[600px] w-full overflow-hidden md:h-[76vh] md:min-h-[540px] md:max-h-[720px]">
+      <div className="relative z-20 h-full w-full">
+        <Container className="flex h-full w-full flex-col justify-end pb-12 pt-24 md:justify-center md:pb-10 md:pt-20">
           <div className="space-y-2 lg:w-[40vw]">
-            <div className="h-16 animate-pulse bg-slate-700 w-[75%]"></div>
-            <div className="h-40 animate-pulse w-full bg-slate-700"></div>
+            <div className="h-16 w-[75%] animate-pulse rounded-2xl bg-white/[0.08]"></div>
+            <div className="h-24 w-full animate-pulse rounded-xl bg-white/[0.06]"></div>
             <div className="flex items-center gap-5">
-              <span className="h-10 w-[7.5rem] animate-pulse bg-slate-700"></span>
+              <span className="h-10 w-[7.5rem] animate-pulse rounded-xl bg-white/[0.08]"></span>
               <span className="h-10 w-[7.5rem] animate-pulse bg-slate-700"></span>
             </div>
           </div>
         </Container>
       </div>
       <div className="absolute hidden md:flex items-center gap-5 right-10 bottom-32 z-50 isolate">
-        <span className="h-10 w-10 rounded-full animate-pulse bg-slate-700"></span>
+        <span className="h-10 w-10 animate-pulse rounded-full bg-white/[0.08]"></span>
         <span className="h-10 w-10 rounded-full animate-pulse bg-slate-700"></span>
       </div>
     </div>

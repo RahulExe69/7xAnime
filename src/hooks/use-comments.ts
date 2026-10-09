@@ -3,6 +3,7 @@ import { IComment } from "@/types/comment";
 import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from "react-query";
 import { toast } from "sonner";
 import { useAuthStore } from "@/store/auth-store";
+import { isLocalBackendEnabled } from "@/lib/api";
 
 export const GET_COMMENTS_KEY = "GET_COMMENTS";
 export const GET_RECENT_COMMENTS_KEY = "GET_RECENT_COMMENTS";
@@ -44,7 +45,7 @@ export const useGetComments = ({
         totalPages: res.totalPages,
       };
     },
-    enabled: !!animeId,
+    enabled: !isLocalBackendEnabled() && !!animeId,
     staleTime: 1000 * 60 * 2, // 2 minutes cache
     refetchOnWindowFocus: false,
   });
@@ -120,7 +121,7 @@ export const useGetInfiniteComments = ({
       }
       return undefined;
     },
-    enabled: !!animeId,
+    enabled: !isLocalBackendEnabled() && !!animeId,
     staleTime: 0,
     refetchOnWindowFocus: true,
   });
@@ -145,6 +146,7 @@ export const useGetRecentComments = (limit: number = 10) => {
         return [];
       }
     },
+    enabled: !isLocalBackendEnabled(),
     staleTime: 0,
     refetchOnWindowFocus: true,
   });
@@ -164,6 +166,9 @@ export const useAddComment = () => {
 
   return useMutation({
     mutationFn: async (input: AddCommentInput) => {
+      if (isLocalBackendEnabled()) {
+        throw new Error("Comments are unavailable in the standalone APK because they require a shared server.");
+      }
       if (!auth) {
         throw new Error("You must be logged in to comment.");
       }
