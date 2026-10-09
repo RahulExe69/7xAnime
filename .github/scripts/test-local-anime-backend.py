@@ -149,6 +149,14 @@ class LocalAnimeApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200, response.text)
         self.assertEqual(response.json()["streams"], [])
 
+    def test_provider_error_diagnostics_remove_upstream_urls(self) -> None:
+        message = local_api._safe_provider_error(
+            RuntimeError("HTTP 403 fetching https://example.invalid/path")
+        )
+        self.assertIn("HTTP 403", message)
+        self.assertIn("<upstream URL>", message)
+        self.assertNotIn("example.invalid", message)
+
     def test_provider_watch_timeout_is_reported_with_actionable_diagnostics(self) -> None:
         async def slow_watch(anilist_id, audio, episode, ctx):
             await asyncio.sleep(0.1)
