@@ -102,6 +102,16 @@ public final class StreamingNavigationWebViewClient extends BridgeWebViewClient 
         return isBlockedAdHost(url.getHost());
     }
 
+    private static void reportBlockedNavigation(WebView view, Uri url) {
+        if (view == null) return;
+        String host = url == null || url.getHost() == null
+            ? ""
+            : url.getHost().replaceAll("[^A-Za-z0-9.\\-]", "");
+        String script = "window.dispatchEvent(new CustomEvent('7xanime:blocked-player-action',{detail:{reason:'top-level-redirect',host:'"
+            + host + "'}}));";
+        view.post(() -> view.evaluateJavascript(script, null));
+    }
+
     private static WebResourceResponse blockedResponse() {
         // A successful empty response avoids noisy net::ERR_BLOCKED_BY_CLIENT
         // errors in players that tolerate missing ad scripts or tracking pixels.
@@ -141,6 +151,7 @@ public final class StreamingNavigationWebViewClient extends BridgeWebViewClient 
         }
         if (isExternalTopLevel(url)) {
             Log.d(TAG, "Blocked external top-level navigation: " + url.getScheme() + "://" + url.getHost());
+            reportBlockedNavigation(view, url);
             return true;
         }
         return super.shouldOverrideUrlLoading(view, request);
