@@ -324,7 +324,7 @@ class LocalAnimeApiTests(unittest.TestCase):
 
         async def exercise() -> None:
             with patch.object(animenosub, "fetch_text", new=AsyncMock(return_value=series_html)):
-                episodes = await animenosub.scrape_series("attack-on-titan-dub")
+                episodes = await animenosub.episode_catalogue("attack-on-titan-dub")
             self.assertEqual(len(episodes), 1)
             self.assertTrue(episodes[0]["hasDub"])
             self.assertFalse(episodes[0]["hasSub"])
