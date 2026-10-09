@@ -318,20 +318,51 @@ def install_navigation_guard(main_activity: Path) -> None:
 
 
 def install_streaming_chrome_client(main_activity: Path) -> None:
-    """Use a Chrome client that supports video fullscreen and suppresses popup dialogs."""
+    """Install popup filtering, native iframe fullscreen, and fullscreen Back handling."""
     text = main_activity.read_text(encoding="utf-8")
-    statement = "getBridge().getWebView().setWebChromeClient(new StreamingWebChromeClient(getBridge()));"
-    if statement in text:
-        return
+    text = add_import(text, "import com.sevenx.anime.StreamingWebChromeClient;")
 
-    super_call = re.search(
-        r"super\.onCreate\s*\(\s*savedInstanceState\s*\)\s*;",
-        text,
+    class_match = re.search(r"class\s+MainActivity\s+extends\s+BridgeActivity\s*\{", text)
+    if not class_match:
+        fail("Could not locate MainActivity class to install streaming Chrome client.")
+
+    field = "private StreamingWebChromeClient streamingWebChromeClient;"
+    if field not in text:
+        position = class_match.end()
+        text = text[:position] + "\n    " + field + "\n" + text[position:]
+
+    statement = (
+        "streamingWebChromeClient = new StreamingWebChromeClient(getBridge());"
+        "\n        getBridge().getWebView().setWebChromeClient(streamingWebChromeClient);"
     )
-    if not super_call:
-        fail("Could not find MainActivity.onCreate super call to install fullscreen Chrome client.")
-    position = super_call.end()
-    text = text[:position] + "\n        " + statement + text[position:]
+    if "setWebChromeClient(streamingWebChromeClient)" not in text:
+        super_call = re.search(
+            r"super\.onCreate\s*\(\s*savedInstanceState\s*\)\s*;",
+            text,
+        )
+        if not super_call:
+            fail("Could not find MainActivity.onCreate super call to install fullscreen Chrome client.")
+        position = super_call.end()
+        text = text[:position] + "\n        " + statement + text[position:]
+
+    back_marker = "streamingWebChromeClient.handleBackPressed()"
+    if back_marker not in text:
+        if re.search(r"void\s+onBackPressed\s*\(", text):
+            fail("MainActivity already overrides onBackPressed; add fullscreen handling to that override explicitly.")
+        close = text.rfind("}")
+        if close < class_match.end():
+            fail("Could not locate MainActivity class terminator for fullscreen Back handler.")
+        method = (
+            "\n    @Override\n"
+            "    public void onBackPressed() {\n"
+            "        if (streamingWebChromeClient != null && streamingWebChromeClient.handleBackPressed()) {\n"
+            "            return;\n"
+            "        }\n"
+            "        super.onBackPressed();\n"
+            "    }\n"
+        )
+        text = text[:close] + method + text[close:]
+
     main_activity.write_text(text, encoding="utf-8")
 
 
