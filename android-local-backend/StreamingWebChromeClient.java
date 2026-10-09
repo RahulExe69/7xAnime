@@ -50,6 +50,15 @@ public final class StreamingWebChromeClient extends BridgeWebChromeClient {
         this.bridgeRef = bridge;
     }
 
+    private static void reportBlockedPlayerAction(WebView view, String reason, String host) {
+        if (view == null) return;
+        String safeReason = reason == null ? "blocked" : reason.replaceAll("[^A-Za-z0-9_-]", "");
+        String safeHost = host == null ? "" : host.replaceAll("[^A-Za-z0-9.\\-]", "");
+        String script = "window.dispatchEvent(new CustomEvent('7xanime:blocked-player-action',{detail:{reason:'"
+            + safeReason + "',host:'" + safeHost + "'}}));";
+        view.post(() -> view.evaluateJavascript(script, null));
+    }
+
     private static boolean isAppOrigin(String rawUrl) {
         if (rawUrl == null || rawUrl.isEmpty()) return false;
         Uri uri = Uri.parse(rawUrl);
@@ -64,6 +73,7 @@ public final class StreamingWebChromeClient extends BridgeWebChromeClient {
         // Never spawn a new WebView/window for pop-under ads or target=_blank.
         // Normal in-frame navigation continues through StreamingNavigationWebViewClient.
         Log.d(TAG, "Blocked third-party popup window");
+        reportBlockedPlayerAction(view, "popup", safeHost(view == null ? "" : view.getUrl()));
         return false;
     }
 
@@ -72,6 +82,7 @@ public final class StreamingWebChromeClient extends BridgeWebChromeClient {
         if (!isAppOrigin(url)) {
             Log.d(TAG, "Cancelled third-party JavaScript alert from " + safeHost(url));
             result.cancel();
+            reportBlockedPlayerAction(view, "javascript-alert", safeHost(url));
             return true;
         }
         return super.onJsAlert(view, url, message, result);
@@ -82,6 +93,7 @@ public final class StreamingWebChromeClient extends BridgeWebChromeClient {
         if (!isAppOrigin(url)) {
             Log.d(TAG, "Cancelled third-party JavaScript confirm from " + safeHost(url));
             result.cancel();
+            reportBlockedPlayerAction(view, "javascript-confirm", safeHost(url));
             return true;
         }
         return super.onJsConfirm(view, url, message, result);
@@ -92,6 +104,7 @@ public final class StreamingWebChromeClient extends BridgeWebChromeClient {
         if (!isAppOrigin(url)) {
             Log.d(TAG, "Cancelled third-party JavaScript prompt from " + safeHost(url));
             result.cancel();
+            reportBlockedPlayerAction(view, "javascript-prompt", safeHost(url));
             return true;
         }
         return super.onJsPrompt(view, url, message, defaultValue, result);
@@ -105,6 +118,7 @@ public final class StreamingWebChromeClient extends BridgeWebChromeClient {
         if (!isAppOrigin(origin)) {
             Log.d(TAG, "Denied web permission request from " + safeHost(origin));
             if (request != null) request.deny();
+            reportBlockedPlayerAction(getBridgeWebView(), "permission-request", safeHost(origin));
             return;
         }
         super.onPermissionRequest(request);
