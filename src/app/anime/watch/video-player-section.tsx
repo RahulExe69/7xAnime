@@ -466,7 +466,42 @@ const VideoPlayerSection = () => {
   const selectableServerProviderNames = serverProviderNames.filter(
     (providerName) => isProviderSelectable(providerName, activeCategory),
   );
-  const selectedProviderIndex = selectableServerProviderNames.indexOf(currentProviderName);
+
+  // Hide providers that failed for this exact anime/episode/audio selection.
+  // Global failure counters are diagnostic only: a source can fail on one
+  // episode and still work elsewhere.
+  const failedServerProviderNames = selectableServerProviderNames.filter(
+    (providerName) => providerPlaybackOutcomes[providerName] === "failed",
+  );
+  const visibleServerProviderNames = selectableServerProviderNames.filter(
+    (providerName) => providerPlaybackOutcomes[providerName] !== "failed",
+  );
+
+  useEffect(() => {
+    if (!isLocalBackendEnabled() || !hasManualProviderSelection || isLoadingData) return;
+    const failed = isEpisodeDataError || (!!episodeData && (
+      !hasPlayableSources ||
+      (!!episodeData.providerStatus && episodeData.providerStatus !== "ok")
+    ));
+    if (!failed) return;
+
+    const providerName = episodeData?.provider || currentProviderName;
+    if (!providerName || providerName === "auto") return;
+    setProviderPlaybackOutcomes((previous) =>
+      previous[providerName] === "failed"
+        ? previous
+        : { ...previous, [providerName]: "failed" },
+    );
+  }, [
+    currentProviderName,
+    episodeData,
+    hasManualProviderSelection,
+    hasPlayableSources,
+    isEpisodeDataError,
+    isLoadingData,
+  ]);
+
+  const selectedProviderIndex = visibleServerProviderNames.indexOf(currentProviderName);
   const fallbackServerNumber = 1;
   const activeServerNumber = isHindiMode
     ? selectedHindiServer + 1
@@ -579,11 +614,26 @@ const VideoPlayerSection = () => {
             <Button size="sm" title="Server 1 — MegaPlay" aria-label="Server 1 — MegaPlay" onClick={() => selectFallbackServer()} className={`h-10 min-w-12 rounded-xl px-2.5 text-xs font-extrabold transition ${activeServerNumber === 1 && (useFallback || isFallbackActive) ? "bg-[#ff2f9d] text-white" : "border border-white/[0.08] bg-white/[0.035] text-zinc-300 hover:border-[#ff2f9d]/30 hover:bg-[#ff2f9d]/10"}`}>
               <span className="flex flex-col items-center gap-0.5 leading-none"><span>1</span><span className="text-[8px] font-semibold opacity-80">MegaPlay</span></span>
             </Button>
-            {selectableServerProviderNames.map((providerName, index) => (
-              <Button key={`${activeCategory}-${providerName}`} size="sm" title={getServerProviderTitle(selectableServerProviderNames, providerName)} aria-label={getServerProviderTitle(selectableServerProviderNames, providerName)} onClick={() => handleProviderSelect(providerName, activeCategory)} className={`h-10 min-w-12 rounded-xl px-2.5 text-xs font-extrabold transition ${currentProviderName === providerName && !useFallback && !isHindiMode ? "bg-[#ff2f9d] text-white" : "border border-white/[0.08] bg-white/[0.035] text-zinc-300 hover:border-[#ff2f9d]/30 hover:bg-[#ff2f9d]/10"}`}>
+            {visibleServerProviderNames.map((providerName, index) => (
+              <Button key={`${activeCategory}-${providerName}`} size="sm" title={getServerProviderTitle(visibleServerProviderNames, providerName)} aria-label={getServerProviderTitle(visibleServerProviderNames, providerName)} onClick={() => handleProviderSelect(providerName, activeCategory)} className={`h-10 min-w-12 rounded-xl px-2.5 text-xs font-extrabold transition ${currentProviderName === providerName && !useFallback && !isHindiMode ? "bg-[#ff2f9d] text-white" : "border border-white/[0.08] bg-white/[0.035] text-zinc-300 hover:border-[#ff2f9d]/30 hover:bg-[#ff2f9d]/10"}`}>
                 <span className="flex flex-col items-center gap-0.5 leading-none"><span>{index + 2}</span><span className="text-[8px] font-semibold opacity-80">{getProviderDisplayName(providerName)}</span></span>
               </Button>
             ))}
+            {failedServerProviderNames.length > 0 && (
+              <Button
+                size="sm"
+                variant="ghost"
+                title="Show servers that failed for this episode so they can be retried"
+                onClick={() => setProviderPlaybackOutcomes((previous) => {
+                  const updated = { ...previous };
+                  for (const providerName of failedServerProviderNames) delete updated[providerName];
+                  return updated;
+                })}
+                className="h-9 rounded-xl px-3 text-[11px] font-semibold text-zinc-500 hover:text-zinc-200"
+              >
+                Retry failed ({failedServerProviderNames.length})
+              </Button>
+            )}
             {isLocalBackendEnabled() && !nativeCatalogueComplete && availableProviderNames.length === 0 && (
               <span className="px-2 text-xs text-zinc-500" role="status">Finding servers…</span>
             )}
