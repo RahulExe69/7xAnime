@@ -4,10 +4,9 @@ import React, { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Search, X } from "lucide-react";
+import { Info, Search, X } from "lucide-react";
 import useDebounce from "@/hooks/use-debounce";
 import { useSearchAnime } from "@/query/search-anime";
-import { useGetTrendingAnime } from "@/query/get-trending-anime";
 import { ROUTES } from "@/constants/routes";
 import AnimeLanguageBadges from "@/components/anime-language-badges";
 
@@ -19,7 +18,6 @@ export default function SearchOverlay({ open, onClose }: Props) {
   const debouncedValue = useDebounce(value, 280);
   const router = useRouter();
   const { data: results, isLoading } = useSearchAnime(debouncedValue.trim());
-  const { data: trendingResponse } = useGetTrendingAnime(1, 10);
   const query = debouncedValue.trim();
 
   useEffect(() => {
@@ -41,13 +39,6 @@ export default function SearchOverlay({ open, onClose }: Props) {
     };
   }, [open, onClose, router]);
 
-  const trending = useMemo(
-    () => (trendingResponse?.results || [])
-      .map((anime) => anime.title?.english || anime.title?.romaji || anime.title?.native || "")
-      .filter(Boolean)
-      .slice(0, 10),
-    [trendingResponse?.results],
-  );
   if (!open) return null;
 
   const submitSearch = (search = value) => {
@@ -86,7 +77,7 @@ export default function SearchOverlay({ open, onClose }: Props) {
                   <div className="min-w-0 flex-1"><p className="line-clamp-2 text-sm font-bold text-[#28243f] dark:text-white">{anime.name || anime.jname}</p><p className="mt-1 text-xs text-[#7f7996] dark:text-[#aaa4c0]">{anime.moreInfo?.filter(Boolean).join(" · ") || anime.type || "Anime"}</p></div>
                   <span className="px-1 text-xs font-semibold text-[#8b83a3]">▶</span>
                   </Link>
-                  <Link href={ROUTES.animeDetails(anime.id)} onClick={onClose} title={`Details for ${anime.name || anime.jname}`} aria-label={`Details for ${anime.name || anime.jname}`} className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-[#dedbea] text-[#77718f] hover:bg-[#ded8f5] dark:border-[#38344a] dark:text-[#bdb6d2] dark:hover:bg-white/10"><span aria-hidden="true">i</span></Link>
+                  <Link href={ROUTES.animeDetails(anime.id)} onClick={onClose} title={`Details for ${anime.name || anime.jname}`} aria-label={`Details for ${anime.name || anime.jname}`} className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-[#dedbea] text-[#77718f] hover:bg-[#ded8f5] dark:border-[#38344a] dark:text-[#bdb6d2] dark:hover:bg-white/10"><Info className="h-4 w-4" aria-hidden="true" /></Link>
                 </div>
               ))}</div>
             ) : (
