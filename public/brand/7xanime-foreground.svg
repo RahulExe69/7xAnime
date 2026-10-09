@@ -14,11 +14,11 @@
   </linearGradient>
 </defs>
 <!-- Angular brush-stroke 7: sharp cuts give the mark an anime action-line silhouette. -->
-<path d="M68 82 L442 68 L414 136 L324 151 L166 430 L88 430 L218 151 L58 164 Z" fill="url(#sevenFill)"/>
+<path d="M64 78 L445 63 L412 137 L337 152 L150 435 L72 435 L247 152 L52 168 Z" fill="url(#sevenFill)"/>
 <path d="M88 99 L164 96 L109 113 Z M383 86 L424 82 L405 105 Z M151 397 L188 322 L166 406 Z" fill="#ffffff" opacity=".78"/>
-<!-- The magenta x cuts through the 7's diagonal so the two characters read as one fused mark. -->
-<path d="M270 253 L302 226 L352 275 L398 225 L433 252 L386 300 L426 341 L394 371 L352 330 L309 370 L276 341 L320 299 Z" fill="url(#xFill)"/>
-<path d="M276 247 L302 226 L332 254 L303 247 Z M394 225 L433 252 L411 273 L422 250 Z M396 371 L372 348 L396 355 L414 346 Z" fill="#ff9bd2" opacity=".9"/>
-<path d="M242 250 L257 241 L281 266 L268 276 Z M430 220 L447 204 L457 216 L440 236 Z M268 361 L284 346 L298 362 L282 377 Z" fill="#ff2f9d"/>
+<!-- The pink x sits just off the descending stroke so the white numeral still reads unmistakably as 7. -->
+<path d="M284 253 L316 226 L366 275 L412 225 L447 252 L400 300 L440 341 L408 371 L366 330 L323 370 L290 341 L334 299 Z" fill="url(#xFill)"/>
+<path d="M290 247 L316 226 L346 254 L317 247 Z M408 225 L447 252 L425 273 L436 250 Z M410 371 L386 348 L410 355 L428 346 Z" fill="#ff9bd2" opacity=".9"/>
+<path d="M444 220 L461 204 L471 216 L454 236 Z M282 361 L298 346 L312 362 L296 377 Z" fill="#ff2f9d"/>
 
 </svg>
