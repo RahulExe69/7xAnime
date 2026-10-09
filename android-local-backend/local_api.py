@@ -38,8 +38,14 @@ app.include_router(router)
 # Last per-provider stream-extraction outcome; messages are sanitized before display.
 _LOCAL_PROVIDER_DIAGNOSTICS: dict[str, dict] = {}
 _LOCAL_WATCH_CACHE: dict[tuple, tuple[float, list]] = {}
-LOCAL_WATCH_TIMEOUT = 22.0
+LOCAL_CONTEXT_TIMEOUT = 30.0
+LOCAL_CONTEXT_CACHE_TTL = 600.0
+LOCAL_WATCH_TIMEOUT = 45.0
 LOCAL_WATCH_CACHE_TTL = 35.0
+LOCAL_ROUTE_TIMEOUT = 80.0
+_LOCAL_CONTEXT_CACHE: dict[int, tuple[float, dict]] = {}
+_LOCAL_CONTEXT_TASKS: dict[int, asyncio.Task] = {}
+_LOCAL_CONTEXT_LOCK = asyncio.Lock()
 
 
 def _safe_provider_error(error: Exception) -> str:
@@ -48,14 +54,71 @@ def _safe_provider_error(error: Exception) -> str:
     return f"{type(error).__name__}: {message[:180]}" if message else type(error).__name__
 
 
-def _record_local_provider_outcome(name: str, outcome: str, message: str | None, seconds: float, *, cached: bool = False) -> None:
+def _record_local_provider_outcome(
+    name: str,
+    outcome: str,
+    message: str | None,
+    seconds: float,
+    *,
+    anilist_id: int,
+    episode: int,
+    audio: str,
+    cached: bool = False,
+) -> None:
     _LOCAL_PROVIDER_DIAGNOSTICS[name] = {
         "outcome": outcome,
         "message": message,
         "seconds": round(max(0.0, seconds), 3),
         "at": int(time.time()),
+        "anilistId": int(anilist_id),
+        "episode": int(episode),
+        "audio": str(audio),
         "cached": cached,
     }
+
+
+async def _get_local_provider_context(anilist_id: int) -> dict:
+    """Share and cache AniList/AniZip identity setup across episode discovery and playback."""
+    anime_id = int(anilist_id)
+    now = time.time()
+    async with _LOCAL_CONTEXT_LOCK:
+        cached = _LOCAL_CONTEXT_CACHE.get(anime_id)
+        if cached and cached[0] > now:
+            return cached[1]
+        if cached:
+            _LOCAL_CONTEXT_CACHE.pop(anime_id, None)
+
+        task = _LOCAL_CONTEXT_TASKS.get(anime_id)
+        if task is None:
+            task = asyncio.create_task(provider_race.build_ctx(anime_id))
+            _LOCAL_CONTEXT_TASKS[anime_id] = task
+
+    try:
+        context = await asyncio.wait_for(
+            asyncio.shield(task),
+            timeout=LOCAL_CONTEXT_TIMEOUT,
+        )
+    except asyncio.TimeoutError as error:
+        raise RuntimeError(
+            f"Provider metadata setup timed out after {LOCAL_CONTEXT_TIMEOUT:.0f}s"
+        ) from error
+    except Exception:
+        async with _LOCAL_CONTEXT_LOCK:
+            if task.done() and _LOCAL_CONTEXT_TASKS.get(anime_id) is task:
+                _LOCAL_CONTEXT_TASKS.pop(anime_id, None)
+        raise
+
+    if not isinstance(context, dict) or not isinstance(context.get("media"), dict):
+        raise RuntimeError("Provider metadata setup returned an invalid context.")
+
+    async with _LOCAL_CONTEXT_LOCK:
+        _LOCAL_CONTEXT_CACHE[anime_id] = (
+            time.time() + LOCAL_CONTEXT_CACHE_TTL,
+            context,
+        )
+        if _LOCAL_CONTEXT_TASKS.get(anime_id) is task:
+            _LOCAL_CONTEXT_TASKS.pop(anime_id, None)
+    return context
 
 # Episode discovery should not hold the watch page hostage while every scraper
 # finishes. Context creation and each provider scraper run in the background so
@@ -90,7 +153,7 @@ async def _start_episode_provider_discovery(anilist_id: int, state: dict) -> Non
             state["expires_at"] = time.time() + _EPISODE_DISCOVERY_TTL
             return
 
-        ctx = await provider_race.build_ctx(anilist_id)
+        ctx = await _get_local_provider_context(anilist_id)
         state["tasks"] = [
             asyncio.create_task(_collect_episode_provider(anilist_id, name, mod, ctx, state))
             for name, mod in mods
@@ -212,6 +275,9 @@ async def local_provider_status():
             "failuresSinceLastSuccess": failures,
             "lastOutcome": attempt.get("outcome"),
             "lastError": attempt.get("message"),
+            "anilistId": attempt.get("anilistId"),
+            "episode": attempt.get("episode"),
+            "audio": attempt.get("audio"),
             "lastAttemptSeconds": attempt.get("seconds"),
             "lastAttemptAt": attempt.get("at"),
             "lastAttemptCached": attempt.get("cached", False),
@@ -265,7 +331,7 @@ async def _watch_one_for_player(mod, name, anilist_id, ep, audio, ctx):
     now = time.time()
     if cached and cached[0] > now:
         streams = cached[1]
-        _record_local_provider_outcome(name, "streams_returned", None, 0.0, cached=True)
+        _record_local_provider_outcome(name, "streams_returned", None, 0.0, anilist_id=anilist_id, episode=ep, audio=audio, cached=True)
         return name, streams, 0.0, bool(streams)
     if cached:
         _LOCAL_WATCH_CACHE.pop(key, None)
@@ -283,11 +349,11 @@ async def _watch_one_for_player(mod, name, anilist_id, ep, audio, ctx):
         message = f"Provider timed out after {LOCAL_WATCH_TIMEOUT:.0f}s"
         if str(error).strip():
             message += f" ({type(error).__name__})"
-        _record_local_provider_outcome(name, "timeout", message, seconds)
+        _record_local_provider_outcome(name, "timeout", message, seconds, anilist_id=anilist_id, episode=ep, audio=audio)
         return name, [], seconds, False
     except Exception as error:
         seconds = time.monotonic() - started
-        _record_local_provider_outcome(name, "request_error", _safe_provider_error(error), seconds)
+        _record_local_provider_outcome(name, "request_error", _safe_provider_error(error), seconds, anilist_id=anilist_id, episode=ep, audio=audio)
         return name, [], seconds, False
 
     seconds = time.monotonic() - started
@@ -295,7 +361,8 @@ async def _watch_one_for_player(mod, name, anilist_id, ep, audio, ctx):
     playable = _playable_streams(raw_streams)
     if not raw_streams:
         _record_local_provider_outcome(
-            name, "no_sources", "Provider returned no stream for this anime, episode and audio.", seconds
+            name, "no_sources", "Provider returned no stream for this anime, episode and audio.", seconds,
+            anilist_id=anilist_id, episode=ep, audio=audio
         )
         return name, [], seconds, False
     if not playable:
@@ -303,11 +370,15 @@ async def _watch_one_for_player(mod, name, anilist_id, ep, audio, ctx):
             name, "unsupported_format",
             "Provider returned sources, but none are supported (HLS, MP4 or embed; DASH is not enabled).",
             seconds,
+            anilist_id=anilist_id, episode=ep, audio=audio,
         )
         return name, [], seconds, False
 
     _LOCAL_WATCH_CACHE[key] = (time.time() + LOCAL_WATCH_CACHE_TTL, playable)
-    _record_local_provider_outcome(name, "streams_returned", None, seconds)
+    _record_local_provider_outcome(
+        name, "streams_returned", None, seconds,
+        anilist_id=anilist_id, episode=ep, audio=audio,
+    )
     return name, playable, seconds, True
 
 
@@ -316,7 +387,7 @@ async def _race_watch_for_player(anilist_id: int, episode: int, audio: str) -> d
     mods = provider_race.providers()
     if not mods:
         return None
-    ctx = await provider_race.build_ctx(anilist_id)
+    ctx = await _get_local_provider_context(anilist_id)
     pending = {
         asyncio.create_task(_watch_one_for_player(mod, name, anilist_id, episode, audio, ctx))
         for name, mod in mods
@@ -429,7 +500,7 @@ async def legacy_watch_route(provider: str, anilist_id: int, audio: str, episode
                 "subtitles": [],
             }
 
-        ctx = await provider_race.build_ctx(anilist_id)
+        ctx = await _get_local_provider_context(anilist_id)
         actual_name, streams, seconds, ok = await _watch_one_for_player(
             module, preferred, anilist_id, episode_number, audio, ctx
         )
@@ -452,7 +523,7 @@ async def legacy_watch_route(provider: str, anilist_id: int, audio: str, episode
     # Bound provider context creation and extraction together. The direct provider
     # branch uses _watch_one's shorter per-provider timeout; Auto races everyone.
     try:
-        data = await asyncio.wait_for(extract_streams(), timeout=28.0)
+        data = await asyncio.wait_for(extract_streams(), timeout=LOCAL_ROUTE_TIMEOUT)
     except asyncio.TimeoutError:
         print(
             f"[7XAnime] stream lookup timed out for provider={provider}, "
@@ -465,7 +536,7 @@ async def legacy_watch_route(provider: str, anilist_id: int, audio: str, episode
             "provider": preferred or ("auto" if is_auto else requested_provider),
             "requestedProvider": preferred or ("auto" if is_auto else requested_provider),
             "providerStatus": "timeout",
-            "providerError": "The selected stream lookup exceeded the 28-second request budget.",
+            "providerError": "The selected stream lookup exceeded the request budget.",
             "streams": [],
             "subtitles": [],
         }

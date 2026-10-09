@@ -167,6 +167,26 @@ class LocalAnimeApiTests(unittest.TestCase):
         self.assertIn("<upstream URL>", message)
         self.assertNotIn("example.invalid", message)
 
+    def test_provider_context_is_cached_across_discovery_and_playback(self) -> None:
+        anime_id = 987654
+        fake_context = {"media": {"id": anime_id, "title": {"english": "Test"}}, "anizip": None}
+
+        async def exercise() -> None:
+            with patch.object(
+                local_api.provider_race,
+                "build_ctx",
+                new=AsyncMock(return_value=fake_context),
+            ) as build_context:
+                first = await local_api._get_local_provider_context(anime_id)
+                second = await local_api._get_local_provider_context(anime_id)
+                self.assertIs(first, fake_context)
+                self.assertIs(second, fake_context)
+                build_context.assert_awaited_once_with(anime_id)
+            local_api._LOCAL_CONTEXT_CACHE.pop(anime_id, None)
+            local_api._LOCAL_CONTEXT_TASKS.pop(anime_id, None)
+
+        asyncio.run(exercise())
+
     def test_provider_watch_timeout_is_reported_with_actionable_diagnostics(self) -> None:
         async def slow_watch(anilist_id, audio, episode, ctx):
             await asyncio.sleep(0.1)
@@ -191,6 +211,9 @@ class LocalAnimeApiTests(unittest.TestCase):
                 diagnostic = local_api._LOCAL_PROVIDER_DIAGNOSTICS["test-provider"]
                 self.assertEqual(diagnostic["outcome"], "timeout")
                 self.assertIn("timed out", diagnostic["message"].lower())
+                self.assertEqual(diagnostic["anilistId"], 12345)
+                self.assertEqual(diagnostic["episode"], 1)
+                self.assertEqual(diagnostic["audio"], "sub")
             finally:
                 local_api.LOCAL_WATCH_TIMEOUT = previous_timeout
                 local_api._LOCAL_WATCH_CACHE.pop(("test-provider", 12345, 1, "sub"), None)

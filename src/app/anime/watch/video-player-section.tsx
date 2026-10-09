@@ -31,7 +31,10 @@ type LocalProviderDiagnostic = {
   averageSeconds: number | null;
   episodesSeconds: number | null;
   failuresSinceLastSuccess: number;
-  lastOutcome?: "streams_returned" | "no_sources" | "unsupported_format" | "timeout" | "request_error" | string | null;
+  lastOutcome?: string | null;
+  anilistId?: number | null;
+  episode?: number | null;
+  audio?: string | null;
   lastError?: string | null;
   lastAttemptSeconds?: number | null;
   lastAttemptAt?: number | null;
@@ -46,6 +49,16 @@ type LocalProviderStatus = {
   providers: LocalProviderDiagnostic[];
   note: string;
 };
+
+const isProviderDiagnosticForSelection = (
+  item: LocalProviderDiagnostic,
+  anilistId: string | number | undefined,
+  episode: number | string,
+  audio: string,
+): boolean =>
+  item.anilistId === Number(anilistId)
+  && item.episode === Number(episode)
+  && item.audio === audio;
 
 const updateEpisodeUrl = (episodeId: string, episodeNumber: number) => {
   if (typeof window === "undefined") return;
@@ -683,21 +696,27 @@ const VideoPlayerSection = () => {
               <div key={item.id} className="flex items-center justify-between gap-3 rounded-lg bg-white/[0.025] px-2.5 py-2">
                 <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                   <span className="truncate font-semibold text-zinc-300">{getProviderDisplayName(item.id)}</span>
-                  {item.lastError && <span title={item.lastError} className="break-words text-[10px] leading-4 text-rose-300/90">{item.lastError}</span>}
+                  {isProviderDiagnosticForSelection(item, animeIdParam, currentEpNumber, activeCategory) && item.lastError && <span title={item.lastError} className="break-words text-[10px] leading-4 text-rose-300/90">{item.lastError}</span>}
                 </span>
                 <span className="shrink-0 text-right">
                   <span className={
                     providerPlaybackOutcomes[item.id] === "playing"
                       ? "text-emerald-300"
-                      : providerPlaybackOutcomes[item.id] === "failed" || item.status === "recent_attempts_failed" || item.status === "module_unavailable"
+                      : providerPlaybackOutcomes[item.id] === "failed"
                         ? "text-rose-300"
-                        : item.status === "recent_attempt_succeeded" ? "text-sky-300" : "text-zinc-500"
+                        : !isProviderDiagnosticForSelection(item, animeIdParam, currentEpNumber, activeCategory)
+                          ? "text-zinc-500"
+                          : item.status === "recent_attempts_failed" || item.status === "module_unavailable"
+                            ? "text-rose-300"
+                            : item.status === "recent_attempt_succeeded" ? "text-sky-300" : "text-zinc-500"
                   }>
                     {providerPlaybackOutcomes[item.id] === "playing"
                       ? "Playback OK"
                       : providerPlaybackOutcomes[item.id] === "failed"
                         ? "Playback failed"
-                        : item.status === "module_unavailable"
+                        : !isProviderDiagnosticForSelection(item, animeIdParam, currentEpNumber, activeCategory)
+                          ? "Not tested for this episode"
+                          : item.status === "module_unavailable"
                           ? "Module missing"
                           : item.status === "not_tested_yet"
                             ? "Not tested"

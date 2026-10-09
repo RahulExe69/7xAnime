@@ -407,12 +407,16 @@ def copy_python_source() -> None:
     # provider or Server 1. Successful providers still return as soon as one wins.
     # Provider extraction can perform several network/decryption steps. Eight seconds
     # caused healthy modules to be reported as failures before extraction completed.
+    # Keep Kuhi's standalone routes consistent with the mobile adapter's
+    # provider budget. The mobile wrapper enforces its own per-provider timeout.
     old_watch_timeout = "WATCH_TIMEOUT = 75.0"
     if old_watch_timeout in race_text:
-        race_text = race_text.replace(old_watch_timeout, "WATCH_TIMEOUT = 22.0", 1)
+        race_text = race_text.replace(old_watch_timeout, "WATCH_TIMEOUT = 45.0", 1)
     elif "WATCH_TIMEOUT = 8.0" in race_text:
-        race_text = race_text.replace("WATCH_TIMEOUT = 8.0", "WATCH_TIMEOUT = 22.0", 1)
-    elif "WATCH_TIMEOUT = 22.0" not in race_text:
+        race_text = race_text.replace("WATCH_TIMEOUT = 8.0", "WATCH_TIMEOUT = 45.0", 1)
+    elif "WATCH_TIMEOUT = 22.0" in race_text:
+        race_text = race_text.replace("WATCH_TIMEOUT = 22.0", "WATCH_TIMEOUT = 45.0", 1)
+    elif "WATCH_TIMEOUT = 45.0" not in race_text:
         fail("Could not locate the upstream stream provider timeout.")
     race_file.write_text(race_text, encoding="utf-8")
 
