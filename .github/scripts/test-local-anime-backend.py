@@ -80,6 +80,63 @@ class LocalAnimeApiTests(unittest.TestCase):
             )
         self.assertEqual(response.status_code, 200, response.text)
 
+    def test_hindi_search_route_proxies_only_the_fixed_catalogue_endpoint(self) -> None:
+        fake_response = type(
+            "FakeResponse",
+            (),
+            {
+                "is_success": True,
+                "status_code": 200,
+                "json": staticmethod(lambda: {"success": True, "results": {"results": []}}),
+            },
+        )()
+        fake_client = AsyncMock()
+        fake_client.__aenter__.return_value = fake_client
+        fake_client.__aexit__.return_value = None
+        fake_client.get = AsyncMock(return_value=fake_response)
+
+        with patch.object(local_api.httpx, "AsyncClient", return_value=fake_client):
+            response = self.client.get(
+                "/hindi/search",
+                params={"s": "Solo Leveling", "page": 2},
+                headers=self.auth,
+            )
+
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertTrue(response.json()["success"])
+        fake_client.get.assert_awaited_once_with(
+            "https://anime-api-ashen-chi.vercel.app/api/search",
+            params={"s": "Solo Leveling", "page": 2},
+        )
+
+    def test_hindi_stream_route_bounds_query_parameters(self) -> None:
+        fake_response = type(
+            "FakeResponse",
+            (),
+            {
+                "is_success": True,
+                "status_code": 200,
+                "json": staticmethod(lambda: {"success": True, "results": []}),
+            },
+        )()
+        fake_client = AsyncMock()
+        fake_client.__aenter__.return_value = fake_client
+        fake_client.__aexit__.return_value = None
+        fake_client.get = AsyncMock(return_value=fake_response)
+
+        with patch.object(local_api.httpx, "AsyncClient", return_value=fake_client):
+            response = self.client.get(
+                "/hindi/stream",
+                params={"id": "solo-leveling", "season": 0, "ep": 0},
+                headers=self.auth,
+            )
+
+        self.assertEqual(response.status_code, 200, response.text)
+        fake_client.get.assert_awaited_once_with(
+            "https://anime-api-ashen-chi.vercel.app/api/stream",
+            params={"id": "solo-leveling", "season": 1, "ep": 1},
+        )
+
     def test_proxy_rejects_loopback_targets(self) -> None:
         response = self.client.get(
             "/api/proxy",
