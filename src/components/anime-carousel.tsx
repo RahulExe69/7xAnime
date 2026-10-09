@@ -12,7 +12,6 @@ import {
 import Button from "./common/custom-button";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
-import BlurFade from "./ui/blur-fade";
 import { ROUTES } from "@/constants/routes";
 
 type Props = {
@@ -48,23 +47,20 @@ const AnimeCarousel = (props: Props) => {
       <Carousel className="w-full" setApi={setApi} opts={{}}>
         <CarouselContent className="w-full">
           {props.anime?.map((ani, idx) => (
-            <BlurFade key={idx} delay={idx * 0.05} inView>
-              <CarouselItem
-                key={idx}
-                className="lg:basis-[1/5] basis-[1/2] sm:basis-[1/3] md:basis-[1/4] xl:basis-[1/6] 2xl:basis-[1/7]"
-              >
-                <AnimeCard
-                  key={idx}
-                  title={ani.name}
-                  languageAliases={[ani.jname || ""]}
-                  format={ani.type}
-                  href={ROUTES.animeDetails(ani.id)}
-                  quickWatchHref={ROUTES.watchAnime(ani.id)}
-                  poster={ani.poster}
-                  className="self-center justify-self-center min-w-[12rem]"
-                />
-              </CarouselItem>
-            </BlurFade>
+            <CarouselItem
+              key={ani.id || idx}
+              className="basis-[47%] sm:basis-[31%] md:basis-[23%] lg:basis-[19%] xl:basis-[16%] 2xl:basis-[14%]"
+            >
+              <AnimeCard
+                title={ani.name}
+                languageAliases={[ani.jname || ""]}
+                format={ani.type}
+                href={ROUTES.animeDetails(ani.id)}
+                quickWatchHref={ROUTES.watchAnime(ani.id)}
+                poster={ani.poster}
+                className="w-full min-w-0"
+              />
+            </CarouselItem>
           ))}
         </CarouselContent>
       </Carousel>
