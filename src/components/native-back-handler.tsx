@@ -32,6 +32,9 @@ const isMeaningfulRouteChange = (from: string, to: string) => {
   if (previousPath === "/profile") {
     return previous.searchParams.get("username") !== next.searchParams.get("username");
   }
+  if (previousPath === "/search") {
+    return previous.search !== next.search;
+  }
   return false;
 };
 
@@ -49,6 +52,63 @@ export default function NativeBackHandler() {
   const lastHomeBackAt = useRef(0);
 
   useEffect(() => { routerRef.current = router; }, [router]);
+
+  const navigateInApp = (target: string) => {
+    pendingRoute.current = normalizeRoute(target);
+    routerRef.current.replace(target);
+  };
+
+  const navigateBackInApp = () => {
+    const current = new URL(currentRoute.current, "https://7xanime.local");
+    const currentPath = normalizePath(current.pathname);
+    let rememberedRoute = routeStack.current.pop();
+
+    // Treat the detail screen as the one-time entry point to an anime. When
+    // leaving playback, return to the page that opened it instead of reopening
+    // the same detail screen a second time.
+    if (currentPath === WATCH && rememberedRoute) {
+      const remembered = new URL(rememberedRoute, "https://7xanime.local");
+      if (normalizePath(remembered.pathname) === DETAILS) {
+        rememberedRoute = routeStack.current.pop() || "/search";
+      }
+    }
+
+    if (rememberedRoute) {
+      navigateInApp(rememberedRoute);
+      lastHomeBackAt.current = 0;
+      return;
+    }
+    if (currentPath === WATCH) {
+      navigateInApp("/search");
+      lastHomeBackAt.current = 0;
+      return;
+    }
+    if (currentPath !== HOME) {
+      navigateInApp(HOME);
+      lastHomeBackAt.current = 0;
+      return;
+    }
+    const now = Date.now();
+    if (now - lastHomeBackAt.current < 1800) {
+      void App.exitApp();
+      return;
+    }
+    lastHomeBackAt.current = now;
+    toast("Press back again to exit 7xAnime", { duration: 1600 });
+  };
+
+  // The in-player back arrow and Android's system Back share one route-aware
+  // handler, so neither sends the user to the anime details page by default.
+  useEffect(() => {
+    const handleRequestedBack = () => {
+      const overlayBack = new Event("7xanime:back", { cancelable: true });
+      window.dispatchEvent(overlayBack);
+      if (overlayBack.defaultPrevented) return;
+      navigateBackInApp();
+    };
+    window.addEventListener("7xanime:navigate-back", handleRequestedBack);
+    return () => window.removeEventListener("7xanime:navigate-back", handleRequestedBack);
+  }, []);
 
   useEffect(() => {
     const next = normalizeRoute(route);
@@ -146,41 +206,11 @@ export default function NativeBackHandler() {
     let disposed = false;
     let listener: { remove: () => Promise<void> } | undefined;
 
-    const navigate = (target: string) => {
-      pendingRoute.current = normalizeRoute(target);
-      routerRef.current.replace(target);
-    };
-
     void App.addListener("backButton", () => {
       const overlayBack = new Event("7xanime:back", { cancelable: true });
       window.dispatchEvent(overlayBack);
       if (overlayBack.defaultPrevented) return;
-      const rememberedRoute = routeStack.current.pop();
-      if (rememberedRoute) {
-        navigate(rememberedRoute);
-        lastHomeBackAt.current = 0;
-        return;
-      }
-      const current = new URL(currentRoute.current, "https://7xanime.local");
-      const currentPath = normalizePath(current.pathname);
-      if (currentPath === WATCH) {
-        const animeId = current.searchParams.get("anime");
-        navigate(animeId ? `${DETAILS}?id=${encodeURIComponent(animeId)}` : HOME);
-        lastHomeBackAt.current = 0;
-        return;
-      }
-      if (currentPath !== HOME) {
-        navigate(HOME);
-        lastHomeBackAt.current = 0;
-        return;
-      }
-      const now = Date.now();
-      if (now - lastHomeBackAt.current < 1800) {
-        void App.exitApp();
-        return;
-      }
-      lastHomeBackAt.current = now;
-      toast("Press back again to exit 7xAnime", { duration: 1600 });
+      navigateBackInApp();
     }).then((handle) => {
       if (disposed) void handle.remove();
       else listener = handle;
