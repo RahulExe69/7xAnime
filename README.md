@@ -74,15 +74,15 @@ Megavid can occasionally display a deceptive “Click Allow” prompt inside its
 
 ## Android APK with an on-device API
 
-The Android debug build now has an experimental **local-backend** path: the APK bundles
-a Python runtime and a pinned Kuhi API snapshot plus three independently authored adapters
-(AnimeNoSub, AniXo, and Megavid), starts the API on `127.0.0.1:8000`, and routes catalog,
-episode extraction, and media proxy requests through that loopback service. The APK still packages thirteen adapter modules for research compatibility, but the
-active app allowlist is now only AniXo and Megavid (plus the dedicated MegaPlay Server 1
-iframe). The ten Kuhi providers and AnimeNoSub are parked: episode discovery and playback
-do not call them. The other eight researched API/repository candidates remain documented
-only and have not been integrated. AniXo and Megavid are manual-only iframe routes; a
-returned embed URL is not proof that the selected episode actually plays. This path does **not** require the three hosted API/proxy/PocketBase Actions
+The Android debug build has an experimental **local-backend** path: the APK bundles
+a Python runtime and a pinned Kuhi API snapshot plus independently authored adapters,
+starts the API on `127.0.0.1:8000`, and routes provider requests and media proxy traffic
+through that loopback service. The provider map now offers MegaPlay as Server 1, followed by
+AniXo, Megavid, AnimeParadise, and Cosmic Player. The other Kuhi adapters remain parked.
+AnimeParadise is a direct HLS candidate exposed only after manual selection; Cosmic is a
+MegaPlay-backed custom player for UI comparison, not an independent provider. AniXo,
+Megavid, AnimeParadise, and Cosmic remain manual-only until tested on a physical Android
+device; a returned URL is not proof that the selected episode actually plays. This path does **not** require the three hosted API/proxy/PocketBase Actions
 secrets or a server we own.
 
 The app still uses the internet to reach AniList, providers, and stream CDNs. The
