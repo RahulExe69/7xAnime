@@ -10,7 +10,7 @@ const VideoPlayer = dynamic(() => import("@/components/video-player"), {
 import { useGetEpisodeData } from "@/query/get-episode-data";
 import { useQuery } from "react-query";
 import { getHindiDubStreams } from "@/lib/hindi-dub";
-import { ArrowLeft, Captions, Mic, AlertCircle, Tv } from "lucide-react";
+import { ArrowLeft, Captions, Mic, AlertCircle } from "lucide-react";
 import Link from "next/link";
 import { ROUTES } from "@/constants/routes";
 import { getServerProviderTitle } from "@/lib/server-map";
