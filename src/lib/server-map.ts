@@ -1,25 +1,38 @@
-export type ProviderInfo = { name: string; site: string };
+export type ProviderAudio = "sub" | "dub";
 
-export const KUHI_PROVIDER_ORDER = [
-  "anineko", "anizone", "anikoto", "reanime", "aniwaves",
-  "kaa", "anibd", "animegg", "mkissa", "animeonsen",
-] as const;
+export type ProviderInfo = {
+  name: string;
+  site: string;
+  audio: readonly ProviderAudio[];
+  formats: readonly ("hls" | "mp4" | "embed" | "dash")[];
+};
+
+/** Explicitly selectable manual sources. AnimeParadise is a direct HLS
+ * candidate awaiting device verification; Cosmic is a MegaPlay-backed player
+ * wrapper for UI comparison, not an independent streaming source.
+ */
+export const KUHI_PROVIDER_ORDER = ["anixo", "megavid", "animeparadise", "cosmic", "megaflix", "tryembed", "cinexstream", "nontongo"] as const;
 
 /**
- * The pinned Kuhi provider ranking. A provider without episodes for an anime
- * is omitted. Server 1 is reserved for MegaPlay; upstream providers start at Server 2.
+ * Explicitly supported manual player/embed routes. These are advertised audio/format
+ * capabilities, not a guarantee that every title or episode plays. The four Yomi-derived
+ * adapters construct iframe URLs and are not treated as direct stream extractors.
  */
 export const PROVIDER_INFO: Record<string, ProviderInfo> = {
-  anineko: { name: "AniNeko", site: "https://anineko.to" },
-  anizone: { name: "AniZone", site: "https://anizone.to" },
-  anikoto: { name: "AniKoto", site: "https://anikototv.to" },
-  reanime: { name: "ReAnime", site: "https://reanime.to" },
-  aniwaves: { name: "AniWaves", site: "https://aniwaves.ru" },
-  kaa: { name: "KAA", site: "https://kaa.lt" },
-  anibd: { name: "AniBD", site: "https://epeng.animeapps.top" },
-  animegg: { name: "AnimeGG", site: "https://www.animegg.org" },
-  mkissa: { name: "MKissa", site: "https://mkissa.to" },
-  animeonsen: { name: "AnimeOnsen", site: "https://www.animeonsen.xyz" },
+  anixo: { name: "AniXo", site: "https://anixo.buzz", audio: ["sub", "dub"], formats: ["embed"] },
+  megavid: { name: "Megavid", site: "https://megavid.buzz", audio: ["sub", "dub"], formats: ["embed"] },
+  animeparadise: { name: "AnimeParadise", site: "https://animeparadise.moe", audio: ["sub"], formats: ["hls"] },
+  cosmic: { name: "Cosmic Player", site: "https://cosmic-api-azure.vercel.app", audio: ["sub", "dub"], formats: ["embed"] },
+  megaflix: { name: "MegaFlix", site: "https://www.megaflix.buzz", audio: ["sub", "dub"], formats: ["embed"] },
+  tryembed: { name: "TryEmbed", site: "https://tryembed.us.cc", audio: ["sub", "dub"], formats: ["embed"] },
+  cinexstream: { name: "CinexStream", site: "https://cinextream.cc", audio: ["sub", "dub"], formats: ["embed"] },
+  nontongo: { name: "NontonGo", site: "https://nontongo.win", audio: ["sub"], formats: ["embed"] },
+};
+
+export const isProviderSelectable = (providerName: string, category: ProviderAudio): boolean => {
+  const provider = PROVIDER_INFO[providerName.toLowerCase()];
+  if (!provider) return true;
+  return provider.audio.includes(category) && provider.formats.some((format) => format !== "dash");
 };
 
 export const getServerLabel = (providerNames: string[], providerName: string): string => {
@@ -28,6 +41,17 @@ export const getServerLabel = (providerNames: string[], providerName: string): s
   // tries the provider race; it is the only visible route until provider data resolves.
   if (index >= 0) return `Server ${index + 2}`;
   return providerName.toLowerCase() === "auto" ? "Automatic server selection" : "Unnumbered provider";
+};
+
+export const getProviderDisplayName = (providerName: string): string => {
+  const normalized = (providerName || "").toLowerCase();
+  const provider = PROVIDER_INFO[normalized];
+  if (provider) return provider.name;
+  if (normalized === "auto") return "Auto";
+  if (!normalized) return "Unknown provider";
+  return normalized.replace(/(^|[-_])([a-z])/g, (_match, prefix: string, letter: string) =>
+    `${prefix ? " " : ""}${letter.toUpperCase()}`,
+  );
 };
 
 export const getServerProviderTitle = (providerNames: string[], providerName: string): string => {

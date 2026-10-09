@@ -94,10 +94,16 @@ const getAllEpisodes = async (animeId: string): Promise<IEpisodesData> => {
     for (const pName of providerNames) {
       const pData = data.providers[pName]?.episodes;
       if (pData?.sub) {
-        pData.sub.forEach((ep) => subEpNumbers.add(ep.number));
+        pData.sub.forEach((ep) => {
+          const number = Number(ep.number);
+          if (Number.isFinite(number) && number > 0) subEpNumbers.add(number);
+        });
       }
       if (pData?.dub) {
-        pData.dub.forEach((ep) => dubEpNumbers.add(ep.number));
+        pData.dub.forEach((ep) => {
+          const number = Number(ep.number);
+          if (Number.isFinite(number) && number > 0) dubEpNumbers.add(number);
+        });
       }
     }
 
@@ -113,8 +119,8 @@ const getAllEpisodes = async (animeId: string): Promise<IEpisodesData> => {
 
       for (const pName of providerNames) {
         const pData = data.providers[pName]?.episodes;
-        const dubMatch = pData?.dub?.find((e) => e.number === epNum);
-        const subMatch = pData?.sub?.find((e) => e.number === epNum);
+        const dubMatch = pData?.dub?.find((e) => Number(e.number) === epNum);
+        const subMatch = pData?.sub?.find((e) => Number(e.number) === epNum);
 
         // Prefer an English dub for the episode list's default selection.
         // Keep a SUB candidate as a fallback while continuing to look for DUB
@@ -141,7 +147,39 @@ const getAllEpisodes = async (animeId: string): Promise<IEpisodesData> => {
     });
 
     if (episodeList.length === 0) {
-      return await fetchAniListEpisodesFallback(animeId);
+      // While Android's progressive catalogue is initializing, return a small
+      // local placeholder immediately instead of waiting on another AniList
+      // network request. The real episode list replaces it as providers reply.
+      if (
+        isLocalBackendEnabled() &&
+        data.source === "native" &&
+        data.complete === false
+      ) {
+        const placeholders: Episode[] = Array.from({ length: 12 }, (_, index) => {
+          const number = index + 1;
+          return {
+            title: `Episode ${number}`,
+            episodeId: `watch/auto/${animeId}/sub/episode-${number}`,
+            number,
+            isFiller: false,
+            hasSub: true,
+            hasDub: false,
+          };
+        });
+        return {
+          totalEpisodes: placeholders.length,
+          episodes: placeholders,
+          rawResponse: data,
+          availableProviders: providerNames,
+        };
+      }
+
+      const fallback = await fetchAniListEpisodesFallback(animeId);
+      return {
+        ...fallback,
+        rawResponse: data,
+        availableProviders: providerNames,
+      };
     }
 
     return {
@@ -167,6 +205,14 @@ export const useGetAllEpisodes = (animeId: string) => {
     staleTime: 1000 * 60 * 15,
     cacheTime: 1000 * 60 * 30,
     refetchOnWindowFocus: false,
+    // The local Android adapter returns an initial partial provider list and
+    // marks it complete only after every source has answered or timed out.
+    refetchInterval: (data) =>
+      isLocalBackendEnabled() &&
+      data?.rawResponse?.source === "native" &&
+      data.rawResponse.complete === false
+        ? 2500
+        : false,
     retry: 0,
   });
 };

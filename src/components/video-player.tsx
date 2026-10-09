@@ -4,8 +4,8 @@ import React, {
   useEffect,
   useRef,
   useMemo,
-  useState,
   HTMLAttributes,
+  useState,
 } from "react";
 import Artplayer from "artplayer";
 import type { Option } from "artplayer";
@@ -29,7 +29,7 @@ const WATCH_PROGRESS_UPDATE_INTERVAL = 10000; // Update every 10 seconds
 const WATCH_PROGRESS_MIN_WATCH_TIME = 10; // Min seconds watched to create record
 
 // --- Define Props for the Combined Player ---
-interface ArtPlayerProps extends HTMLAttributes<HTMLDivElement> {
+type ArtPlayerProps = Omit<HTMLAttributes<HTMLDivElement>, "onError"> & {
   episodeInfo: IEpisodeSource; // Source info including URLs, tracks, intro/outro
   animeInfo: { title: string; image: string; id: string }; // Basic anime info for poster etc.
   subOrDub: "sub" | "dub"; // Use literal type for clarity
@@ -37,8 +37,9 @@ interface ArtPlayerProps extends HTMLAttributes<HTMLDivElement> {
   getInstance?: (art: Artplayer) => void; // Callback to get the instance
   autoSkip?: boolean;
   serversData: IEpisodeServers;
-  onError?: () => void;
-}
+  onError?: (detail?: string) => void;
+  onPlaybackReady?: () => void;
+};
 
 // --- Helper to generate highlights ---
 interface HighlightPoint {
@@ -67,14 +68,19 @@ function VideoPlayer({
   autoSkip = true,
   serversData,
   onError,
+  onPlaybackReady,
   ...rest // Spread other div attributes like className, id, etc.
 }: ArtPlayerProps): JSX.Element {
   const artContainerRef = useRef<HTMLDivElement>(null); // Ref for the mounting div
   const artInstanceRef = useRef<Artplayer | null>(null); // Ref for the ArtPlayer instance
   const hlsInstanceRef = useRef<Hls | null>(null); // Ref for the Hls.js instance
+  const animeInfoRef = useRef(animeInfo);
+  const serversDataRef = useRef(serversData);
+  animeInfoRef.current = animeInfo;
+  serversDataRef.current = serversData;
 
   // State only needed for the current auto-skip setting
-  const [isAutoSkipEnabled, setIsAutoSkipEnabled] = useState(autoSkip);
+  const isAutoSkipEnabledRef = useRef(autoSkip);
 
   const bookmarkIdRef = useRef<string | null>(null);
   const watchHistoryIdsRef = useRef<string[]>([]); // Store initial list
@@ -83,6 +89,8 @@ function VideoPlayer({
   const lastUpdateTimeRef = useRef<number>(0);
   const hasMetMinWatchTimeRef = useRef<boolean>(false); // Track if min time met for this episode
   const initialSeekTimeRef = useRef<number | null>(null);
+  const seekFeedbackTimerRef = useRef<number | null>(null);
+  const [seekFeedback, setSeekFeedback] = useState<"backward" | "forward" | null>(null);
 
   const { auth } = useAuthStore();
   const { createOrUpdateBookMark, syncWatchProgress } = useBookMarks({
@@ -93,14 +101,16 @@ function VideoPlayer({
     current: number,
     duration: number,
   ): Promise<string | null> => {
-    const episodeNumber = parseInt(serversData.episodeNo, 10) || 1;
+    const currentAnimeInfo = animeInfoRef.current;
+    const currentServersData = serversDataRef.current;
+    const episodeNumber = parseInt(currentServersData.episodeNo, 10) || 1;
     if (isLocalBackendEnabled()) {
       saveLocalWatchProgress({
-        animeId: animeInfo.id,
-        episodeId: serversData.episodeId,
+        animeId: currentAnimeInfo.id,
+        episodeId: currentServersData.episodeId,
         episodeNumber,
-        animeTitle: animeInfo.title,
-        poster: animeInfo.image,
+        animeTitle: currentAnimeInfo.title,
+        poster: currentAnimeInfo.image,
         current,
         duration,
       });
@@ -108,7 +118,7 @@ function VideoPlayer({
     }
 
     return syncWatchProgress(bookmarkIdRef.current, watchedRecordIdRef.current, {
-      episodeId: serversData.episodeId,
+      episodeId: currentServersData.episodeId,
       episodeNumber,
       current,
       duration,
@@ -116,16 +126,32 @@ function VideoPlayer({
   };
 
   useEffect(() => {
-    setIsAutoSkipEnabled(autoSkip);
+    isAutoSkipEnabledRef.current = autoSkip;
   }, [autoSkip]);
 
-  // --- Construct Stream URI via Next.js internal /api/proxy ---
+  // --- Construct the proxy URI and preserve the provider's actual media format ---
+  const firstSource = episodeInfo?.sources?.[0];
+  const firstSourceUrl = firstSource?.url;
+  const sourceReferer = firstSource?.referer || firstSource?.headers?.Referer || episodeInfo?.headers?.Referer;
+  const sourceType = String(firstSource?.type || "").toLowerCase();
+  const isHlsSource = sourceType === "m3u8" || sourceType === "hls";
   const uri = useMemo(() => {
-    const firstSourceUrl = episodeInfo?.sources?.[0]?.url;
     if (!firstSourceUrl) return null;
-    const referer = episodeInfo?.headers?.Referer;
-    return getProxyUrl(firstSourceUrl, referer);
-  }, [episodeInfo]);
+    return getProxyUrl(firstSourceUrl, sourceReferer);
+  }, [firstSourceUrl, sourceReferer]);
+
+  // Use a value signature instead of the episode object identity: React Query
+  // can return an equivalent new object after lifecycle/network events. Rebuilding
+  // ArtPlayer for identical stream data resets playback when the app resumes.
+  const episodeInfoSignature = useMemo(
+    () => JSON.stringify({
+      sources: episodeInfo?.sources?.map(({ url, type }) => ({ url, type })) ?? [],
+      subtitles: episodeInfo?.subtitles?.map(({ lang, url }) => ({ lang, url })) ?? [],
+      intro: episodeInfo?.intro,
+      outro: episodeInfo?.outro,
+    }),
+    [episodeInfo],
+  );
 
   const skipTimesRef = useRef<{
     introStart?: number;
@@ -379,7 +405,9 @@ function VideoPlayer({
     const finalOptions: Option = {
       container: artContainerRef.current,
       url: uri,
-      type: "m3u8", // Explicitly set type for HLS
+      // Preserve the actual media type. MP4 should use the browser's native
+      // video pipeline; forcing every source to m3u8 makes MP4 providers fail.
+      ...(isHlsSource ? { type: "m3u8" as const } : sourceType === "mp4" ? { type: "mp4" as const } : {}),
       customType: {
         m3u8: (
           videoElement: HTMLMediaElement,
@@ -397,7 +425,8 @@ function VideoPlayer({
             hls.on(Hls.Events.ERROR, (event, data) => {
               if (data.fatal) {
                 console.error("Fatal HLS error encountered:", data);
-                if (onError) onError();
+                const detail = `HLS playback error: ${data.details || data.type || "fatal media error"}`;
+                onError?.(detail);
               }
             });
             hlsInstanceRef.current = hls; // Store ref
@@ -416,12 +445,13 @@ function VideoPlayer({
             videoElement.src = url; // Fallback for Safari native HLS
           } else {
             artPlayerInstance.notice.show =
-              "HLS playback is not supported on your browser.";
+              "HLS playback is not supported on this WebView.";
+            onError?.("HLS playback is not supported on this WebView.");
           }
         },
       },
       plugins: [
-        artplayerPluginHlsControl({
+        ...(isHlsSource ? [artplayerPluginHlsControl({
           // Configure HLS controls
           quality: {
             control: true,
@@ -438,7 +468,7 @@ function VideoPlayer({
             title: "Audio",
             auto: "Auto",
           },
-        }),
+        })] : []),
         artplayerPluginAmbilight({
           // Configure Ambilight
           blur: "30", // Use numbers
@@ -494,7 +524,7 @@ function VideoPlayer({
           "Outro",
         ),
       ],
-      poster: animeInfo.image,
+      poster: animeInfoRef.current.image,
       volume: 0.8,
       isLive: false,
       muted: false,
@@ -509,8 +539,11 @@ function VideoPlayer({
       flip: false,
       playbackRate: true,
       aspectRatio: true,
-      fullscreen: true,
-      fullscreenWeb: true,
+      // The outer PlayerViewport owns fullscreen/rotation so the same controls
+      // work for direct media and third-party iframes. Double-tap is repurposed
+      // for +/-10s seeking below instead of ArtPlayer's fullscreen action.
+      fullscreen: false,
+      fullscreenWeb: false,
       subtitleOffset: true,
       miniProgressBar: false,
       mutex: true,
@@ -527,8 +560,87 @@ function VideoPlayer({
     };
 
     // --- Initialize ArtPlayer ---
-    const art = new Artplayer(finalOptions);
+    // Invalid provider metadata or a plugin regression must not bubble into
+    // Next's route-level error boundary (the full-screen "Something went wrong").
+    // Let the player section switch to its fallback instead.
+    let art: Artplayer;
+    try {
+      art = new Artplayer(finalOptions);
+    } catch (error) {
+      console.error("ArtPlayer initialization failed; switching to fallback:", error);
+      onError?.(error instanceof Error ? error.message : String(error));
+      return;
+    }
     artInstanceRef.current = art;
+
+    // YouTube-style double tap: left half seeks back 10s, right half forward
+    // 10s. Single taps still play/pause, but are delayed briefly so a second
+    // tap can cancel the single-tap action. Controls/buttons remain untouched.
+    const interactionContainer = artContainerRef.current;
+    let lastVideoTapAt = 0;
+    let videoTapTimer: number | null = null;
+    const isVideoSurfaceTarget = (target: EventTarget | null): target is HTMLElement => {
+      if (!(target instanceof HTMLElement)) return false;
+      if (target.closest("button, a, input, select, textarea, .art-controls, .art-control, .art-setting, .art-contextmenu")) {
+        return false;
+      }
+      return target === art.video
+        || target.classList.contains("art-video")
+        || !!target.closest(".art-video");
+    };
+    const handleVideoClickCapture = (event: MouseEvent) => {
+      if (!isVideoSurfaceTarget(event.target)) return;
+      const videoRect = (art.video || interactionContainer)?.getBoundingClientRect();
+      if (!videoRect || videoRect.width <= 0) return;
+
+      // Intercept the player surface click so ArtPlayer doesn't treat a
+      // double-tap as fullscreen or toggle twice.
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+      const now = Date.now();
+      if (lastVideoTapAt > 0 && now - lastVideoTapAt <= 360) {
+        lastVideoTapAt = 0;
+        if (videoTapTimer) {
+          window.clearTimeout(videoTapTimer);
+          videoTapTimer = null;
+        }
+        const forward = event.clientX >= videoRect.left + videoRect.width / 2;
+        const current = Math.max(0, Number(art.currentTime) || 0);
+        const duration = Number(art.duration);
+        const proposed = current + (forward ? 10 : -10);
+        const targetTime = Math.max(
+          0,
+          Number.isFinite(duration) && duration > 0 ? Math.min(duration, proposed) : proposed,
+        );
+        art.seek = targetTime;
+        setSeekFeedback(forward ? "forward" : "backward");
+        if (seekFeedbackTimerRef.current) window.clearTimeout(seekFeedbackTimerRef.current);
+        seekFeedbackTimerRef.current = window.setTimeout(() => {
+          setSeekFeedback(null);
+          seekFeedbackTimerRef.current = null;
+        }, 700);
+        return;
+      }
+
+      lastVideoTapAt = now;
+      if (videoTapTimer) window.clearTimeout(videoTapTimer);
+      videoTapTimer = window.setTimeout(() => {
+        lastVideoTapAt = 0;
+        videoTapTimer = null;
+        if (artInstanceRef.current !== art) return;
+        if (art.playing) art.pause();
+        else void art.play();
+      }, 360);
+    };
+    const suppressVideoDoubleClick = (event: MouseEvent) => {
+      if (!isVideoSurfaceTarget(event.target)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+    };
+    interactionContainer?.addEventListener("click", handleVideoClickCapture, true);
+    interactionContainer?.addEventListener("dblclick", suppressVideoDoubleClick, true);
 
     // --- Skip Logic Handler ---
     const handleTimeUpdate = () => {
@@ -564,7 +676,7 @@ function VideoPlayer({
       // Get the manual skip control instance *once* per update
       const manualSkip = art.controls["manual-skip"]; // Access by name
 
-      if (isAutoSkipEnabled) {
+      if (isAutoSkipEnabledRef.current) {
         // Auto Skip Logic
         if (manualSkip?.style?.display !== "none") {
           // Ensure manual button is hidden
@@ -687,9 +799,21 @@ function VideoPlayer({
         "Reconnect attempt:",
         reconnectTime,
       );
-      if (onError) onError();
+      let detail = "The video element reported a media error.";
+      if (error instanceof Error) {
+        detail = error.message;
+      } else if (typeof error === "string") {
+        detail = error;
+      } else if (error && typeof error === "object") {
+        const event = error as { message?: string; code?: number; type?: string; details?: string };
+        detail = event.message || [event.type, event.details, event.code ? `code ${event.code}` : ""]
+          .filter(Boolean).join(": ") || detail;
+      }
+      onError?.(detail);
     });
 
+    const handlePlaybackReady = () => onPlaybackReady?.();
+    art.on("video:playing", handlePlaybackReady);
     art.on("video:timeupdate", handleTimeUpdate);
 
     const handleInteractionUpdate = () => {
@@ -716,6 +840,18 @@ function VideoPlayer({
 
     // --- Cleanup Function ---
     return () => {
+      if (videoTapTimer) {
+        window.clearTimeout(videoTapTimer);
+        videoTapTimer = null;
+      }
+      interactionContainer?.removeEventListener("click", handleVideoClickCapture, true);
+      interactionContainer?.removeEventListener("dblclick", suppressVideoDoubleClick, true);
+      if (seekFeedbackTimerRef.current) {
+        window.clearTimeout(seekFeedbackTimerRef.current);
+        seekFeedbackTimerRef.current = null;
+      }
+      setSeekFeedback(null);
+
       console.log(
         "Running cleanup for ArtPlayer instance:",
         artInstanceRef.current?.id,
@@ -755,6 +891,7 @@ function VideoPlayer({
         console.log("Cleanup: Destroying ArtPlayer instance.");
         art.off("video:pause", handleInteractionUpdate);
         art.off("video:seeked", handleInteractionUpdate);
+        art.off("video:playing", handlePlaybackReady);
         art.off("video:timeupdate", handleTimeUpdate);
 
         console.log("Cleanup: Pausing player");
@@ -796,20 +933,20 @@ function VideoPlayer({
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [uri, episodeInfo, animeInfo, subOrDub, getInstance, autoSkip]);
+  }, [uri, episodeInfoSignature, subOrDub, getInstance]);
 
   // --- Render ---
   return (
     <div
       className={cn(
-        "relative w-full h-auto aspect-video  min-h-[20vh] sm:min-h-[30vh] md:min-h-[40vh] lg:min-h-[60vh] max-h-[500px] lg:max-h-[calc(100vh-150px)] bg-black overflow-hidden", // Added relative and overflow-hidden
+        "relative w-full h-auto aspect-video min-h-[20vh] sm:min-h-[30vh] md:min-h-[40vh] lg:min-h-[60vh] max-h-[500px] lg:max-h-[calc(100vh-150px)] bg-black overflow-hidden",
         rest.className ?? "",
       )}
     >
-      <div ref={artContainerRef} className="w-full h-full">
+      <div ref={artContainerRef} className="h-full w-full">
         {!uri && (
           <div
-            className="w-full h-full flex items-center justify-center bg-cover bg-center"
+            className="flex h-full w-full items-center justify-center bg-cover bg-center"
             style={{ backgroundImage: `url(${animeInfo.image})` }}
           >
             <Image
@@ -821,6 +958,17 @@ function VideoPlayer({
           </div>
         )}
       </div>
+      {seekFeedback && (
+        <div
+          aria-live="polite"
+          className={`pointer-events-none absolute inset-y-0 z-40 flex w-1/3 items-center justify-center ${seekFeedback === "backward" ? "left-0" : "right-0"}`}
+        >
+          <div className="flex flex-col items-center gap-2 rounded-2xl bg-black/60 px-5 py-4 text-white shadow-lg backdrop-blur-sm">
+            <span className="text-3xl font-black leading-none">{seekFeedback === "backward" ? "↶" : "↷"}</span>
+            <span className="text-sm font-extrabold">{seekFeedback === "backward" ? "−10s" : "+10s"}</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

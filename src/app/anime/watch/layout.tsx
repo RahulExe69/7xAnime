@@ -1,6 +1,5 @@
 "use client";
 
-import Loading from "@/app/loading";
 import parse from "html-react-parser";
 import { ROUTES } from "@/constants/routes";
 
@@ -31,15 +30,30 @@ type Props = {
   children: ReactNode;
 };
 
+const WatchLayoutFallback = () => (
+  <div role="status" aria-live="polite" className="mx-auto mt-3 w-full max-w-screen-2xl px-3 sm:px-5">
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-4">
+      <div className="space-y-3 lg:col-span-3">
+        <div className="aspect-video w-full animate-pulse rounded-2xl bg-[#171421]" />
+        <div className="h-10 w-full animate-pulse rounded-xl bg-[#171421]" />
+      </div>
+      <div className="space-y-2 rounded-2xl border border-white/[0.06] bg-[#101018] p-3">
+        <div className="h-5 w-24 animate-pulse rounded bg-white/[0.06]" />
+        {Array.from({ length: 6 }, (_, index) => <div key={index} className="h-11 animate-pulse rounded-xl bg-white/[0.04]" />)}
+      </div>
+    </div>
+  </div>
+);
+
 const Layout = (props: Props) => (
-  <Suspense fallback={<Loading />}>
+  <Suspense fallback={<WatchLayoutFallback />}>
     <LayoutContent {...props} />
   </Suspense>
 );
 
 const LayoutContent = (props: Props) => {
   const searchParams = useSearchParams();
-  const { setAnime, setSelectedEpisode } = useAnimeStore();
+  const { setAnime, selectedEpisode, setSelectedEpisode } = useAnimeStore();
   const router = useRouter();
 
   const currentAnimeId = searchParams.get("anime");
@@ -49,7 +63,7 @@ const LayoutContent = (props: Props) => {
   const epNumberParam = searchParams.get("ep");
   const currentEpNum = epNumberParam ? Number(epNumberParam) : 1;
 
-  const { data: anime, isLoading } = useGetAnimeDetails(animeId as string);
+  const { data: anime } = useGetAnimeDetails(animeId as string);
 
   useEffect(() => {
     if (anime) {
@@ -130,52 +144,49 @@ const LayoutContent = (props: Props) => {
     animeId as string,
   );
 
-  // Auto-resolve episode ID if only episode number (ep) is in query or if no episode parameter exists
+  // Track the selected episode for highlighting, but do not rewrite an
+  // episode-number URL into a provider-specific URL during initial discovery.
+  // The Android player can start its auto route immediately while the provider
+  // list is still loading, and URL replacement here used to restart that work.
   useEffect(() => {
-    if (episodes?.episodes?.length) {
-      if (episodeId) {
-        setSelectedEpisode(episodeId);
-      } else {
-        const epNum = epNumberParam ? Number(epNumberParam) : 1;
-        const matchedEp =
-          episodes.episodes.find((e) => e.number === epNum) || episodes.episodes[0];
-        if (matchedEp?.episodeId) {
-          setSelectedEpisode(matchedEp.episodeId);
-          if (typeof window !== "undefined") {
-            const url = new URL(window.location.href);
-            url.searchParams.set("episode", matchedEp.episodeId);
-            url.searchParams.delete("ep");
-            window.history.replaceState({}, "", url.toString());
-          }
-        }
-      }
+    if (episodeId) {
+      if (selectedEpisode !== episodeId) setSelectedEpisode(episodeId);
+      return;
     }
-  }, [episodes, episodeId, epNumberParam, setSelectedEpisode]);
-
-  if (isLoading) return <Loading />;
+    if (!episodes?.episodes?.length) return;
+    const epNum = epNumberParam ? Number(epNumberParam) : 1;
+    const matchedEp =
+      episodes.episodes.find((episode) => Number(episode.number) === epNum) || episodes.episodes[0];
+    if (matchedEp?.episodeId && selectedEpisode !== matchedEp.episodeId) {
+      setSelectedEpisode(matchedEp.episodeId);
+    }
+  }, [episodes, episodeId, epNumberParam, selectedEpisode, setSelectedEpisode]);
 
   return (
-    anime?.anime.info && (
       <Container className="mt-3 space-y-5 pb-12 sm:mt-5 md:mt-6 md:space-y-7">
         <div className="grid w-full grid-cols-1 gap-4 lg:grid-cols-4 lg:gap-5">
           <div className="lg:col-span-3 col-span-1 lg:mb-0">
             {props.children}
           </div>
-          {episodes && (
+          {episodes ? (
             <EpisodePlaylist
               animeId={animeId as string}
-              title={
-                !!anime?.anime.info.name
-                  ? anime.anime.info.name
-                  : (anime?.anime.moreInfo.japanese as string)
-              }
+              title={anime?.anime.info.name || "Episodes"}
               subOrDub={anime?.anime.info.stats.episodes}
               episodes={episodes}
               isLoading={episodeLoading}
               bookmarks={bookmarks}
             />
+          ) : (
+            <div className="min-h-[260px] max-h-[58vh] space-y-3 overflow-hidden rounded-2xl border border-white/10 bg-[#101018] p-3 lg:min-h-[500px]">
+              <div className="h-5 w-24 animate-pulse rounded bg-white/[0.06]" />
+              <div className="h-9 w-full animate-pulse rounded-xl bg-white/[0.05]" />
+              {Array.from({ length: 7 }, (_, index) => <div key={index} className="h-11 animate-pulse rounded-xl bg-white/[0.04]" />)}
+            </div>
           )}
         </div>
+        {anime?.anime.info ? (
+          <>
         <div className="flex flex-col gap-3 rounded-2xl border border-white/[0.07] bg-[#101018] p-3 sm:flex-row sm:items-start sm:gap-4">
           <AnimeCard
             title={anime?.anime.info.name}
@@ -199,24 +210,25 @@ const LayoutContent = (props: Props) => {
           </div>
         </div>
 
-        {/* Community Comments Section */}
-        <CommentsSection
-          animeId={animeId as string}
-          animeTitle={anime?.anime.info.name || "Anime"}
-          episodeNumber={currentEpNum}
-        />
 
-        <AnimeCarousel
-          title={"Also Watch"}
-          anime={anime?.relatedAnimes as IAnime[]}
-        />
-        <AnimeCarousel
-          title={"Recommended"}
-          anime={anime?.recommendedAnimes as IAnime[]}
-        />
+            <CommentsSection
+              animeId={animeId as string}
+              animeTitle={anime.anime.info.name || "Anime"}
+              episodeNumber={currentEpNum}
+            />
+
+            <AnimeCarousel
+              title={"Also Watch"}
+              anime={anime.relatedAnimes as IAnime[]}
+            />
+            <AnimeCarousel
+              title={"Recommended"}
+              anime={anime.recommendedAnimes as IAnime[]}
+            />
+          </>
+        ) : null}
       </Container>
-    )
-  );
+    );
 };
 
 export default Layout;

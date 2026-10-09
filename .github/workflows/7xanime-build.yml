@@ -54,52 +54,8 @@ jobs:
       - name: Install SVG renderer for Android launcher icons
         run: python -m pip install --disable-pip-version-check cairosvg
 
-      - name: Smoke test pinned Python API
-        run: |
-          python -m pip install --disable-pip-version-check -r android-local-backend/requirements-android.txt
-          PYTHONPATH="android-local-backend:$KUHI_SOURCE_DIR" python - <<'PY'
-          import local_api
-          from fastapi.testclient import TestClient
-          from src.providers import _race
-
-          providers = _race.providers()
-          if not providers:
-              raise SystemExit("Kuhi loaded no native providers")
-          print("Local API import OK; providers:", ", ".join(name for name, _ in providers))
-
-          assert local_api._episode_number_from_slug("anineko-12") == 12
-          assert local_api._episode_number_from_slug("episode-3") == 3
-          assert local_api._validated_remote_url("https://example.com/master.m3u8").startswith("https://")
-          try:
-              local_api._validated_remote_url("http://127.0.0.1/private")
-          except ValueError:
-              pass
-          else:
-              raise SystemExit("Loopback URL validation did not reject a private target")
-
-          # Smoke-test loopback auth and the Capacitor WebView's CORS preflight without network access.
-          with TestClient(local_api.app) as client:
-              health = client.get("/api/health")
-              assert health.status_code == 200 and health.json()["status"] == "ok"
-              unauthorized = client.get("/spotlight")
-              assert unauthorized.status_code == 403
-              preflight = client.options(
-                  "/spotlight",
-                  headers={
-                      "Origin": "https://localhost",
-                      "Access-Control-Request-Method": "GET",
-                      "Access-Control-Request-Headers": "x-7xanime-token",
-                  },
-              )
-              assert preflight.status_code == 200
-              assert preflight.headers.get("access-control-allow-origin") == "https://localhost"
-          print("Local API health, auth guard, slug parsing, and CORS checks passed.")
-          PY
-
-      - name: Run local API contract tests
-        env:
-          PYTHONPATH: android-local-backend:${{ env.KUHI_SOURCE_DIR }}
-        run: python .github/scripts/test-local-anime-backend.py
+      - name: Install Android backend test dependencies
+        run: python -m pip install --disable-pip-version-check -r android-local-backend/requirements-android.txt
 
       - name: Setup Java 21
         uses: actions/setup-java@v5
@@ -140,6 +96,142 @@ jobs:
         run: |
           python3 .github/scripts/configure-capacitor-android.py
           python3 .github/scripts/configure-local-anime-backend.py
+
+      - name: Verify native ad blocking and fullscreen wiring
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          java_root = Path("android/app/src/main/java/com/sevenx/anime")
+          required = {
+              "StreamingNavigationWebViewClient.java",
+              "StreamingWebChromeClient.java",
+              "PlayerFullscreenPlugin.java",
+              "LocalAnimeBackendPlugin.java",
+          }
+          missing = sorted(name for name in required if not (java_root / name).is_file())
+          if missing:
+              raise SystemExit(f"Native player integration files missing: {missing}")
+
+          main_files = list(Path("android/app/src/main/java").rglob("MainActivity.java"))
+          if len(main_files) != 1:
+              raise SystemExit(f"Expected one MainActivity.java, found {len(main_files)}")
+          main_activity = main_files[0].read_text(encoding="utf-8")
+          expected_wiring = (
+              "registerPlugin(PlayerFullscreenPlugin.class)",
+              "StreamingNavigationWebViewClient(getBridge())",
+              "setWebChromeClient(streamingWebChromeClient)",
+              "streamingWebChromeClient.handleBackPressed()",
+          )
+          missing_wiring = [item for item in expected_wiring if item not in main_activity]
+          if missing_wiring:
+              raise SystemExit(f"MainActivity native wiring missing: {missing_wiring}")
+
+          nav = (java_root / "StreamingNavigationWebViewClient.java").read_text(encoding="utf-8")
+          chrome = (java_root / "StreamingWebChromeClient.java").read_text(encoding="utf-8")
+          for item, text in (
+              ("BLOCKED_AD_DOMAINS", nav),
+              ("shouldInterceptRequest", nav),
+              ("onCreateWindow", chrome),
+              ("onJsConfirm", chrome),
+              ("onPermissionRequest", chrome),
+              ("handleBackPressed", chrome),
+              ("reportBlockedPlayerAction", chrome),
+              ("reportBlockedNavigation", nav),
+          ):
+              if item not in text:
+                  raise SystemExit(f"Native ad/fullscreen feature missing: {item}")
+
+          watch_section = Path("src/app/anime/watch/video-player-section.tsx").read_text(encoding="utf-8")
+          player_component = Path("src/components/video-player.tsx").read_text(encoding="utf-8")
+          viewport = Path("src/components/player-viewport.tsx").read_text(encoding="utf-8")
+          if "7xanime:blocked-player-action" not in watch_section:
+              raise SystemExit("Player page is not wired to blocked-ad auto-switch events")
+          if "YouTube-style double tap" not in player_component or "art.seek = targetTime" not in player_component:
+              raise SystemExit("Double-tap ±10-second seeking wiring missing")
+          if "SWIPE_THRESHOLD" not in viewport or "enterNativePlayerFullscreen" not in viewport:
+              raise SystemExit("Player swipe/fullscreen wiring missing")
+
+          print("Native ad filtering, popup prompt protection, auto-switch event, fullscreen and seeking gestures are wired.")
+          PY
+
+      # Test the exact patched Python tree that Chaquopy packages in the APK,
+      # not the raw upstream checkout that still contains Python 3.12-only syntax.
+      - name: Smoke test packaged Kuhi providers
+        env:
+          PYTHONPATH: android/app/src/main/python:android-local-backend
+        run: |
+          python - <<'PY'
+          import local_api
+          from fastapi.testclient import TestClient
+          from src.providers import _race
+
+          expected_modules = {
+              "anineko", "anizone", "anikoto", "reanime", "aniwaves",
+              "kaa", "anibd", "animegg", "mkissa", "animeonsen", "animenosub",
+              "anixo", "megavid", "animeparadise", "cosmic",
+              "megaflix", "tryembed", "cinexstream", "nontongo",
+          }
+          providers = _race.providers()
+          loaded_names = {name for name, _ in providers}
+          print("Packaged Kuhi providers:", ", ".join(name for name, _ in providers))
+          missing = expected_modules - loaded_names
+          if missing:
+              raise SystemExit(f"Packaged API failed to load required providers: {sorted(missing)}")
+
+          assert local_api._episode_number_from_slug("anineko-12") == 12
+          assert local_api._episode_number_from_slug("episode-3") == 3
+          assert local_api._validated_remote_url("https://example.com/master.m3u8").startswith("https://")
+          try:
+              local_api._validated_remote_url("http://127.0.0.1/private")
+          except ValueError:
+              pass
+          else:
+              raise SystemExit("Loopback URL validation did not reject a private target")
+
+          with TestClient(local_api.app) as client:
+              health = client.get("/api/health")
+              assert health.status_code == 200 and health.json()["status"] == "ok"
+              unauthorized = client.get("/spotlight")
+              assert unauthorized.status_code == 403
+              preflight = client.options(
+                  "/spotlight",
+                  headers={
+                      "Origin": "https://localhost",
+                      "Access-Control-Request-Method": "GET",
+                      "Access-Control-Request-Headers": "x-7xanime-token",
+                  },
+              )
+              assert preflight.status_code == 200
+              assert preflight.headers.get("access-control-allow-origin") == "https://localhost"
+              status = client.get(
+                  "/api/diagnostics/providers",
+                  headers={"X-7xAnime-Token": local_api.get_token()},
+              )
+              assert status.status_code == 200, status.text
+              reported = {item["id"] for item in status.json()["providers"] if item["moduleLoaded"]}
+              active_manual = {
+                  "anixo", "megavid", "animeparadise", "cosmic",
+                  "megaflix", "tryembed", "cinexstream", "nontongo",
+              }
+              assert active_manual <= reported, (
+                  "Diagnostics do not list all approved manual providers: "
+                  f"{sorted(active_manual - reported)}"
+              )
+              assert reported <= active_manual, (
+                  "Parked providers leaked into active diagnostics: "
+                  f"{sorted(reported - active_manual)}"
+              )
+          print(
+              "Packaged API: all 19 adapter modules imported; only the eight approved "
+              "manual choices are exposed; health, auth, diagnostics and CORS passed."
+          )
+          PY
+
+      - name: Run packaged API contract tests
+        env:
+          PYTHONPATH: android/app/src/main/python:android-local-backend
+        run: python .github/scripts/test-local-anime-backend.py
 
       - name: Build Debug APK
         working-directory: android

@@ -22,6 +22,14 @@ export interface IEpisodeSource {
   sources: Source[];
   anilistID: number;
   malID: number;
+  /** The actual embedded provider that supplied these streams, when known. */
+  provider?: string;
+  requestedProvider?: string;
+  defaultProvider?: string;
+  providerStatus?: "ok" | "no_stream" | "provider_unavailable" | "unsupported_provider" | "timeout" | "error";
+  providerError?: string | null;
+  /** Extraction outcomes for providers attempted by the automatic route. */
+  timings?: Record<string, { seconds: number; ok: boolean }>;
 }
 
 export interface IEpisodeServers {
@@ -59,4 +67,7 @@ export interface Outro {
 export interface Source {
   url: string;
   type: string;
+  referer?: string;
+  headers?: Record<string, string>;
+  server?: string;
 }

@@ -252,12 +252,15 @@ export interface ProviderCategory {
 }
 
 export interface EpisodeResponse {
-  mappings: {
+  mappings?: {
     anilistId: number;
     malId?: number;
     kitsuId?: number;
     [key: string]: any;
   };
+  anilistId?: number;
+  source?: string;
+  complete?: boolean;
   providers: Record<
     string,
     {
@@ -269,7 +272,10 @@ export interface EpisodeResponse {
 export interface StreamSourceItem {
   url: string;
   type: string;
-  quality: string;
+  quality?: string;
+  referer?: string;
+  headers?: Record<string, string>;
+  server?: string;
 }
 
 export interface SubtitleItem {
@@ -288,4 +294,10 @@ export interface WatchSourcesResponse {
   subtitles: SubtitleItem[];
   intro: SkipInterval;
   outro: SkipInterval;
+  provider?: string;
+  requestedProvider?: string;
+  defaultProvider?: string;
+  providerStatus?: "ok" | "no_stream" | "provider_unavailable" | "unsupported_provider" | "timeout" | "error";
+  providerError?: string | null;
+  timings?: Record<string, { seconds: number; ok: boolean }>;
 }

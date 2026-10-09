@@ -30,6 +30,13 @@ export default function Error({
           className=""
         />
         <p className="font-bold text-2xl">Something went wrong!</p>
+        <p className="max-w-[min(88vw,28rem)] text-center text-sm text-zinc-400">
+          The page hit an unexpected error. Reload once; if it repeats, share the technical details below so we can pinpoint the failing component.
+        </p>
+        <details className="max-w-[min(88vw,28rem)] rounded-xl border border-white/10 bg-white/[0.03] p-3 text-left">
+          <summary className="cursor-pointer text-sm font-semibold text-zinc-300">Technical details</summary>
+          <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap break-words text-xs text-zinc-400">{String(error?.message || "No error message was provided").slice(0, 1200)}{error?.digest ? `\nError ID: ${error.digest}` : ""}</pre>
+        </details>
         <div className="flex gap-3 items-center">
           <ButtonLink href={ROUTES.HOME}>Back to Home</ButtonLink>
           <Button onClick={() => reset()} className="" variant={"secondary"}>

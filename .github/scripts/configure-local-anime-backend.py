@@ -252,45 +252,20 @@ def add_import(text: str, import_statement: str) -> str:
 
 
 def register_plugin(main_activity: Path) -> None:
+    """Register native plugins idempotently before BridgeActivity initializes."""
     text = main_activity.read_text(encoding="utf-8")
-    if "registerPlugin(LocalAnimeBackendPlugin.class)" in text:
-        return
-
     text = add_import(text, "import com.sevenx.anime.LocalAnimeBackendPlugin;")
+    text = add_import(text, "import com.sevenx.anime.PlayerFullscreenPlugin;")
     if "import com.getcapacitor.BridgeActivity;" not in text:
         text = add_import(text, "import com.getcapacitor.BridgeActivity;")
 
-    on_create = re.search(
-        r"(?s)void\s+onCreate\s*\([^)]*\)\s*\{",
-        text,
-    )
-    if on_create:
-        remaining = text[on_create.end():]
-        super_call = re.search(
-            r"super\.onCreate\s*\(\s*savedInstanceState\s*\)\s*;",
-            remaining,
-        )
-        if super_call:
-            position = on_create.end() + super_call.start()
-            text = (
-                text[:position]
-                + "registerPlugin(LocalAnimeBackendPlugin.class);\n        "
-                + text[position:]
-            )
-        else:
-            fail("MainActivity has an onCreate method without the expected super call.")
-    else:
-        class_match = re.search(
-            r"class\s+MainActivity\s+extends\s+BridgeActivity\s*\{",
-            text,
-        )
+    on_create = re.search(r"(?s)void\s+onCreate\s*\([^)]*\)\s*\{", text)
+    if not on_create:
+        class_match = re.search(r"class\s+MainActivity\s+extends\s+BridgeActivity\s*\{", text)
         if not class_match:
-            fail("Could not locate MainActivity class declaration.")
+            fail("Could not locate MainActivity.onCreate or class declaration.")
         text = add_import(text, "import android.os.Bundle;")
-        class_match = re.search(
-            r"class\s+MainActivity\s+extends\s+BridgeActivity\s*\{",
-            text,
-        )
+        class_match = re.search(r"class\s+MainActivity\s+extends\s+BridgeActivity\s*\{", text)
         close = text.rfind("}")
         if close < class_match.end():
             fail("Could not locate MainActivity class terminator.")
@@ -298,10 +273,97 @@ def register_plugin(main_activity: Path) -> None:
             "\n    @Override\n"
             "    public void onCreate(Bundle savedInstanceState) {\n"
             "        registerPlugin(LocalAnimeBackendPlugin.class);\n"
+            "        registerPlugin(PlayerFullscreenPlugin.class);\n"
             "        super.onCreate(savedInstanceState);\n"
             "    }\n"
         )
         text = text[:close] + method + text[close:]
+    else:
+        remaining = text[on_create.end():]
+        super_call = re.search(
+            r"super\.onCreate\s*\(\s*savedInstanceState\s*\)\s*;",
+            remaining,
+        )
+        if not super_call:
+            fail("MainActivity has an onCreate method without the expected super call.")
+        missing_registrations = []
+        if "registerPlugin(LocalAnimeBackendPlugin.class)" not in text:
+            missing_registrations.append("registerPlugin(LocalAnimeBackendPlugin.class);")
+        if "registerPlugin(PlayerFullscreenPlugin.class)" not in text:
+            missing_registrations.append("registerPlugin(PlayerFullscreenPlugin.class);")
+        if missing_registrations:
+            position = on_create.end() + super_call.start()
+            insert = "\n        " + "\n        ".join(missing_registrations) + "\n        "
+            text = text[:position] + insert + text[position:]
+    main_activity.write_text(text, encoding="utf-8")
+
+
+def install_navigation_guard(main_activity: Path) -> None:
+    """Keep main-frame navigation in-app without sandboxing the streaming iframe itself."""
+    text = main_activity.read_text(encoding="utf-8")
+    text = add_import(text, "import com.sevenx.anime.StreamingNavigationWebViewClient;")
+    statement = "getBridge().getWebView().setWebViewClient(new StreamingNavigationWebViewClient(getBridge()));"
+    if statement in text:
+        return
+
+    super_call = re.search(
+        r"super\.onCreate\s*\(\s*savedInstanceState\s*\)\s*;",
+        text,
+    )
+    if not super_call:
+        fail("Could not find MainActivity.onCreate super call to install navigation guard.")
+
+    position = super_call.end()
+    text = text[:position] + "\n        " + statement + text[position:]
+    main_activity.write_text(text, encoding="utf-8")
+
+
+def install_streaming_chrome_client(main_activity: Path) -> None:
+    """Install popup filtering, native iframe fullscreen, and fullscreen Back handling."""
+    text = main_activity.read_text(encoding="utf-8")
+    text = add_import(text, "import com.sevenx.anime.StreamingWebChromeClient;")
+
+    class_match = re.search(r"class\s+MainActivity\s+extends\s+BridgeActivity\s*\{", text)
+    if not class_match:
+        fail("Could not locate MainActivity class to install streaming Chrome client.")
+
+    field = "private StreamingWebChromeClient streamingWebChromeClient;"
+    if field not in text:
+        position = class_match.end()
+        text = text[:position] + "\n    " + field + "\n" + text[position:]
+
+    statement = (
+        "streamingWebChromeClient = new StreamingWebChromeClient(getBridge());"
+        "\n        getBridge().getWebView().setWebChromeClient(streamingWebChromeClient);"
+    )
+    if "setWebChromeClient(streamingWebChromeClient)" not in text:
+        super_call = re.search(
+            r"super\.onCreate\s*\(\s*savedInstanceState\s*\)\s*;",
+            text,
+        )
+        if not super_call:
+            fail("Could not find MainActivity.onCreate super call to install fullscreen Chrome client.")
+        position = super_call.end()
+        text = text[:position] + "\n        " + statement + text[position:]
+
+    back_marker = "streamingWebChromeClient.handleBackPressed()"
+    if back_marker not in text:
+        if re.search(r"void\s+onBackPressed\s*\(", text):
+            fail("MainActivity already overrides onBackPressed; add fullscreen handling to that override explicitly.")
+        close = text.rfind("}")
+        if close < class_match.end():
+            fail("Could not locate MainActivity class terminator for fullscreen Back handler.")
+        method = (
+            "\n    @Override\n"
+            "    public void onBackPressed() {\n"
+            "        if (streamingWebChromeClient != null && streamingWebChromeClient.handleBackPressed()) {\n"
+            "            return;\n"
+            "        }\n"
+            "        super.onBackPressed();\n"
+            "    }\n"
+        )
+        text = text[:close] + method + text[close:]
+
     main_activity.write_text(text, encoding="utf-8")
 
 
@@ -320,11 +382,116 @@ def copy_python_source() -> None:
     if destination_src.exists():
         shutil.rmtree(destination_src)
     shutil.copytree(source_dir / "src", destination_src)
+
+    # Copy the independently authored extra adapters into the packaged provider tree.
+    # AniXo and Megavid are manual-only embed servers; local_api.py excludes them
+    # from Auto racing so a constructed iframe URL cannot masquerade as playback.
+    extra_providers = {
+        "animenosub": "android-local-backend/extra-providers/animenosub.py",
+        "anixo": "android-local-backend/extra-providers/anixo.py",
+        "megavid": "android-local-backend/extra-providers/megavid.py",
+        "animeparadise": "android-local-backend/extra-providers/animeparadise.py",
+        "cosmic": "android-local-backend/extra-providers/cosmic.py",
+        "megaflix": "android-local-backend/extra-providers/megaflix.py",
+        "tryembed": "android-local-backend/extra-providers/tryembed.py",
+        "cinexstream": "android-local-backend/extra-providers/cinexstream.py",
+        "nontongo": "android-local-backend/extra-providers/nontongo.py",
+    }
+    for provider_name, relative_path in extra_providers.items():
+        extra_provider = ROOT / relative_path
+        if not extra_provider.is_file():
+            fail(f"The extra {provider_name} provider adapter is missing.")
+        shutil.copy2(extra_provider, destination_src / "providers" / f"{provider_name}.py")
+
+    # The pinned upstream snapshot includes PEP 701 f-string syntax that
+    # Python 3.11 cannot parse. The Android workflow deliberately uses Python
+    # 3.11, so make these two provider modules compatible before importing them.
+    anibd_file = destination_src / "providers" / "anibd.py"
+    anibd_text = anibd_file.read_text(encoding="utf-8")
+    anibd_lines = anibd_text.splitlines()
+    anibd_patched = False
+    for index, line in enumerate(anibd_lines):
+        if "apilink.php?data=" in line and "quote(provider_link" in line:
+            indent = line[:len(line) - len(line.lstrip())]
+            anibd_lines[index:index + 1] = [
+                indent + """encoded_link = quote(provider_link, safe="-_.!~*'()")""",
+                indent + """data = await fetch_json(f"{BASE}/apilink.php?data={encoded_link}")""",
+            ]
+            anibd_patched = True
+            break
+    if anibd_patched:
+        anibd_text = "\n".join(anibd_lines) + "\n"
+    elif "encoded_link = quote(provider_link," not in anibd_text:
+        fail("Could not apply the Python 3.11 compatibility patch to anibd.py.")
+    anibd_file.write_text(anibd_text, encoding="utf-8")
+
+    mkissa_file = destination_src / "providers" / "mkissa.py"
+    mkissa_text = mkissa_file.read_text(encoding="utf-8")
+    pep701_fragment = """safe="'")"""
+    if pep701_fragment in mkissa_text:
+        if mkissa_text.count(pep701_fragment) != 2:
+            fail("Expected two Python 3.11-incompatible quote expressions in mkissa.py.")
+        mkissa_text = mkissa_text.replace(pep701_fragment, "safe=chr(39))")
+    elif "safe=chr(39))" not in mkissa_text:
+        fail("Could not apply the Python 3.11 compatibility patch to mkissa.py.")
+    mkissa_file.write_text(mkissa_text, encoding="utf-8")
+
+    # The upstream race waits up to eight seconds after finding a winning stream,
+    # only to collect optional latency measurements. That tail delay is noticeable
+    # on mobile, so cancel slower competitors almost immediately after a winner.
+    race_file = destination_src / "providers" / "_race.py"
+    race_text = race_file.read_text(encoding="utf-8")
+
+    # Register the added adapter only in the copied, packaged provider tree.
+    ranking_match = re.search(r"(?s)RANKING\s*=\s*\[(.*?)\]", race_text)
+    if not ranking_match:
+        fail("Could not locate Kuhi's provider ranking.")
+    ranking_block = ranking_match.group(1)
+    if '"animenosub"' not in ranking_block:
+        if '"animeonsen"' not in ranking_block:
+            fail("Could not append AnimeNoSub to Kuhi's provider ranking.")
+        ranking_block = ranking_block.replace('"animeonsen"', '"animeonsen", "animenosub"', 1)
+
+    # These added adapters are selectable manually during verification; local_api.py
+    # excludes them from Auto so route construction cannot masquerade as playback.
+    for provider_name in ("anixo", "megavid", "animeparadise", "cosmic", "megaflix", "tryembed", "cinexstream", "nontongo"):
+        if f'"{provider_name}"' not in ranking_block:
+            ranking_block = ranking_block.rstrip().rstrip(",") + f', "{provider_name}"'
+    race_text = race_text[:ranking_match.start(1)] + ranking_block + race_text[ranking_match.end(1):]
+
+    slow_cleanup = "await asyncio.wait(pending, timeout=8.0)"
+    if slow_cleanup in race_text:
+        race_text = race_text.replace(slow_cleanup, "await asyncio.wait(pending, timeout=0.2)", 1)
+    elif "await asyncio.wait(pending, timeout=0.2)" not in race_text:
+        fail("Could not locate the upstream stream-race cleanup wait.")
+
+    # A failed stream race must also fail fast enough for the UI to try the next
+    # provider or Server 1. Successful providers still return as soon as one wins.
+    # Provider extraction can perform several network/decryption steps. Eight seconds
+    # caused healthy modules to be reported as failures before extraction completed.
+    # Keep Kuhi's standalone routes consistent with the mobile adapter's
+    # provider budget. The mobile wrapper enforces its own per-provider timeout.
+    old_watch_timeout = "WATCH_TIMEOUT = 75.0"
+    if old_watch_timeout in race_text:
+        race_text = race_text.replace(old_watch_timeout, "WATCH_TIMEOUT = 45.0", 1)
+    elif "WATCH_TIMEOUT = 8.0" in race_text:
+        race_text = race_text.replace("WATCH_TIMEOUT = 8.0", "WATCH_TIMEOUT = 45.0", 1)
+    elif "WATCH_TIMEOUT = 22.0" in race_text:
+        race_text = race_text.replace("WATCH_TIMEOUT = 22.0", "WATCH_TIMEOUT = 45.0", 1)
+    elif "WATCH_TIMEOUT = 45.0" not in race_text:
+        fail("Could not locate the upstream stream provider timeout.")
+    race_file.write_text(race_text, encoding="utf-8")
+
     shutil.copy2(local_api, PYTHON_ROOT / "local_api.py")
     shutil.copy2(requirements, PYTHON_ROOT / "requirements.txt")
 
     import py_compile
     py_compile.compile(str(PYTHON_ROOT / "local_api.py"), doraise=True)
+    py_compile.compile(str(race_file), doraise=True)
+    # Catch optional provider syntax regressions during the build, not only at
+    # first playback when the UI would otherwise show a silently missing server.
+    for provider_file in (destination_src / "providers").rglob("*.py"):
+        py_compile.compile(str(provider_file), doraise=True)
 
 
 def main() -> None:
@@ -337,17 +504,29 @@ def main() -> None:
     patch_app_gradle()
     patch_manifest()
 
-    java_source = ROOT / "android-local-backend/LocalAnimeBackendPlugin.java"
+    native_sources = {
+        "LocalAnimeBackendPlugin.java": ROOT / "android-local-backend/LocalAnimeBackendPlugin.java",
+        "StreamingNavigationWebViewClient.java": ROOT / "android-local-backend/StreamingNavigationWebViewClient.java",
+        "StreamingWebChromeClient.java": ROOT / "android-local-backend/StreamingWebChromeClient.java",
+        "PlayerFullscreenPlugin.java": ROOT / "android-local-backend/PlayerFullscreenPlugin.java",
+    }
+    for filename, source in native_sources.items():
+        if not source.is_file():
+            fail(f"Required native Android source is missing: {source}")
+
     package_dir = ANDROID / "app/src/main/java/com/sevenx/anime"
     package_dir.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(java_source, package_dir / "LocalAnimeBackendPlugin.java")
+    for filename, source in native_sources.items():
+        shutil.copy2(source, package_dir / filename)
 
     candidates = list((ANDROID / "app/src/main/java").rglob("MainActivity.java"))
     if len(candidates) != 1:
         fail(f"Expected one generated MainActivity.java, found {len(candidates)}.")
     register_plugin(candidates[0])
+    install_navigation_guard(candidates[0])
+    install_streaming_chrome_client(candidates[0])
 
-    print("Configured 7xAnime with an embedded Python API (loopback-only, on-demand).")
+    print("Configured 7xAnime with the on-device API, ad-filtering navigation guard, popup protection, and fullscreen support.")
 
 
 if __name__ == "__main__":
