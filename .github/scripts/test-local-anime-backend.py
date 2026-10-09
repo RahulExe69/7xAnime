@@ -95,7 +95,7 @@ class LocalAnimeApiTests(unittest.TestCase):
             patch.object(local_api.provider_race, "race_watch", new=AsyncMock(side_effect=AssertionError("must not silently switch providers"))),
         ):
             response = self.client.get(
-                "/watch/anineko/12345/sub/anineko-12",
+                "/watch/animeparadise/12345/sub/animeparadise-12",
                 headers=self.auth,
             )
 
