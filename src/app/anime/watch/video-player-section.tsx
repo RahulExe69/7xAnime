@@ -40,8 +40,9 @@ const VideoPlayerSection = () => {
   const episodeIdParam = searchParams.get("episode") || "";
   const { selectedEpisode, setSelectedEpisode, anime } = useAnimeStore();
 
-  const { data: allEpisodesData } = useGetAllEpisodes(animeIdParam);
+  const { data: allEpisodesData, isLoading: isEpisodesLoading } = useGetAllEpisodes(animeIdParam);
   const [preferredCategory, setPreferredCategory] = useState<"sub" | "dub">("dub");
+  const requestedEpisodeNumber = Math.max(1, Number(epParam) || 1);
 
   const rawProviders = useMemo(
     () => allEpisodesData?.rawResponse?.providers || {},
@@ -49,8 +50,8 @@ const VideoPlayerSection = () => {
   );
   const providerNames = useMemo(() => Object.keys(rawProviders), [rawProviders]);
 
-  const targetEpByNumber = epParam && allEpisodesData?.episodes
-    ? allEpisodesData.episodes.find((episode) => episode.number === Number(epParam))
+  const targetEpByNumber = allEpisodesData?.episodes
+    ? allEpisodesData.episodes.find((episode) => Number(episode.number) === requestedEpisodeNumber)
     : null;
   const preferredEpisodeId = useMemo(() => {
     if (episodeIdParam) return "";
@@ -63,9 +64,14 @@ const VideoPlayerSection = () => {
     return "";
   }, [episodeIdParam, epParam, preferredCategory, providerNames, rawProviders]);
 
-  // Resolve the requested episode in the preferred language before fetching a
-  // stream, so an available English dub does not briefly load the SUB episode.
-  const activeEpisodeId = episodeIdParam || preferredEpisodeId ||
+  // In the Android build, start with Kuhi's automatic route immediately. The
+  // local API races providers for a working stream while the full provider
+  // catalogue continues loading; waiting for every episode scraper first made
+  // the watch screen look frozen for far too long.
+  const localAutoEpisodeId = isLocalBackendEnabled() && animeIdParam
+    ? `watch/auto/${animeIdParam}/${preferredCategory}/episode-${requestedEpisodeNumber}`
+    : "";
+  const activeEpisodeId = episodeIdParam || localAutoEpisodeId || preferredEpisodeId ||
     (epParam ? targetEpByNumber?.episodeId || "" : allEpisodesData?.episodes?.[0]?.episodeId || "");
 
   useEffect(() => {
@@ -120,15 +126,19 @@ const VideoPlayerSection = () => {
     const candidates: Array<{ id: string; category: "dub" | "sub" }> = [];
     for (const category of ["dub", "sub"] as const) {
       for (const providerName of providerNames) {
-        const episode = rawProviders[providerName]?.episodes?.[category]
-          ?.find((item) => item.number === currentEpNumber);
-        if (episode?.id && !candidates.some((candidate) => candidate.id === episode.id)) {
-          candidates.push({ id: episode.id, category });
+        const providerEpisodes = rawProviders[providerName]?.episodes?.[category] || [];
+        if (!providerEpisodes.length) continue;
+        const episode = providerEpisodes.find((item) => Number(item.number) === currentEpNumber);
+        const id = episode?.id || (isLocalBackendEnabled()
+          ? `watch/${providerName}/${animeIdParam}/${category}/${providerName}-${currentEpNumber}`
+          : "");
+        if (id && !candidates.some((candidate) => candidate.id === id)) {
+          candidates.push({ id, category });
         }
       }
     }
     return candidates;
-  }, [providerNames, rawProviders, currentEpNumber]);
+  }, [providerNames, rawProviders, currentEpNumber, animeIdParam]);
 
   useEffect(() => {
     attemptedSourceIdsRef.current.clear();
@@ -159,9 +169,29 @@ const VideoPlayerSection = () => {
 
   useEffect(() => {
     if (!activeEpisodeId || isHindiMode || useFallback || isLoadingData) return;
-        const requestFailed = isEpisodeDataError || (!!episodeData && !episodeData.sources?.length);
-    if (requestFailed) advanceAfterSourceFailure();
-  }, [activeEpisodeId, advanceAfterSourceFailure, episodeData, isEpisodeDataError, isHindiMode, isLoadingData, useFallback]);
+    const requestFailed = isEpisodeDataError || (!!episodeData && !episodeData.sources?.length);
+    if (!requestFailed) return;
+
+    // Let the initial local provider discovery yield at least a first batch
+    // before falling back. If every known candidate has already failed, keep
+    // waiting for the in-flight catalogue rather than giving up after two hosts.
+    if (isLocalBackendEnabled() && isEpisodesLoading) return;
+    const nativeCatalogue = allEpisodesData?.rawResponse?.source === "native";
+    const catalogueComplete = allEpisodesData?.rawResponse?.complete === true;
+    if (
+      isLocalBackendEnabled() &&
+      nativeCatalogue &&
+      !catalogueComplete &&
+      automaticCandidates.every((candidate) => attemptedSourceIdsRef.current.has(candidate.id))
+    ) {
+      return;
+    }
+    advanceAfterSourceFailure();
+  }, [
+    activeEpisodeId, advanceAfterSourceFailure, allEpisodesData?.rawResponse?.complete,
+    allEpisodesData?.rawResponse?.source, automaticCandidates, episodeData,
+    isEpisodeDataError, isEpisodesLoading, isHindiMode, isLoadingData, useFallback,
+  ]);
   const animeTitleOptions = useMemo(
     () => [...new Set([
       anime?.anime?.info?.name || "",
@@ -183,26 +213,38 @@ const VideoPlayerSection = () => {
   const hindiStreams = hindiDubData?.streams || [];
 
   // Check sub/dub availability for this episode
-  const hasSub = providerNames.some((p) => (rawProviders[p]?.episodes?.sub || []).some((episode) => episode.number === currentEpNumber));
-  const hasDub = providerNames.some((p) => (rawProviders[p]?.episodes?.dub || []).some((episode) => episode.number === currentEpNumber));
+  const hasSub = providerNames.some((p) => (rawProviders[p]?.episodes?.sub || []).length > 0);
+  const hasDub = providerNames.some((p) => (rawProviders[p]?.episodes?.dub || []).length > 0);
+  const nativeCatalogueComplete =
+    allEpisodesData?.rawResponse?.source === "native" &&
+    allEpisodesData.rawResponse.complete === true;
 
   const handleCategoryChange = (cat: "sub" | "dub") => {
     setIsHindiMode(false);
     setUseFallback(false);
     setPreferredCategory(cat);
 
-    // Switch active episode to the first available server of that category for current episode
-    if (providerNames.length > 0) {
-      for (const pName of providerNames) {
-        const pData = rawProviders[pName]?.episodes?.[cat] || [];
-        const targetEp = pData.find((ep: any) => ep.number === currentEpNumber);
-        if (targetEp?.id) {
-          setSelectedEpisode(targetEp.id);
-          attemptedSourceIdsRef.current.delete(targetEp.id);
-          updateEpisodeUrl(targetEp.id, currentEpNumber);
-          break;
-        }
-      }
+    const categoryProviders = providerNames.filter(
+      (name) => (rawProviders[name]?.episodes?.[cat] || []).length > 0,
+    );
+    const preferredProvider = categoryProviders.find((name) =>
+      (rawProviders[name]?.episodes?.[cat] || []).some((episode) => Number(episode.number) === currentEpNumber),
+    ) || categoryProviders[0];
+
+    const target = preferredProvider
+      ? (rawProviders[preferredProvider]?.episodes?.[cat] || [])
+          .find((episode) => Number(episode.number) === currentEpNumber)
+      : undefined;
+    const targetId = target?.id || (isLocalBackendEnabled() && preferredProvider
+      ? `watch/${preferredProvider}/${animeIdParam}/${cat}/${preferredProvider}-${currentEpNumber}`
+      : isLocalBackendEnabled()
+        ? `watch/auto/${animeIdParam}/${cat}/episode-${currentEpNumber}`
+        : "");
+
+    if (targetId) {
+      attemptedSourceIdsRef.current.delete(targetId);
+      setSelectedEpisode(targetId);
+      updateEpisodeUrl(targetId, currentEpNumber);
     }
   };
 
@@ -322,19 +364,25 @@ const VideoPlayerSection = () => {
     setUseFallback(false);
     setPreferredCategory(category);
     const pData = rawProviders[pName]?.episodes?.[category] || [];
-    const targetEp = pData.find((ep: any) => ep.number === currentEpNumber);
-    if (targetEp?.id) {
-      attemptedSourceIdsRef.current.delete(targetEp.id);
-      setSelectedEpisode(targetEp.id);
-      updateEpisodeUrl(targetEp.id, currentEpNumber);
+    const targetEp = pData.find((ep) => Number(ep.number) === currentEpNumber);
+    // Episode catalogues can be incomplete even when a source can play the
+    // requested episode. The local adapter accepts the trailing episode number
+    // and lets the selected provider try extraction directly.
+    const targetId = targetEp?.id || (isLocalBackendEnabled()
+      ? `watch/${pName}/${animeIdParam}/${category}/${pName}-${currentEpNumber}`
+      : "");
+    if (targetId) {
+      attemptedSourceIdsRef.current.delete(targetId);
+      setSelectedEpisode(targetId);
+      updateEpisodeUrl(targetId, currentEpNumber);
     }
   };
 
   const cleanParts = activeEpisodeId.replace(/^\//, "").split("/");
   const currentProviderName = cleanParts[1] || providerNames[0] || "auto";
   const activeCategory = cleanParts[3] === "dub" ? "dub" : cleanParts[3] === "sub" ? "sub" : preferredCategory;
-  const availableProviderNames = providerNames.filter((providerName) =>
-    (rawProviders[providerName]?.episodes?.[activeCategory] || []).some((episode) => episode.number === currentEpNumber),
+  const availableProviderNames = providerNames.filter(
+    (providerName) => (rawProviders[providerName]?.episodes?.[activeCategory] || []).length > 0,
   );
   const selectedProviderIndex = availableProviderNames.indexOf(currentProviderName);
   const fallbackServerNumber = 1;
@@ -370,10 +418,10 @@ const VideoPlayerSection = () => {
     <div className="flex w-full flex-col gap-3 rounded-2xl border border-white/[0.07] bg-[#101018] p-3 sm:p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-1.5 rounded-xl border border-white/[0.08] bg-black/20 p-1">
-          <Button size="sm" variant="ghost" disabled={!hasSub} onClick={() => handleCategoryChange("sub")} className={`h-8 rounded-lg px-3 text-xs font-bold transition ${!isHindiMode && activeCategory === "sub" ? "bg-[#ff2f9d] text-white hover:bg-[#ff56ad]" : "text-zinc-400 hover:text-white"}`}>
+          <Button size="sm" variant="ghost" disabled={nativeCatalogueComplete && !hasSub} onClick={() => handleCategoryChange("sub")} className={`h-8 rounded-lg px-3 text-xs font-bold transition ${!isHindiMode && activeCategory === "sub" ? "bg-[#ff2f9d] text-white hover:bg-[#ff56ad]" : "text-zinc-400 hover:text-white"}`}>
             <Captions className="mr-1.5 h-3.5 w-3.5" /> SUB
           </Button>
-          <Button size="sm" variant="ghost" disabled={!hasDub} onClick={() => handleCategoryChange("dub")} className={`h-8 rounded-lg px-3 text-xs font-bold transition ${!isHindiMode && activeCategory === "dub" ? "bg-[#ff2f9d] text-white hover:bg-[#ff56ad]" : "text-zinc-400 hover:text-white"}`}>
+          <Button size="sm" variant="ghost" disabled={nativeCatalogueComplete && !hasDub} onClick={() => handleCategoryChange("dub")} className={`h-8 rounded-lg px-3 text-xs font-bold transition ${!isHindiMode && activeCategory === "dub" ? "bg-[#ff2f9d] text-white hover:bg-[#ff56ad]" : "text-zinc-400 hover:text-white"}`}>
             <Mic className="mr-1.5 h-3.5 w-3.5" /> ENGLISH
           </Button>
           {hindiStreams.length > 0 && (
@@ -399,6 +447,9 @@ const VideoPlayerSection = () => {
             {availableProviderNames.map((providerName, index) => (
               <Button key={`${activeCategory}-${providerName}`} size="sm" title={getServerProviderTitle(availableProviderNames, providerName)} aria-label={getServerProviderTitle(availableProviderNames, providerName)} onClick={() => handleProviderSelect(providerName, activeCategory)} className={`h-9 min-w-9 rounded-xl px-3 text-xs font-extrabold transition ${activeServerNumber === index + 2 ? "bg-[#ff2f9d] text-white" : "border border-white/[0.08] bg-white/[0.035] text-zinc-300 hover:border-[#ff2f9d]/30 hover:bg-[#ff2f9d]/10"}`}>{index + 2}</Button>
             ))}
+            {isLocalBackendEnabled() && !nativeCatalogueComplete && availableProviderNames.length === 0 && (
+              <span className="px-2 text-xs text-zinc-500" role="status">Finding servers…</span>
+            )}
           </>
         )}
       </div>
