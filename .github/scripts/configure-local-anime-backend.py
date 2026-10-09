@@ -252,56 +252,49 @@ def add_import(text: str, import_statement: str) -> str:
 
 
 def register_plugin(main_activity: Path) -> None:
+    """Register native plugins idempotently before BridgeActivity initializes."""
     text = main_activity.read_text(encoding="utf-8")
-    if "registerPlugin(LocalAnimeBackendPlugin.class)" in text:
-        return
-
     text = add_import(text, "import com.sevenx.anime.LocalAnimeBackendPlugin;")
+    text = add_import(text, "import com.sevenx.anime.PlayerFullscreenPlugin;")
     if "import com.getcapacitor.BridgeActivity;" not in text:
         text = add_import(text, "import com.getcapacitor.BridgeActivity;")
 
-    on_create = re.search(
-        r"(?s)void\s+onCreate\s*\([^)]*\)\s*\{",
-        text,
-    )
-    if on_create:
-        remaining = text[on_create.end():]
-        super_call = re.search(
-            r"super\.onCreate\s*\(\s*savedInstanceState\s*\)\s*;",
-            remaining,
-        )
-        if super_call:
-            position = on_create.end() + super_call.start()
-            text = (
-                text[:position]
-                + "registerPlugin(LocalAnimeBackendPlugin.class);\n        "
-                + text[position:]
-            )
-        else:
-            fail("MainActivity has an onCreate method without the expected super call.")
-    else:
-        class_match = re.search(
-            r"class\s+MainActivity\s+extends\s+BridgeActivity\s*\{",
-            text,
-        )
+    on_create = re.search(r"(?s)void\\s+onCreate\\s*\\([^)]*\\)\\s*\\{", text)
+    if not on_create:
+        class_match = re.search(r"class\\s+MainActivity\\s+extends\\s+BridgeActivity\\s*\\{", text)
         if not class_match:
-            fail("Could not locate MainActivity class declaration.")
+            fail("Could not locate MainActivity.onCreate or class declaration.")
         text = add_import(text, "import android.os.Bundle;")
-        class_match = re.search(
-            r"class\s+MainActivity\s+extends\s+BridgeActivity\s*\{",
-            text,
-        )
+        class_match = re.search(r"class\\s+MainActivity\\s+extends\\s+BridgeActivity\\s*\\{", text)
         close = text.rfind("}")
         if close < class_match.end():
             fail("Could not locate MainActivity class terminator.")
         method = (
-            "\n    @Override\n"
-            "    public void onCreate(Bundle savedInstanceState) {\n"
-            "        registerPlugin(LocalAnimeBackendPlugin.class);\n"
-            "        super.onCreate(savedInstanceState);\n"
-            "    }\n"
+            "\\n    @Override\\n"
+            "    public void onCreate(Bundle savedInstanceState) {\\n"
+            "        registerPlugin(LocalAnimeBackendPlugin.class);\\n"
+            "        registerPlugin(PlayerFullscreenPlugin.class);\\n"
+            "        super.onCreate(savedInstanceState);\\n"
+            "    }\\n"
         )
         text = text[:close] + method + text[close:]
+    else:
+        remaining = text[on_create.end():]
+        super_call = re.search(
+            r"super\\.onCreate\\s*\\(\\s*savedInstanceState\\s*\\)\\s*;",
+            remaining,
+        )
+        if not super_call:
+            fail("MainActivity has an onCreate method without the expected super call.")
+        missing_registrations = []
+        if "registerPlugin(LocalAnimeBackendPlugin.class)" not in text:
+            missing_registrations.append("registerPlugin(LocalAnimeBackendPlugin.class);")
+        if "registerPlugin(PlayerFullscreenPlugin.class)" not in text:
+            missing_registrations.append("registerPlugin(PlayerFullscreenPlugin.class);")
+        if missing_registrations:
+            position = on_create.end() + super_call.start()
+            insert = "\\n        " + "\\n        ".join(missing_registrations) + "\\n        "
+            text = text[:position] + insert + text[position:]
     main_activity.write_text(text, encoding="utf-8")
 
 
@@ -321,6 +314,24 @@ def install_navigation_guard(main_activity: Path) -> None:
 
     position = super_call.end()
     text = text[:position] + "\n        " + statement + text[position:]
+    main_activity.write_text(text, encoding="utf-8")
+
+
+def install_streaming_chrome_client(main_activity: Path) -> None:
+    """Use a Chrome client that supports video fullscreen and suppresses popup dialogs."""
+    text = main_activity.read_text(encoding="utf-8")
+    statement = "getBridge().getWebView().setWebChromeClient(new StreamingWebChromeClient(getBridge()));"
+    if statement in text:
+        return
+
+    super_call = re.search(
+        r"super\\.onCreate\\s*\\(\\s*savedInstanceState\\s*\\)\\s*;",
+        text,
+    )
+    if not super_call:
+        fail("Could not find MainActivity.onCreate super call to install fullscreen Chrome client.")
+    position = super_call.end()
+    text = text[:position] + "\\n        " + statement + text[position:]
     main_activity.write_text(text, encoding="utf-8")
 
 
@@ -461,24 +472,29 @@ def main() -> None:
     patch_app_gradle()
     patch_manifest()
 
-    java_source = ROOT / "android-local-backend/LocalAnimeBackendPlugin.java"
-    navigation_source = ROOT / "android-local-backend/StreamingNavigationWebViewClient.java"
-    for source in (java_source, navigation_source):
+    native_sources = {
+        "LocalAnimeBackendPlugin.java": ROOT / "android-local-backend/LocalAnimeBackendPlugin.java",
+        "StreamingNavigationWebViewClient.java": ROOT / "android-local-backend/StreamingNavigationWebViewClient.java",
+        "StreamingWebChromeClient.java": ROOT / "android-local-backend/StreamingWebChromeClient.java",
+        "PlayerFullscreenPlugin.java": ROOT / "android-local-backend/PlayerFullscreenPlugin.java",
+    }
+    for filename, source in native_sources.items():
         if not source.is_file():
             fail(f"Required native Android source is missing: {source}")
 
     package_dir = ANDROID / "app/src/main/java/com/sevenx/anime"
     package_dir.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(java_source, package_dir / "LocalAnimeBackendPlugin.java")
-    shutil.copy2(navigation_source, package_dir / "StreamingNavigationWebViewClient.java")
+    for filename, source in native_sources.items():
+        shutil.copy2(source, package_dir / filename)
 
     candidates = list((ANDROID / "app/src/main/java").rglob("MainActivity.java"))
     if len(candidates) != 1:
         fail(f"Expected one generated MainActivity.java, found {len(candidates)}.")
     register_plugin(candidates[0])
     install_navigation_guard(candidates[0])
+    install_streaming_chrome_client(candidates[0])
 
-    print("Configured 7xAnime with an embedded Python API and native external-navigation guard.")
+    print("Configured 7xAnime with the on-device API, ad-filtering navigation guard, popup protection, and fullscreen support.")
 
 
 if __name__ == "__main__":
