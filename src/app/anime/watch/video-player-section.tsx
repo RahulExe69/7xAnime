@@ -518,9 +518,11 @@ const VideoPlayerSection = () => {
     ? actualProviderName && actualProviderName !== "auto"
       ? `Auto → ${getProviderDisplayName(actualProviderName)}`
       : "Auto"
-    : activeServerNumber === 1
-      ? "Server 1 — MegaPlay"
-      : `Server ${activeServerNumber} — ${getProviderDisplayName(currentProviderName)}`;
+    : !useFallback && !isHindiMode && providerPlaybackOutcomes[currentProviderName] === "failed"
+      ? `${getProviderDisplayName(currentProviderName)} unavailable`
+      : activeServerNumber === 1
+        ? "Server 1 — MegaPlay"
+        : `Server ${activeServerNumber} — ${getProviderDisplayName(currentProviderName)}`;
 
   const selectFallbackServer = (category?: "sub" | "dub") => {
     if (category) setPreferredCategory(category);
