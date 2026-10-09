@@ -157,10 +157,18 @@ jobs:
               raise SystemExit("Default EasyList/EasyPrivacy subscriptions are missing")
 
           app_gradle = Path("android/app/build.gradle").read_text(encoding="utf-8")
-          settings_gradle = Path("android/settings.gradle").read_text(encoding="utf-8")
+          gradle_repository_files = [
+              Path("android/settings.gradle"),
+              Path("android/capacitor.settings.gradle"),
+              Path("android/build.gradle"),
+          ]
+          has_jitpack_repository = any(
+              path.is_file() and "https://jitpack.io" in path.read_text(encoding="utf-8")
+              for path in gradle_repository_files
+          )
           if "com.github.Edsuns.AdblockAndroid:ad-filter:1.0" not in app_gradle:
               raise SystemExit("Android filter-engine dependency is missing")
-          if "https://jitpack.io" not in settings_gradle:
+          if not has_jitpack_repository:
               raise SystemExit("JitPack repository is missing from Android dependency repositories")
           license_asset = Path("android/app/src/main/assets/THIRD_PARTY_LICENSES/AdblockAndroid-LICENSE.txt")
           if not license_asset.is_file() or license_asset.stat().st_size < 10000:
