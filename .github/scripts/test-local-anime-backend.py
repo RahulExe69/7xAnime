@@ -451,7 +451,7 @@ class LocalAnimeApiTests(unittest.TestCase):
 
         asyncio.run(exercise())
 
-    def test_auto_race_excludes_manual_only_embed_route_builders(self) -> None:
+    def test_auto_race_does_not_call_parked_or_manual_embed_providers(self) -> None:
         attempted = []
 
         async def fake_watch_one(mod, name, anilist_id, episode, audio, ctx):
@@ -471,8 +471,8 @@ class LocalAnimeApiTests(unittest.TestCase):
             ):
                 result = await local_api._race_watch_for_player(21, 1, "sub")
 
-            self.assertEqual(result["provider"], "anineko")
-            self.assertEqual(attempted, ["anineko"])
+            self.assertIsNone(result)
+            self.assertEqual(attempted, [])
 
         asyncio.run(exercise())
 
