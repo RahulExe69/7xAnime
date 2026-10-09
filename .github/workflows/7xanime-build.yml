@@ -112,6 +112,7 @@ jobs:
               "anineko", "anizone", "anikoto", "reanime", "aniwaves",
               "kaa", "anibd", "animegg", "mkissa", "animeonsen", "animenosub",
               "anixo", "megavid", "animeparadise", "cosmic",
+              "megaflix", "tryembed", "cinexstream", "nontongo",
           }
           providers = _race.providers()
           loaded_names = {name for name, _ in providers}
@@ -151,7 +152,10 @@ jobs:
               )
               assert status.status_code == 200, status.text
               reported = {item["id"] for item in status.json()["providers"] if item["moduleLoaded"]}
-              active_manual = {"anixo", "megavid", "animeparadise", "cosmic"}
+              active_manual = {
+                  "anixo", "megavid", "animeparadise", "cosmic",
+                  "megaflix", "tryembed", "cinexstream", "nontongo",
+              }
               assert active_manual <= reported, (
                   "Diagnostics do not list all approved manual providers: "
                   f"{sorted(active_manual - reported)}"
@@ -161,7 +165,7 @@ jobs:
                   f"{sorted(reported - active_manual)}"
               )
           print(
-              "Packaged API: all 15 adapter modules imported; only the four approved "
+              "Packaged API: all 19 adapter modules imported; only the eight approved "
               "manual choices are exposed; health, auth, diagnostics and CORS passed."
           )
           PY
