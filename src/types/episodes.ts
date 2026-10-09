@@ -28,6 +28,8 @@ export interface IEpisodeSource {
   defaultProvider?: string;
   providerStatus?: "ok" | "no_stream" | "provider_unavailable" | "unsupported_provider" | "timeout" | "error";
   providerError?: string | null;
+  /** Extraction outcomes for providers attempted by the automatic route. */
+  timings?: Record<string, { seconds: number; ok: boolean }>;
 }
 
 export interface IEpisodeServers {

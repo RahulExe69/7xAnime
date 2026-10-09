@@ -120,13 +120,20 @@ class LocalAnimeApiTests(unittest.TestCase):
         self.assertEqual(response.json()["providerStatus"], "unsupported_provider")
         self.assertEqual(response.json()["streams"], [])
 
-    def test_auto_watch_route_returns_an_empty_result_quickly_when_no_provider_wins(self) -> None:
+    def test_auto_watch_route_returns_failure_timings_when_no_provider_wins(self) -> None:
         async def fake_race(anilist_id, episode, audio="sub", preferred=None):
             self.assertEqual(anilist_id, 12345)
             self.assertEqual(episode, 1)
             self.assertEqual(audio, "sub")
             self.assertIsNone(preferred)
-            return None
+            return {
+                "provider": "auto",
+                "streams": [],
+                "timings": {
+                    "anineko": {"seconds": 0.2, "ok": False},
+                    "animegg": {"seconds": 0.4, "ok": False},
+                },
+            }
 
         with patch.object(local_api, "_race_watch_for_player", new=AsyncMock(side_effect=fake_race)):
             response = self.client.get(
@@ -134,7 +141,10 @@ class LocalAnimeApiTests(unittest.TestCase):
                 headers=self.auth,
             )
         self.assertEqual(response.status_code, 200, response.text)
-        self.assertEqual(response.json()["streams"], [])
+        payload = response.json()
+        self.assertEqual(payload["streams"], [])
+        self.assertFalse(payload["timings"]["anineko"]["ok"])
+        self.assertFalse(payload["timings"]["animegg"]["ok"])
 
     def test_auto_watch_route_converts_provider_exception_to_empty_stream_result(self) -> None:
         with patch.object(

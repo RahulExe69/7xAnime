@@ -47,6 +47,7 @@ const getEpisodeData = async (
     defaultProvider: data.defaultProvider,
     providerStatus: data.providerStatus,
     providerError: data.providerError,
+    timings: data.timings,
   };
 };
 

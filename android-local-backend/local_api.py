@@ -344,7 +344,14 @@ async def _race_watch_for_player(anilist_id: int, episode: int, audio: str) -> d
         if pending:
             await asyncio.gather(*pending, return_exceptions=True)
     if winner is None:
-        return None
+        # Preserve all attempted-provider outcomes when Auto has no winner so
+        # the client can hide only sources that failed for this selection.
+        return {
+            "provider": "auto",
+            "streams": [],
+            "timings": timings,
+            "defaultProvider": provider_race.default_provider(),
+        }
     winner["timings"] = timings
     winner["defaultProvider"] = provider_race.default_provider()
     return winner
@@ -389,6 +396,7 @@ async def legacy_watch_route(provider: str, anilist_id: int, audio: str, episode
                 "defaultProvider": result.get("defaultProvider") or provider_race.default_provider(),
                 "providerStatus": "ok" if streams else "no_stream",
                 "providerError": None if streams else "No supported stream was returned. See per-provider diagnostics for timeout, HTTP, empty-result, or unsupported-format details.",
+                "timings": result.get("timings") or {},
                 "streams": streams,
                 "subtitles": provider_race.merge_subtitles(streams),
             }

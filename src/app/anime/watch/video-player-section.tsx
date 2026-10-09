@@ -506,6 +506,29 @@ const VideoPlayerSection = () => {
     isLoadingData,
   ]);
 
+  // An automatic provider race reports the outcomes of sources it actually
+  // attempted. Apply those failures to this screen's scoped hide/retry state;
+  // never infer per-episode failure from the backend's global failure counters.
+  useEffect(() => {
+    const timings = episodeData?.timings;
+    if (!isLocalBackendEnabled() || !activeEpisodeId.startsWith("watch/auto/") || !timings) return;
+    const failedProviders = Object.entries(timings)
+      .filter(([, outcome]) => outcome && outcome.ok === false)
+      .map(([providerName]) => providerName);
+    if (!failedProviders.length) return;
+    setProviderPlaybackOutcomes((previous) => {
+      let changed = false;
+      const next = { ...previous };
+      for (const providerName of failedProviders) {
+        if (next[providerName] !== "failed") {
+          next[providerName] = "failed";
+          changed = true;
+        }
+      }
+      return changed ? next : previous;
+    });
+  }, [activeEpisodeId, episodeData?.timings]);
+
   const selectedProviderIndex = visibleServerProviderNames.indexOf(currentProviderName);
   const fallbackServerNumber = 1;
   const activeServerNumber = isHindiMode
