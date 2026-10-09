@@ -340,6 +340,13 @@ def copy_python_source() -> None:
         shutil.rmtree(destination_src)
     shutil.copytree(source_dir / "src", destination_src)
 
+    # Add the independent AnimeNoSub adapter as an optional eleventh provider.
+    # It is embed-first and does not replace any existing Kuhi provider.
+    extra_provider = ROOT / "android-local-backend/extra-providers/animenosub.py"
+    if not extra_provider.is_file():
+        fail("The extra AnimeNoSub provider adapter is missing.")
+    shutil.copy2(extra_provider, destination_src / "providers" / "animenosub.py")
+
     # The pinned upstream snapshot includes PEP 701 f-string syntax that
     # Python 3.11 cannot parse. The Android workflow deliberately uses Python
     # 3.11, so make these two provider modules compatible before importing them.
@@ -378,6 +385,18 @@ def copy_python_source() -> None:
     # on mobile, so cancel slower competitors almost immediately after a winner.
     race_file = destination_src / "providers" / "_race.py"
     race_text = race_file.read_text(encoding="utf-8")
+
+    # Register the added adapter only in the copied, packaged provider tree.
+    ranking_match = re.search(r"(?s)RANKING\\s*=\\s*\\[(.*?)\\]", race_text)
+    if not ranking_match:
+        fail("Could not locate Kuhi's provider ranking.")
+    ranking_block = ranking_match.group(1)
+    if '"animenosub"' not in ranking_block:
+        if '"animeonsen"' not in ranking_block:
+            fail("Could not append AnimeNoSub to Kuhi's provider ranking.")
+        ranking_block = ranking_block.replace('"animeonsen"', '"animeonsen", "animenosub"', 1)
+        race_text = race_text[:ranking_match.start(1)] + ranking_block + race_text[ranking_match.end(1):]
+
     slow_cleanup = "await asyncio.wait(pending, timeout=8.0)"
     if slow_cleanup in race_text:
         race_text = race_text.replace(slow_cleanup, "await asyncio.wait(pending, timeout=0.2)", 1)
