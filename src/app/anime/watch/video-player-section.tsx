@@ -22,7 +22,6 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useGetAllEpisodes } from "@/query/get-all-episodes";
 
 import useBookMarks from "@/hooks/use-get-bookmark";
-import { useGetSourceAvailable } from "@/query/get-source-available";
 import { isLocalBackendEnabled } from "@/lib/api";
 import { saveLocalWatchProgress } from "@/lib/local-watch-progress";
 
@@ -41,7 +40,6 @@ const VideoPlayerSection = () => {
   const episodeIdParam = searchParams.get("episode") || "";
   const { selectedEpisode, setSelectedEpisode, anime } = useAnimeStore();
 
-  const { data: isSourceAvailable } = useGetSourceAvailable();
   const { data: allEpisodesData } = useGetAllEpisodes(animeIdParam);
   const [preferredCategory, setPreferredCategory] = useState<"sub" | "dub">("dub");
 
@@ -76,9 +74,7 @@ const VideoPlayerSection = () => {
     }
   }, [activeEpisodeId, selectedEpisode, setSelectedEpisode]);
 
-  const isPrimaryDisabled = isSourceAvailable === false;
   const [useFallback, setUseFallback] = useState<boolean>(false);
-  const [forcePrimary, setForcePrimary] = useState<boolean>(false);
   const [isHindiMode, setIsHindiMode] = useState<boolean>(false);
   const [selectedHindiServer, setSelectedHindiServer] = useState<number>(0);
   const attemptedSourceIdsRef = useRef<Set<string>>(new Set());
@@ -87,7 +83,7 @@ const VideoPlayerSection = () => {
     data: episodeData,
     isLoading: isLoadingData,
     isError: isEpisodeDataError,
-  } = useGetEpisodeData(activeEpisodeId, (!isPrimaryDisabled || forcePrimary) && !useFallback && !isHindiMode);
+  } = useGetEpisodeData(activeEpisodeId, !useFallback && !isHindiMode);
 
   const [autoSkip, setAutoSkip] = useState<boolean>(true);
 
@@ -137,7 +133,6 @@ const VideoPlayerSection = () => {
   useEffect(() => {
     attemptedSourceIdsRef.current.clear();
     setUseFallback(false);
-    setForcePrimary(false);
     setIsHindiMode(false);
     setSelectedHindiServer(0);
     setPreferredCategory("dub");
@@ -154,22 +149,19 @@ const VideoPlayerSection = () => {
       attemptedSourceIdsRef.current.add(next.id);
       setUseFallback(false);
       setIsHindiMode(false);
-      setForcePrimary(true);
       setPreferredCategory(next.category);
       setSelectedEpisode(next.id);
       updateEpisodeUrl(next.id, currentEpNumber);
       return;
     }
-    setForcePrimary(false);
     setUseFallback(true);
   }, [activeEpisodeId, automaticCandidates, currentEpNumber, setSelectedEpisode]);
 
   useEffect(() => {
     if (!activeEpisodeId || isHindiMode || useFallback || isLoadingData) return;
-    if (isSourceAvailable === false && !forcePrimary) return;
-    const requestFailed = isEpisodeDataError || (!!episodeData && !episodeData.sources?.length);
+        const requestFailed = isEpisodeDataError || (!!episodeData && !episodeData.sources?.length);
     if (requestFailed) advanceAfterSourceFailure();
-  }, [activeEpisodeId, advanceAfterSourceFailure, episodeData, forcePrimary, isEpisodeDataError, isHindiMode, isLoadingData, isSourceAvailable, useFallback]);
+  }, [activeEpisodeId, advanceAfterSourceFailure, episodeData, isEpisodeDataError, isHindiMode, isLoadingData, useFallback]);
   const animeTitleOptions = useMemo(
     () => [...new Set([
       anime?.anime?.info?.name || "",
@@ -197,7 +189,6 @@ const VideoPlayerSection = () => {
   const handleCategoryChange = (cat: "sub" | "dub") => {
     setIsHindiMode(false);
     setUseFallback(false);
-    setForcePrimary(true);
     setPreferredCategory(cat);
 
     // Switch active episode to the first available server of that category for current episode
@@ -216,7 +207,7 @@ const VideoPlayerSection = () => {
   };
 
   const isFallbackActive = !isHindiMode && (
-    (!forcePrimary && isSourceAvailable === false) || useFallback
+    useFallback
   );
 
   // Listen to postMessage events from Fallback Player iframe (megaplay.buzz / megacloud)
@@ -329,7 +320,6 @@ const VideoPlayerSection = () => {
   const handleProviderSelect = (pName: string, category: "sub" | "dub") => {
     setIsHindiMode(false);
     setUseFallback(false);
-    setForcePrimary(true);
     setPreferredCategory(category);
     const pData = rawProviders[pName]?.episodes?.[category] || [];
     const targetEp = pData.find((ep: any) => ep.number === currentEpNumber);
@@ -357,13 +347,11 @@ const VideoPlayerSection = () => {
   const selectFallbackServer = (category?: "sub" | "dub") => {
     if (category) setPreferredCategory(category);
     setIsHindiMode(false);
-    setForcePrimary(false);
     setUseFallback(true);
   };
   const selectHindiMode = () => {
     if (!hindiStreams.length) return;
     setUseFallback(false);
-    setForcePrimary(false);
     setSelectedHindiServer(0);
     setIsHindiMode(true);
   };
