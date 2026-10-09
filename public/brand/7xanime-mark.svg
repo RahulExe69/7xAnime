@@ -7,7 +7,7 @@
   </defs>
   <rect width="512" height="512" rx="112" fill="url(#bg)"/>
   <circle cx="267" cy="254" r="230" fill="url(#ambience)"/>
-  <g filter="url(#glow)" opacity=".32"><path d="M70 86 L433 71 L409 135 L302 151 L204 424 L134 424 L250 151 L62 161 Z" fill="#ff2f9d"/></g>
+  <g filter="url(#glow)" opacity=".32"><path d="M68 82 L442 68 L414 136 L330 151 L202 430 L124 430 L251 151 L58 164 Z" fill="#ff2f9d"/></g>
   
 <defs>
   <linearGradient id="sevenFill" x1="0" y1="0" x2="0.9" y2="1">
@@ -22,12 +22,12 @@
   </linearGradient>
 </defs>
 <!-- Angular brush-stroke 7: sharp cuts give the mark an anime action-line silhouette. -->
-<path d="M70 86 L433 71 L409 135 L302 151 L204 424 L134 424 L250 151 L62 161 Z" fill="url(#sevenFill)"/>
-<path d="M91 103 L174 99 L116 116 Z M373 89 L414 86 L399 103 Z M165 389 L191 324 L174 398 Z" fill="#ffffff" opacity=".78"/>
+<path d="M68 82 L442 68 L414 136 L330 151 L202 430 L124 430 L251 151 L58 164 Z" fill="url(#sevenFill)"/>
+<path d="M88 99 L164 96 L109 113 Z M383 86 L424 82 L405 105 Z M151 397 L188 322 L166 406 Z" fill="#ffffff" opacity=".78"/>
 <!-- The magenta x cuts through the 7's diagonal so the two characters read as one fused mark. -->
-<path d="M224 253 L256 226 L306 275 L352 225 L387 252 L340 300 L380 341 L348 371 L306 330 L263 370 L230 341 L274 299 Z" fill="url(#xFill)"/>
-<path d="M230 247 L256 226 L286 254 L257 247 Z M348 225 L387 252 L365 273 L376 250 Z M350 371 L326 348 L350 355 L368 346 Z" fill="#ff9bd2" opacity=".9"/>
-<path d="M196 250 L211 241 L235 266 L222 276 Z M384 220 L401 204 L411 216 L394 236 Z M222 361 L238 346 L252 362 L236 377 Z" fill="#ff2f9d"/>
+<path d="M238 253 L270 226 L320 275 L366 225 L401 252 L354 300 L394 341 L362 371 L320 330 L277 370 L244 341 L288 299 Z" fill="url(#xFill)"/>
+<path d="M244 247 L270 226 L300 254 L271 247 Z M362 225 L401 252 L379 273 L390 250 Z M364 371 L340 348 L364 355 L382 346 Z" fill="#ff9bd2" opacity=".9"/>
+<path d="M210 250 L225 241 L249 266 L236 276 Z M398 220 L415 204 L425 216 L408 236 Z M236 361 L252 346 L266 362 L250 377 Z" fill="#ff2f9d"/>
 
   <path d="M355 112 L405 80 L375 132 Z M112 348 L138 332 L120 377 Z M397 382 L425 363 L408 399 Z" fill="#ff2f9d" opacity=".9"/>
 </svg>
