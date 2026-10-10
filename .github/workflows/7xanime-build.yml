@@ -97,7 +97,7 @@ jobs:
           python3 .github/scripts/configure-capacitor-android.py
           python3 .github/scripts/configure-local-anime-backend.py
 
-      - name: Verify native ad blocking and fullscreen wiring
+      - name: Verify native navigation and fullscreen wiring
         run: |
           python - <<'PY'
           from pathlib import Path
@@ -141,38 +141,6 @@ jobs:
           ):
               if item not in text:
                   raise SystemExit(f"Native ad/fullscreen feature missing: {item}")
-
-          # The EasyList-compatible native engine must be wired in at request interception
-          # and page start, and its LGPL license must be packaged with the APK.
-          for item in (
-              "AdFilter.Companion.get().shouldIntercept(view, request)",
-              "AdFilter.Companion.get().performScript(view, url)",
-          ):
-              if item not in nav:
-                  raise SystemExit(f"Filter-list request/cosmetic wiring missing: {item}")
-
-          if "AdFilter.Companion.create(getApplicationContext())" not in main_activity:
-              raise SystemExit("Native AdFilter initialization missing from MainActivity")
-          if "EasyList" not in main_activity or "EasyPrivacy" not in main_activity:
-              raise SystemExit("Default EasyList/EasyPrivacy subscriptions are missing")
-
-          app_gradle = Path("android/app/build.gradle").read_text(encoding="utf-8")
-          gradle_repository_files = [
-              Path("android/settings.gradle"),
-              Path("android/capacitor.settings.gradle"),
-              Path("android/build.gradle"),
-          ]
-          has_jitpack_repository = any(
-              path.is_file() and "https://jitpack.io" in path.read_text(encoding="utf-8")
-              for path in gradle_repository_files
-          )
-          if "com.github.Edsuns.AdblockAndroid:ad-filter:v0.9.1" not in app_gradle:
-              raise SystemExit("Android filter-engine dependency is missing")
-          if not has_jitpack_repository:
-              raise SystemExit("JitPack repository is missing from Android dependency repositories")
-          license_asset = Path("android/app/src/main/assets/THIRD_PARTY_LICENSES/AdblockAndroid-LICENSE.txt")
-          if not license_asset.is_file() or license_asset.stat().st_size < 10000:
-              raise SystemExit("AdblockAndroid LGPL license was not packaged in Android assets")
 
           watch_section = Path("src/app/anime/watch/video-player-section.tsx").read_text(encoding="utf-8")
           player_component = Path("src/components/video-player.tsx").read_text(encoding="utf-8")
