@@ -308,13 +308,13 @@ def install_navigation_guard(main_activity: Path) -> None:
     statement = "getBridge().getWebView().setWebViewClient(new StreamingNavigationWebViewClient(getBridge()));"
     if statement not in text:
         super_call = re.search(
-            r"super\\.onCreate\\s*\\(\\s*savedInstanceState\\s*\\)\\s*;",
+            r"super\.onCreate\s*\(\s*savedInstanceState\s*\)\s*;",
             text,
         )
         if not super_call:
             fail("Could not find MainActivity.onCreate super call to install the navigation guard.")
         position = super_call.end()
-        text = text[:position] + "\\n        " + statement + text[position:]
+        text = text[:position] + "\n        " + statement + text[position:]
 
     main_activity.write_text(text, encoding="utf-8")
 
