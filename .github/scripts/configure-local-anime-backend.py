@@ -96,61 +96,6 @@ def patch_settings_gradle() -> None:
     path.write_text(text, encoding="utf-8")
 
 
-def patch_dependency_repositories() -> None:
-    """Add JitPack to the active Android dependency repositories."""
-    # Capacitor versions have put repositories either in settings.gradle or an
-    # applied capacitor.settings.gradle script. Prefer centralized management
-    # when present, and fall back to the generated root allprojects repositories.
-    candidates = [ANDROID / "settings.gradle", ANDROID / "capacitor.settings.gradle"]
-    for path in candidates:
-        if not path.is_file():
-            continue
-        text = path.read_text(encoding="utf-8")
-        if "https://jitpack.io" in text:
-            return
-
-        management = re.search(r"(?m)^\s*dependencyResolutionManagement\s*\{", text)
-        if not management:
-            continue
-
-        open_index = text.find("{", management.start())
-        close_index = matching_brace(text, open_index)
-        block = text[open_index:close_index]
-        repositories = re.search(r"(?m)^\s*repositories\s*\{", block)
-        if not repositories:
-            fail(f"Could not locate dependency repositories in {path}.")
-        repo_open = block.find("{", repositories.start())
-        repo_close = matching_brace(block, repo_open)
-        block = block[:repo_close] + '\n        maven { url = uri("https://jitpack.io") }\n    ' + block[repo_close:]
-        text = text[:open_index] + block + text[close_index:]
-        path.write_text(text, encoding="utf-8")
-        return
-
-    root_gradle = ANDROID / "build.gradle"
-    if not root_gradle.is_file():
-        fail("Could not locate Android Gradle files for adding JitPack.")
-    text = root_gradle.read_text(encoding="utf-8")
-    if "https://jitpack.io" in text:
-        return
-
-    all_projects = re.search(r"(?m)^\s*allprojects\s*\{", text)
-    if all_projects:
-        project_open = text.find("{", all_projects.start())
-        project_close = matching_brace(text, project_open)
-        project_block = text[project_open:project_close]
-        repositories = re.search(r"(?m)^\s*repositories\s*\{", project_block)
-        if repositories:
-            repo_open = project_block.find("{", repositories.start())
-            repo_close = matching_brace(project_block, repo_open)
-            project_block = project_block[:repo_close] + '\n        maven { url "https://jitpack.io" }\n    ' + project_block[repo_close:]
-            text = text[:project_open] + project_block + text[project_close:]
-        else:
-            project_block += '\n    repositories { maven { url "https://jitpack.io" } }\n'
-            text = text[:project_open] + project_block + text[project_close:]
-    else:
-        text += '\n\nallprojects {\n    repositories {\n        maven { url "https://jitpack.io" }\n    }\n}\n'
-    root_gradle.write_text(text, encoding="utf-8")
-
 
 def patch_root_gradle() -> None:
     path = ANDROID / "build.gradle"
@@ -264,30 +209,6 @@ def patch_app_gradle() -> None:
     path.write_text(text, encoding="utf-8")
 
 
-def patch_adblock_dependency() -> None:
-    """Add the Android-native EasyList-compatible engine to the generated app module."""
-    path = ANDROID / "app/build.gradle"
-    text = path.read_text(encoding="utf-8")
-    dependency_coordinate = "com.github.Edsuns.AdblockAndroid:ad-filter:v0.9.1"
-    if dependency_coordinate in text:
-        return
-
-    # AdblockAndroid's published POM still declares Anko artifacts from the retired
-    # JCenter repository. A source search of the filter module finds no Anko usage;
-    # exclude that unused legacy group so modern Gradle builds remain resolvable.
-    dependency = (
-        "implementation('" + dependency_coordinate + "') {\n"
-        "        exclude group: 'org.jetbrains.anko'\n"
-        "    }"
-    )
-    match = re.search(r"(?m)^\s*dependencies\s*\{", text)
-    if not match:
-        fail("Could not locate app dependencies block for the WebView filter engine.")
-    open_index = text.find("{", match.start())
-    close_index = matching_brace(text, open_index)
-    text = text[:close_index] + "\n    " + dependency + "\n" + text[close_index:]
-    path.write_text(text, encoding="utf-8")
-
 
 def patch_manifest() -> None:
     path = ANDROID / "app/src/main/AndroidManifest.xml"
@@ -380,52 +301,25 @@ def register_plugin(main_activity: Path) -> None:
 
 
 def install_navigation_guard(main_activity: Path) -> None:
-    """Install the navigation guard; ad filtering must never prevent app startup."""
+    """Install the in-app navigation guard without optional native filter libraries."""
     text = main_activity.read_text(encoding="utf-8")
-    text = add_import(text, "import android.util.Log;")
     text = add_import(text, "import com.sevenx.anime.StreamingNavigationWebViewClient;")
-    text = add_import(text, "import io.github.edsuns.adfilter.AdFilter;")
-
-    super_call = re.search(
-        r"super\.onCreate\s*\(\s*savedInstanceState\s*\)\s*;",
-        text,
-    )
-    if not super_call:
-        fail("Could not find MainActivity.onCreate super call to initialize the WebView filter.")
-
-    initialization_marker = "AdFilter.Companion.create(getApplicationContext())"
-    end_marker = "// 7X_ADFILTER_INITIALIZATION_END"
-    if initialization_marker not in text:
-        initialization = (
-            "\n        // Optional: filtering failures must not crash startup on OEM WebViews/JNI variants.\n"
-            "        try {\n"
-            "            AdFilter adFilter = AdFilter.Companion.create(getApplicationContext());\n"
-            "            adFilter.setupWebView(getBridge().getWebView());\n"
-            "            if (!adFilter.getHasInstallation()) {\n"
-            "                io.github.edsuns.adfilter.Filter easyList = adFilter.getViewModel().addFilter(\n"
-            "                    \"EasyList\", \"https://easylist.to/easylist/easylist.txt\");\n"
-            "                adFilter.getViewModel().download(easyList.getId());\n"
-            "                io.github.edsuns.adfilter.Filter easyPrivacy = adFilter.getViewModel().addFilter(\n"
-            "                    \"EasyPrivacy\", \"https://easylist.to/easylist/easyprivacy.txt\");\n"
-            "                adFilter.getViewModel().download(easyPrivacy.getId());\n"
-            "            }\n"
-            "        } catch (RuntimeException | LinkageError error) {\n"
-            "            Log.w(\"7xAnimeAdFilter\", \"Native filter unavailable; continuing without filter lists\", error);\n"
-            "        }\n"
-            "        " + end_marker + "\n"
-        )
-        position = super_call.end()
-        text = text[:position] + initialization + text[position:]
 
     statement = "getBridge().getWebView().setWebViewClient(new StreamingNavigationWebViewClient(getBridge()));"
     if statement not in text:
-        position = text.find(end_marker)
-        if position < 0:
-            fail("Could not locate safe filter initialization boundary to install the navigation guard.")
-        position += len(end_marker)
-        text = text[:position] + "\n        " + statement + text[position:]
+        super_call = re.search(
+            r"super\\.onCreate\\s*\\(\\s*savedInstanceState\\s*\\)\\s*;",
+            text,
+        )
+        if not super_call:
+            fail("Could not find MainActivity.onCreate super call to install the navigation guard.")
+        position = super_call.end()
+        text = text[:position] + "\\n        " + statement + text[position:]
 
     main_activity.write_text(text, encoding="utf-8")
+
+
+
 def install_streaming_chrome_client(main_activity: Path) -> None:
     """Install popup filtering, native iframe fullscreen, and fullscreen Back handling."""
     text = main_activity.read_text(encoding="utf-8")
@@ -608,10 +502,8 @@ def main() -> None:
 
     copy_python_source()
     patch_settings_gradle()
-    patch_dependency_repositories()
     patch_root_gradle()
     patch_app_gradle()
-    patch_adblock_dependency()
     patch_manifest()
 
     native_sources = {
@@ -623,14 +515,6 @@ def main() -> None:
     for filename, source in native_sources.items():
         if not source.is_file():
             fail(f"Required native Android source is missing: {source}")
-
-    # Ship the dependency's license with the APK, not just a repository link.
-    license_source = ROOT / "third_party/AdblockAndroid-LICENSE.txt"
-    if not license_source.is_file():
-        fail("The AdblockAndroid LGPL license file is missing.")
-    license_destination = ANDROID / "app/src/main/assets/THIRD_PARTY_LICENSES/AdblockAndroid-LICENSE.txt"
-    license_destination.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(license_source, license_destination)
 
     package_dir = ANDROID / "app/src/main/java/com/sevenx/anime"
     package_dir.mkdir(parents=True, exist_ok=True)
@@ -644,7 +528,7 @@ def main() -> None:
     install_navigation_guard(candidates[0])
     install_streaming_chrome_client(candidates[0])
 
-    print("Configured 7xAnime with the on-device API, ad-filtering navigation guard, popup protection, and fullscreen support.")
+    print("Configured 7xAnime with the on-device API, navigation guard, popup protection, and fullscreen support.")
 
 
 if __name__ == "__main__":
