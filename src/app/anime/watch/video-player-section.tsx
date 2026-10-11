@@ -718,23 +718,21 @@ const VideoPlayerSection = () => {
         setProviderPlaybackOutcomes((previous) => ({ ...previous, [providerKey]: "failed" }));
       }
 
+      // A native JS dialog is a stronger signal than a missing stream: it means
+      // the embed tried to interrupt the viewer with a robot-check/Allow prompt.
+      // Advance immediately for dialogs and blocked redirects/popups; do not leave
+      // the user stuck on the same third-party frame with only an error message.
+      const deceptiveInterstitial = reason.startsWith("javascript-")
+        || reason === "popup"
+        || reason === "top-level-redirect";
+      if (deceptiveInterstitial) {
+        advanceAfterSourceFailure();
+        return;
+      }
+
       if (useFallback || isFallbackActive) {
-        const next = automaticCandidates.find((candidate) =>
-          !attemptedSourceIdsRef.current.has(candidate.id),
-        ) || automaticCandidates.find((candidate) => candidate.id !== activeEpisodeId)
-          || automaticCandidates[0];
-        if (next) {
-          attemptedSourceIdsRef.current.delete(next.id);
-          setIsHindiMode(false);
-          setUseFallback(false);
-          setPreferredCategory(next.category);
-          setManualProviderPlaybackFailed(false);
-          setPlaybackSourceIndex(0);
-          setLastPlayerError(null);
-          setSelectedEpisode(next.id);
-          updateEpisodeUrl(next.id, currentEpNumber);
-          return;
-        }
+        advanceAfterSourceFailure();
+        return;
       }
 
       handlePlayerError(`Blocked ${reason} from ${host}; trying the next server.`);
