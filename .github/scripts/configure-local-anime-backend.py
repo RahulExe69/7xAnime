@@ -337,8 +337,8 @@ def install_service_worker_filter(main_activity: Path) -> None:
         fail("Could not find MainActivity.onCreate super call to install service-worker filtering.")
 
     statement = (
-        "\n        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-        "\n            ServiceWorkerController.getInstance().setServiceWorkerClient(new StreamingServiceWorkerClient());
+        "\n        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {"
+        "\n            ServiceWorkerController.getInstance().setServiceWorkerClient(new StreamingServiceWorkerClient());"
         "\n        }"
     )
     position = super_call.end()
