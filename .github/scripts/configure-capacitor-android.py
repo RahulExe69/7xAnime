@@ -83,6 +83,40 @@ if not namespace_match or namespace_match.group(1) != "com.sevenx.anime":
 
 app_gradle.write_text(text, encoding="utf-8")
 
+# The selected adblock-rust AAR declares compileSdk 37. Align the generated
+# Capacitor toolchain with the first stable AGP release supporting Android 17.
+root_gradle = Path("android/build.gradle")
+if not root_gradle.is_file():
+    print("ERROR: generated android/build.gradle is missing.", file=sys.stderr)
+    raise SystemExit(1)
+root_text = root_gradle.read_text(encoding="utf-8")
+root_text, agp_count = re.subn(
+    r"com\\.android\\.tools\\.build:gradle:[0-9.]+",
+    "com.android.tools.build:gradle:9.1.1",
+    root_text,
+    count=1,
+)
+if agp_count != 1:
+    print("ERROR: could not locate the generated Android Gradle Plugin version.", file=sys.stderr)
+    raise SystemExit(1)
+root_gradle.write_text(root_text, encoding="utf-8")
+
+wrapper_properties = Path("android/gradle/wrapper/gradle-wrapper.properties")
+if not wrapper_properties.is_file():
+    print("ERROR: generated Gradle wrapper properties are missing.", file=sys.stderr)
+    raise SystemExit(1)
+wrapper_text = wrapper_properties.read_text(encoding="utf-8")
+wrapper_text, wrapper_count = re.subn(
+    r"(?m)^distributionUrl=.*$",
+    "distributionUrl=https\\\\://services.gradle.org/distributions/gradle-9.3.1-bin.zip",
+    wrapper_text,
+    count=1,
+)
+if wrapper_count != 1:
+    print("ERROR: could not locate the Gradle wrapper distribution URL.", file=sys.stderr)
+    raise SystemExit(1)
+wrapper_properties.write_text(wrapper_text, encoding="utf-8")
+
 strings = Path("android/app/src/main/res/values/strings.xml")
 if strings.is_file():
     source_strings = strings.read_text(encoding="utf-8")
