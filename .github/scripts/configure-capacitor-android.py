@@ -89,17 +89,28 @@ root_gradle = Path("android/build.gradle")
 if not root_gradle.is_file():
     print("ERROR: generated android/build.gradle is missing.", file=sys.stderr)
     raise SystemExit(1)
-root_text = root_gradle.read_text(encoding="utf-8")
-root_text, agp_count = re.subn(
-    r"com\.android\.tools\.build:gradle:[0-9.]+",
-    "com.android.tools.build:gradle:9.1.1",
-    root_text,
-    count=1,
-)
-if agp_count != 1:
-    print("ERROR: could not locate the generated Android Gradle Plugin version.", file=sys.stderr)
+agp_pattern = r"com\.android\.tools\.build:gradle:[0-9.]+"
+agp_files = []
+for gradle_file in Path("android").rglob("*.gradle"):
+    gradle_text = gradle_file.read_text(encoding="utf-8")
+    gradle_text, agp_count = re.subn(
+        agp_pattern,
+        "com.android.tools.build:gradle:9.1.1",
+        gradle_text,
+    )
+    if agp_count:
+        gradle_file.write_text(gradle_text, encoding="utf-8")
+        agp_files.append(gradle_file.resolve())
+if root_gradle.resolve() not in agp_files:
+    print("ERROR: could not update the root Android Gradle Plugin version.", file=sys.stderr)
     raise SystemExit(1)
-root_gradle.write_text(root_text, encoding="utf-8")
+
+# Capacitor copies the core Android library into the generated project; keep its
+# nested buildscript on the same AGP version to avoid mixed plugin classpaths.
+capacitor_gradle = Path("android/capacitor/build.gradle")
+if capacitor_gradle.is_file() and "com.android.tools.build:gradle:9.1.1" not in capacitor_gradle.read_text(encoding="utf-8"):
+    print("ERROR: Capacitor Android module did not inherit AGP 9.1.1.", file=sys.stderr)
+    raise SystemExit(1)
 
 wrapper_properties = Path("android/gradle/wrapper/gradle-wrapper.properties")
 if not wrapper_properties.is_file():
