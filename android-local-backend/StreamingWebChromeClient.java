@@ -24,10 +24,10 @@ import com.getcapacitor.Bridge;
 import com.getcapacitor.BridgeWebChromeClient;
 
 /**
- * Capacitor WebChromeClient with real video fullscreen support and conservative
- * anti-pop-up handling. Third-party JS alert/confirm/prompt dialogs are often
- * used by fake "allow/robot check" ads; they are cancelled rather than shown as
- * native system dialogs. Regular app-origin dialogs keep Capacitor behaviour.
+ * Capacitor WebChromeClient with video fullscreen support and anti-pop-up handling.
+ * JavaScript alert/confirm/prompt dialogs are suppressed from every origin because
+ * nested iframes can be misreported as the local app origin on some OEM WebViews.
+ * 7xAnime does not use browser-native JavaScript dialogs for its own UI.
  */
 public final class StreamingWebChromeClient extends BridgeWebChromeClient {
     private static final String TAG = "7xAnimeWebChrome";
