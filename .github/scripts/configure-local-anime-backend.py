@@ -151,14 +151,14 @@ def patch_app_gradle() -> None:
             else:
                 fail("Could not locate app-level Android plugin declaration.")
 
-    # Chaquopy 17 requires minSdk 24. Set the shared version when present.
+    # Chaquopy requires API 24; the maintained adblock-rust wrapper requires API 26.
     variables = ANDROID / "variables.gradle"
     patched_min_sdk = False
     if variables.is_file():
         variables_text = variables.read_text(encoding="utf-8")
         variables_text, count = re.subn(
             r"(?m)^(\s*minSdkVersion\s*=\s*)\d+",
-            r"\g<1>24",
+            r"\g<1>26",
             variables_text,
             count=1,
         )
@@ -172,12 +172,12 @@ def patch_app_gradle() -> None:
             r"(?m)^(\s*minSdk\s*=\s*)(?:rootProject\.ext\.minSdkVersion|\d+)",
         ]
         for pattern in patterns:
-            text, count = re.subn(pattern, r"\g<1>24", text, count=1)
+            text, count = re.subn(pattern, r"\g<1>26", text, count=1)
             if count:
                 patched_min_sdk = True
                 break
     if not patched_min_sdk:
-        fail("Could not raise Android minSdk to Chaquopy's required API level 24.")
+        fail("Could not raise Android minSdk to API level 26 required by the adblock-rust wrapper.")
 
     default_pattern = r"^\s*defaultConfig\s*\{"
     default_match = re.search(default_pattern, text, flags=re.MULTILINE)
@@ -205,6 +205,13 @@ def patch_app_gradle() -> None:
             "}\n"
         )
 
+    if "io.github.mlm-games:adblock:0.1.3" not in text:
+        text = insert_before_block_end(
+            text,
+            r"^dependencies\s*\{",
+            '\n    implementation "io.github.mlm-games:adblock:0.1.3"\n',
+            "app dependencies block",
+        )
     path.write_text(text, encoding="utf-8")
 
 
@@ -343,6 +350,26 @@ def install_service_worker_filter(main_activity: Path) -> None:
     )
     position = super_call.end()
     text = text[:position] + statement + text[position:]
+    main_activity.write_text(text, encoding="utf-8")
+
+
+def install_adblock_filter_engine(main_activity: Path) -> None:
+    """Initialize the rule engine without blocking the Activity startup thread."""
+    text = main_activity.read_text(encoding="utf-8")
+    text = add_import(text, "import com.sevenx.anime.AdblockFilterEngine;")
+    statement = "AdblockFilterEngine.initialize(getApplicationContext());"
+    if statement in text:
+        return
+
+    super_call = re.search(
+        r"super\.onCreate\s*\(\s*savedInstanceState\s*\)\s*;",
+        text,
+    )
+    if not super_call:
+        fail("Could not find MainActivity.onCreate super call to initialize ad filtering.")
+
+    position = super_call.end()
+    text = text[:position] + "\n        " + statement + text[position:]
     main_activity.write_text(text, encoding="utf-8")
 
 
@@ -536,6 +563,7 @@ def main() -> None:
         "LocalAnimeBackendPlugin.java": ROOT / "android-local-backend/LocalAnimeBackendPlugin.java",
         "StreamingNavigationWebViewClient.java": ROOT / "android-local-backend/StreamingNavigationWebViewClient.java",
         "StreamingServiceWorkerClient.java": ROOT / "android-local-backend/StreamingServiceWorkerClient.java",
+        "AdblockFilterEngine.java": ROOT / "android-local-backend/AdblockFilterEngine.java",
         "StreamingWebChromeClient.java": ROOT / "android-local-backend/StreamingWebChromeClient.java",
         "PlayerFullscreenPlugin.java": ROOT / "android-local-backend/PlayerFullscreenPlugin.java",
     }
@@ -555,8 +583,9 @@ def main() -> None:
     install_navigation_guard(candidates[0])
     install_service_worker_filter(candidates[0])
     install_streaming_chrome_client(candidates[0])
+    install_adblock_filter_engine(candidates[0])
 
-    print("Configured 7xAnime with the on-device API, ad-filtering navigation guard, popup protection, and fullscreen support.")
+    print("Configured 7xAnime with maintained filter-list blocking, domain fallback, popup protection, and fullscreen support.")
 
 
 if __name__ == "__main__":

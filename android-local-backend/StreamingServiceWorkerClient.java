@@ -18,8 +18,20 @@ public final class StreamingServiceWorkerClient extends ServiceWorkerClient {
     public WebResourceResponse shouldInterceptRequest(WebResourceRequest request) {
         Uri url = request == null ? null : request.getUrl();
         if (StreamingNavigationWebViewClient.isBlockedAdRequest(url)) {
-            Log.d(TAG, "Blocked service-worker ad resource: " + (url == null ? "" : url.getHost()));
+            Log.d(TAG, "Blocked known service-worker ad resource: " + (url == null ? "" : url.getHost()));
             return StreamingNavigationWebViewClient.blockedResponse();
+        }
+        if (request != null && url != null) {
+            WebResourceResponse filtered = AdblockFilterEngine.intercept(
+                url.toString(),
+                AdblockFilterEngine.header(request, "Referer"),
+                AdblockFilterEngine.header(request, "Accept"),
+                request.isForMainFrame()
+            );
+            if (filtered != null) {
+                Log.d(TAG, "Blocked/replaced service-worker request by filter-list rule: " + url.getHost());
+                return filtered;
+            }
         }
         return null;
     }

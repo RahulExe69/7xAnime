@@ -125,12 +125,31 @@ public final class StreamingNavigationWebViewClient extends BridgeWebViewClient 
         );
     }
 
+    private static String headerSourceUrl(WebView view, WebResourceRequest request) {
+        String referer = AdblockFilterEngine.header(request, "Referer");
+        if (referer != null && !referer.isEmpty()) return referer;
+        return view == null ? null : view.getUrl();
+    }
+
     @Override
     public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
         Uri url = request == null ? null : request.getUrl();
         if (isBlockedAdRequest(url)) {
-            Log.d(TAG, "Blocked ad resource: " + url.getHost());
+            Log.d(TAG, "Blocked known ad resource: " + url.getHost());
             return blockedResponse();
+        }
+        if (request != null && url != null) {
+            String sourceUrl = headerSourceUrl(view, request);
+            WebResourceResponse filtered = AdblockFilterEngine.intercept(
+                url.toString(),
+                sourceUrl,
+                AdblockFilterEngine.header(request, "Accept"),
+                request.isForMainFrame()
+            );
+            if (filtered != null) {
+                Log.d(TAG, "Blocked/replaced by filter-list rule: " + url.getHost());
+                return filtered;
+            }
         }
         return super.shouldInterceptRequest(view, request);
     }
