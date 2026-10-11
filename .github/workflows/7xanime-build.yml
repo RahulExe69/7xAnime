@@ -146,7 +146,7 @@ jobs:
           # on some OEM Chromium builds. Never delegate JS dialogs to Android's default UI.
           for callback in ("onJsAlert", "onJsConfirm", "onJsPrompt"):
               start = chrome.index("public boolean " + callback)
-              end = chrome.find("\\n    @Override", start)
+              end = chrome.find("\n    @Override", start)
               body = chrome[start:] if end < 0 else chrome[start:end]
               if "result.cancel()" not in body or "return true;" not in body:
                   raise SystemExit(f"{callback} must cancel immediately and suppress the native dialog")
