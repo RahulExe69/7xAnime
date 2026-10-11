@@ -105,6 +105,7 @@ jobs:
           java_root = Path("android/app/src/main/java/com/sevenx/anime")
           required = {
               "StreamingNavigationWebViewClient.java",
+              "StreamingServiceWorkerClient.java",
               "StreamingWebChromeClient.java",
               "PlayerFullscreenPlugin.java",
               "LocalAnimeBackendPlugin.java",
@@ -120,6 +121,7 @@ jobs:
           expected_wiring = (
               "registerPlugin(PlayerFullscreenPlugin.class)",
               "StreamingNavigationWebViewClient(getBridge())",
+              "ServiceWorkerController.getInstance().setServiceWorkerClient(new StreamingServiceWorkerClient())",
               "setWebChromeClient(streamingWebChromeClient)",
               "streamingWebChromeClient.handleBackPressed()",
           )
@@ -129,9 +131,13 @@ jobs:
 
           nav = (java_root / "StreamingNavigationWebViewClient.java").read_text(encoding="utf-8")
           chrome = (java_root / "StreamingWebChromeClient.java").read_text(encoding="utf-8")
+          service_worker = (java_root / "StreamingServiceWorkerClient.java").read_text(encoding="utf-8")
           for item, text in (
               ("BLOCKED_AD_DOMAINS", nav),
               ("shouldInterceptRequest", nav),
+              ("shouldInterceptRequest", service_worker),
+              ("ServiceWorkerController", main_activity),
+              ("Build.VERSION_CODES.N", main_activity),
               ("onCreateWindow", chrome),
               ("onJsConfirm", chrome),
               ("onPermissionRequest", chrome),
