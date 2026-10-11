@@ -318,6 +318,34 @@ def install_navigation_guard(main_activity: Path) -> None:
     main_activity.write_text(text, encoding="utf-8")
 
 
+def install_service_worker_filter(main_activity: Path) -> None:
+    """Apply the same known-ad request rules to Service Worker fetches on API 24+."""
+    text = main_activity.read_text(encoding="utf-8")
+    text = add_import(text, "import android.os.Build;")
+    text = add_import(text, "import android.webkit.ServiceWorkerController;")
+    text = add_import(text, "import com.sevenx.anime.StreamingServiceWorkerClient;")
+
+    marker = "StreamingServiceWorkerClient()"
+    if marker in text:
+        return
+
+    super_call = re.search(
+        r"super\\.onCreate\\s*\\(\\s*savedInstanceState\\s*\\)\\s*;",
+        text,
+    )
+    if not super_call:
+        fail("Could not find MainActivity.onCreate super call to install service-worker filtering.")
+
+    statement = (
+        "\\n        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {"
+        "\\n            ServiceWorkerController.getInstance().setServiceWorkerClient(new StreamingServiceWorkerClient());"
+        "\\n        }"
+    )
+    position = super_call.end()
+    text = text[:position] + statement + text[position:]
+    main_activity.write_text(text, encoding="utf-8")
+
+
 def install_streaming_chrome_client(main_activity: Path) -> None:
     """Install popup filtering, native iframe fullscreen, and fullscreen Back handling."""
     text = main_activity.read_text(encoding="utf-8")
@@ -507,6 +535,7 @@ def main() -> None:
     native_sources = {
         "LocalAnimeBackendPlugin.java": ROOT / "android-local-backend/LocalAnimeBackendPlugin.java",
         "StreamingNavigationWebViewClient.java": ROOT / "android-local-backend/StreamingNavigationWebViewClient.java",
+        "StreamingServiceWorkerClient.java": ROOT / "android-local-backend/StreamingServiceWorkerClient.java",
         "StreamingWebChromeClient.java": ROOT / "android-local-backend/StreamingWebChromeClient.java",
         "PlayerFullscreenPlugin.java": ROOT / "android-local-backend/PlayerFullscreenPlugin.java",
     }
@@ -524,6 +553,7 @@ def main() -> None:
         fail(f"Expected one generated MainActivity.java, found {len(candidates)}.")
     register_plugin(candidates[0])
     install_navigation_guard(candidates[0])
+    install_service_worker_filter(candidates[0])
     install_streaming_chrome_client(candidates[0])
 
     print("Configured 7xAnime with the on-device API, ad-filtering navigation guard, popup protection, and fullscreen support.")
