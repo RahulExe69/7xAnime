@@ -65,6 +65,7 @@ public final class AdblockFilterEngine {
         return thread;
     });
     private static final AtomicBoolean INITIALIZING = new AtomicBoolean(false);
+    private static final Object ENGINE_LOCK = new Object();
     private static volatile AdblockEngine engine;
 
     private AdblockFilterEngine() {}
@@ -101,7 +102,9 @@ public final class AdblockFilterEngine {
                 if (candidate.deserializeFrom(cacheFile)) {
                     loadResources(context, candidate);
                     cachedEngine = candidate;
-                    engine = candidate;
+                    synchronized (ENGINE_LOCK) {
+                        engine = candidate;
+                    }
                     Log.i(TAG, "Loaded cached filter engine");
                 } else {
                     candidate.close();
@@ -139,26 +142,35 @@ public final class AdblockFilterEngine {
             loadResources(context, freshEngine);
 
             File tempFile = new File(context.getFilesDir(), "7xanime-adblock-engine.tmp");
+            boolean cachePersisted = false;
             if (freshEngine.serializeTo(tempFile) && tempFile.isFile() && tempFile.length() > 0) {
                 try {
-                    Files.move(tempFile.toPath(), cacheFile.toPath(),
-                        StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
-                } catch (AtomicMoveNotSupportedException unsupported) {
-                    Files.move(tempFile.toPath(), cacheFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+                    try {
+                        Files.move(tempFile.toPath(), cacheFile.toPath(),
+                            StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+                    } catch (AtomicMoveNotSupportedException unsupported) {
+                        Files.move(tempFile.toPath(), cacheFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+                    }
+                    cachePersisted = true;
                 } catch (IOException cacheError) {
                     Log.w(TAG, "Could not persist refreshed engine; keeping it in memory", cacheError);
+                    tempFile.delete();
                 }
             } else {
                 tempFile.delete();
             }
 
-            engine = freshEngine;
-            freshEngine = null;
-            if (cachedEngine != null && cachedEngine != engine) {
-                cachedEngine.close();
-                cachedEngine = null;
+            synchronized (ENGINE_LOCK) {
+                engine = freshEngine;
+                freshEngine = null;
+                if (cachedEngine != null && cachedEngine != engine) {
+                    cachedEngine.close();
+                    cachedEngine = null;
+                }
             }
-            preferences.edit().putLong(PREF_LAST_SUCCESS, System.currentTimeMillis()).apply();
+            if (cachePersisted) {
+                preferences.edit().putLong(PREF_LAST_SUCCESS, System.currentTimeMillis()).apply();
+            }
             Log.i(TAG, "Loaded " + lists.size() + " maintained ad-filter lists");
         } finally {
             if (freshEngine != null) freshEngine.close();
@@ -244,13 +256,15 @@ public final class AdblockFilterEngine {
         String host = uri.getHost() == null ? "" : uri.getHost().toLowerCase(Locale.ROOT);
         if ((!scheme.equals("http") && !scheme.equals("https")) || isAppHost(host)) return null;
 
-        AdblockEngine current = engine;
-        if (current == null) return null;
-
         String documentUrl = sourceUrl == null || sourceUrl.isEmpty() ? rawUrl : sourceUrl;
         try {
             String requestType = RequestTypeMapper.INSTANCE.from(uri, acceptHeader);
-            BlockDecision decision = current.checkNetworkRequest(rawUrl, documentUrl, requestType);
+            BlockDecision decision;
+            synchronized (ENGINE_LOCK) {
+                AdblockEngine current = engine;
+                if (current == null) return null;
+                decision = current.checkNetworkRequest(rawUrl, documentUrl, requestType);
+            }
 
             String redirect = decision.getRedirect();
             if (redirect != null && !redirect.isEmpty()) {

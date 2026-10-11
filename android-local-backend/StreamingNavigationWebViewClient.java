@@ -125,10 +125,9 @@ public final class StreamingNavigationWebViewClient extends BridgeWebViewClient 
         );
     }
 
-    private static String headerSourceUrl(WebView view, WebResourceRequest request) {
+    private static String headerSourceUrl(WebResourceRequest request) {
         String referer = AdblockFilterEngine.header(request, "Referer");
-        if (referer != null && !referer.isEmpty()) return referer;
-        return view == null ? null : view.getUrl();
+        return referer == null || referer.isEmpty() ? null : referer;
     }
 
     @Override
@@ -139,7 +138,7 @@ public final class StreamingNavigationWebViewClient extends BridgeWebViewClient 
             return blockedResponse();
         }
         if (request != null && url != null) {
-            String sourceUrl = headerSourceUrl(view, request);
+            String sourceUrl = headerSourceUrl(request);
             WebResourceResponse filtered = AdblockFilterEngine.intercept(
                 url.toString(),
                 sourceUrl,
