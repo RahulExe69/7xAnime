@@ -73,6 +73,17 @@ public final class StreamingWebChromeClient extends BridgeWebChromeClient {
     // whether a JavaScript dialog is safe: player frames can spoof native-looking
     // "Allow", "robot check", and notification prompts with alert/confirm/prompt.
     // 7xAnime does not use JS dialogs for its own UI, so suppress them everywhere.
+    // Used only for web permission requests; JavaScript dialogs are suppressed
+    // unconditionally because a nested frame's callback URL may be ambiguous.
+    private static boolean isAppOrigin(String rawUrl) {
+        if (rawUrl == null || rawUrl.isEmpty()) return false;
+        Uri uri = Uri.parse(rawUrl);
+        String scheme = uri.getScheme() == null ? "" : uri.getScheme().toLowerCase();
+        String host = uri.getHost() == null ? "" : uri.getHost().toLowerCase();
+        return ("http".equals(scheme) || "https".equals(scheme))
+            && ("localhost".equals(host) || "127.0.0.1".equals(host) || "::1".equals(host));
+    }
+
     @Override
     public boolean onJsAlert(WebView view, String url, String message, JsResult result) {
         Log.d(TAG, "Suppressed JavaScript alert from " + safeHost(url));
