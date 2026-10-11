@@ -59,15 +59,6 @@ public final class StreamingWebChromeClient extends BridgeWebChromeClient {
         view.post(() -> view.evaluateJavascript(script, null));
     }
 
-    private static boolean isAppOrigin(String rawUrl) {
-        if (rawUrl == null || rawUrl.isEmpty()) return false;
-        Uri uri = Uri.parse(rawUrl);
-        String scheme = uri.getScheme() == null ? "" : uri.getScheme().toLowerCase();
-        String host = uri.getHost() == null ? "" : uri.getHost().toLowerCase();
-        return ("http".equals(scheme) || "https".equals(scheme))
-            && ("localhost".equals(host) || "127.0.0.1".equals(host) || "::1".equals(host));
-    }
-
     @Override
     public boolean onCreateWindow(WebView view, boolean isDialog, boolean isUserGesture, Message resultMsg) {
         // Never spawn a new WebView/window for pop-under ads or target=_blank.
@@ -77,37 +68,42 @@ public final class StreamingWebChromeClient extends BridgeWebChromeClient {
         return false;
     }
 
+    // WebView may report the top-level URL for a dialog opened by a nested frame
+    // on some Chromium/OEM combinations. Never trust the callback URL to decide
+    // whether a JavaScript dialog is safe: player frames can spoof native-looking
+    // "Allow", "robot check", and notification prompts with alert/confirm/prompt.
+    // 7xAnime does not use JS dialogs for its own UI, so suppress them everywhere.
     @Override
     public boolean onJsAlert(WebView view, String url, String message, JsResult result) {
-        if (!isAppOrigin(url)) {
-            Log.d(TAG, "Cancelled third-party JavaScript alert from " + safeHost(url));
-            result.cancel();
-            reportBlockedPlayerAction(view, "javascript-alert", safeHost(url));
-            return true;
-        }
-        return super.onJsAlert(view, url, message, result);
+        Log.d(TAG, "Suppressed JavaScript alert from " + safeHost(url));
+        if (result != null) result.cancel();
+        reportBlockedPlayerAction(view, "javascript-alert", safeHost(url));
+        return true;
     }
 
     @Override
     public boolean onJsConfirm(WebView view, String url, String message, JsResult result) {
-        if (!isAppOrigin(url)) {
-            Log.d(TAG, "Cancelled third-party JavaScript confirm from " + safeHost(url));
-            result.cancel();
-            reportBlockedPlayerAction(view, "javascript-confirm", safeHost(url));
-            return true;
-        }
-        return super.onJsConfirm(view, url, message, result);
+        Log.d(TAG, "Suppressed JavaScript confirm from " + safeHost(url));
+        if (result != null) result.cancel();
+        reportBlockedPlayerAction(view, "javascript-confirm", safeHost(url));
+        return true;
     }
 
     @Override
     public boolean onJsPrompt(WebView view, String url, String message, String defaultValue, JsPromptResult result) {
-        if (!isAppOrigin(url)) {
-            Log.d(TAG, "Cancelled third-party JavaScript prompt from " + safeHost(url));
-            result.cancel();
-            reportBlockedPlayerAction(view, "javascript-prompt", safeHost(url));
-            return true;
-        }
-        return super.onJsPrompt(view, url, message, defaultValue, result);
+        Log.d(TAG, "Suppressed JavaScript prompt from " + safeHost(url));
+        if (result != null) result.cancel();
+        reportBlockedPlayerAction(view, "javascript-prompt", safeHost(url));
+        return true;
+    }
+
+    @Override
+    public boolean onJsBeforeUnload(WebView view, String url, String message, JsResult result) {
+        // Do not let third-party pages trap Back/navigation behind a native confirm.
+        // Confirm the unload so the viewer can always leave a deceptive player page.
+        Log.d(TAG, "Suppressed JavaScript before-unload confirmation from " + safeHost(url));
+        if (result != null) result.confirm();
+        return true;
     }
 
     @Override
