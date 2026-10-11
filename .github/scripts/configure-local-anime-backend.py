@@ -330,7 +330,7 @@ def install_service_worker_filter(main_activity: Path) -> None:
         return
 
     super_call = re.search(
-        r"super\\.onCreate\\s*\\(\\s*savedInstanceState\\s*\\)\\s*;",
+        r"super\.onCreate\s*\(\s*savedInstanceState\s*\)\s*;",
         text,
     )
     if not super_call:
