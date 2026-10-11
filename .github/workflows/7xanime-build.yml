@@ -282,7 +282,7 @@ jobs:
             echo "Android sdkmanager was not found." >&2
             exit 1
           fi
-          yes | "${SDKMANAGER}" --sdk_root="${ANDROID_HOME}" --licenses >/dev/null
+          (yes || true) | "${SDKMANAGER}" --sdk_root="${ANDROID_HOME}" --licenses >/dev/null
           "${SDKMANAGER}" --sdk_root="${ANDROID_HOME}" "platforms;android-37"
 
       - name: Build Debug APK
