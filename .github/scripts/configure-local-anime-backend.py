@@ -151,20 +151,31 @@ def patch_app_gradle() -> None:
             else:
                 fail("Could not locate app-level Android plugin declaration.")
 
-    # Chaquopy requires API 24; the maintained adblock-rust wrapper requires API 26.
+    # Keep minSdk at 26 for the adblock-rust wrapper and compile against API 37,
+    # which is required by the published AAR metadata. Do not change targetSdk.
     variables = ANDROID / "variables.gradle"
     patched_min_sdk = False
+    patched_compile_sdk = False
     if variables.is_file():
         variables_text = variables.read_text(encoding="utf-8")
-        variables_text, count = re.subn(
+        variables_text, min_count = re.subn(
             r"(?m)^(\s*minSdkVersion\s*=\s*)\d+",
             r"\g<1>26",
             variables_text,
             count=1,
         )
-        if count:
-            variables.write_text(variables_text, encoding="utf-8")
+        variables_text, compile_count = re.subn(
+            r"(?m)^(\s*compileSdkVersion\s*=\s*)\d+",
+            r"\g<1>37",
+            variables_text,
+            count=1,
+        )
+        if min_count:
             patched_min_sdk = True
+        if compile_count:
+            patched_compile_sdk = True
+        if min_count or compile_count:
+            variables.write_text(variables_text, encoding="utf-8")
 
     if not patched_min_sdk:
         patterns = [
@@ -178,6 +189,8 @@ def patch_app_gradle() -> None:
                 break
     if not patched_min_sdk:
         fail("Could not raise Android minSdk to API level 26 required by the adblock-rust wrapper.")
+    if not patched_compile_sdk:
+        fail("Could not raise Android compileSdk to API level 37 required by the adblock-rust AAR.")
 
     default_pattern = r"^\s*defaultConfig\s*\{"
     default_match = re.search(default_pattern, text, flags=re.MULTILINE)

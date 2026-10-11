@@ -136,8 +136,11 @@ jobs:
           service_worker = (java_root / "StreamingServiceWorkerClient.java").read_text(encoding="utf-8")
           adblock = (java_root / "AdblockFilterEngine.java").read_text(encoding="utf-8")
           app_gradle = Path("android/app/build.gradle").read_text(encoding="utf-8")
+          variables = Path("android/variables.gradle").read_text(encoding="utf-8")
           if "io.github.mlm-games:adblock:0.1.3" not in app_gradle:
               raise SystemExit("Maintained adblock-rust Android dependency is missing")
+          if "compileSdkVersion = 37" not in variables:
+              raise SystemExit("Android compileSdk must be 37 for the adblock-rust AAR")
           for item, text in (
               ("BLOCKED_AD_DOMAINS", nav),
               ("shouldInterceptRequest", nav),
@@ -267,6 +270,20 @@ jobs:
         env:
           PYTHONPATH: android/app/src/main/python:android-local-backend
         run: python .github/scripts/test-local-anime-backend.py
+
+      - name: Install Android API 37 platform
+        run: |
+          set -euo pipefail
+          SDKMANAGER="${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager"
+          if [[ ! -x "${SDKMANAGER}" ]]; then
+            SDKMANAGER="$(find "${ANDROID_HOME}/cmdline-tools" -type f -name sdkmanager -print -quit)"
+          fi
+          if [[ ! -x "${SDKMANAGER}" ]]; then
+            echo "Android sdkmanager was not found." >&2
+            exit 1
+          fi
+          yes | "${SDKMANAGER}" --sdk_root="${ANDROID_HOME}" --licenses >/dev/null
+          "${SDKMANAGER}" --sdk_root="${ANDROID_HOME}" "platforms;android-37"
 
       - name: Build Debug APK
         working-directory: android
