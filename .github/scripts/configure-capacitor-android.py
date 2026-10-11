@@ -98,6 +98,30 @@ if proguard_replacements == 0 and "proguard-android-optimize.txt" not in text:
 
 app_gradle.write_text(text, encoding="utf-8")
 
+# Capacitor plugins contain their own Android library build files under node_modules.
+# AGP 9 rejects the legacy ProGuard default in those files as well as in :app.
+capacitor_plugin_root = Path("node_modules/@capacitor")
+if capacitor_plugin_root.is_dir():
+    plugin_gradle_files = list(capacitor_plugin_root.rglob("*.gradle"))
+    for plugin_gradle in plugin_gradle_files:
+        plugin_text = plugin_gradle.read_text(encoding="utf-8")
+        updated_plugin_text = plugin_text.replace(
+            "getDefaultProguardFile('proguard-android.txt')",
+            "getDefaultProguardFile('proguard-android-optimize.txt')",
+        ).replace(
+            'getDefaultProguardFile("proguard-android.txt")',
+            'getDefaultProguardFile("proguard-android-optimize.txt")',
+        )
+        if updated_plugin_text != plugin_text:
+            plugin_gradle.write_text(updated_plugin_text, encoding="utf-8")
+
+capacitor_app_gradle = Path("node_modules/@capacitor/app/android/build.gradle")
+if capacitor_app_gradle.is_file():
+    capacitor_app_text = capacitor_app_gradle.read_text(encoding="utf-8")
+    if "getDefaultProguardFile('proguard-android.txt')" in capacitor_app_text or 'getDefaultProguardFile("proguard-android.txt")' in capacitor_app_text:
+        print("ERROR: AGP 9 legacy ProGuard default remains in @capacitor/app.", file=sys.stderr)
+        raise SystemExit(1)
+
 # The selected adblock-rust AAR declares compileSdk 37. Align the generated
 # Capacitor toolchain with the first stable AGP release supporting Android 17.
 root_gradle = Path("android/build.gradle")

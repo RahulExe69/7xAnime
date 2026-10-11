@@ -143,6 +143,11 @@ jobs:
               raise SystemExit("Maintained adblock-rust Android dependency is missing")
           if "getDefaultProguardFile('proguard-android-optimize.txt')" not in app_gradle and 'getDefaultProguardFile("proguard-android-optimize.txt")' not in app_gradle:
               raise SystemExit("AGP 9 ProGuard default compatibility patch is missing")
+          capacitor_app_gradle = Path("node_modules/@capacitor/app/android/build.gradle").read_text(encoding="utf-8")
+          if "getDefaultProguardFile('proguard-android.txt')" in capacitor_app_gradle or 'getDefaultProguardFile("proguard-android.txt")' in capacitor_app_gradle:
+              raise SystemExit("AGP 9 legacy ProGuard default remains in @capacitor/app")
+          if "getDefaultProguardFile('proguard-android-optimize.txt')" not in capacitor_app_gradle and 'getDefaultProguardFile("proguard-android-optimize.txt")' not in capacitor_app_gradle:
+              raise SystemExit("AGP 9 ProGuard default patch is missing from @capacitor/app")
           if "compileSdkVersion = 37" not in variables:
               raise SystemExit("Android compileSdk must be 37 for the adblock-rust AAR")
           if "com.android.tools.build:gradle:9.1.1" not in root_gradle:
