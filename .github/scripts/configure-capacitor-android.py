@@ -108,7 +108,7 @@ if not wrapper_properties.is_file():
 wrapper_text = wrapper_properties.read_text(encoding="utf-8")
 wrapper_text, wrapper_count = re.subn(
     r"(?m)^distributionUrl=.*$",
-    "distributionUrl=https\\://services.gradle.org/distributions/gradle-9.3.1-bin.zip",
+    lambda _: r"distributionUrl=https\://services.gradle.org/distributions/gradle-9.3.1-bin.zip",
     wrapper_text,
     count=1,
 )
