@@ -93,7 +93,7 @@ public final class StreamingNavigationWebViewClient extends BridgeWebViewClient 
         return false;
     }
 
-    private static boolean isBlockedAdRequest(Uri url) {
+    static boolean isBlockedAdRequest(Uri url) {
         if (url == null || isAppUrl(url)) return false;
         String scheme = url.getScheme();
         if (scheme == null || (!"http".equalsIgnoreCase(scheme) && !"https".equalsIgnoreCase(scheme))) {
@@ -112,7 +112,7 @@ public final class StreamingNavigationWebViewClient extends BridgeWebViewClient 
         view.post(() -> view.evaluateJavascript(script, null));
     }
 
-    private static WebResourceResponse blockedResponse() {
+    static WebResourceResponse blockedResponse() {
         // A successful empty response avoids noisy net::ERR_BLOCKED_BY_CLIENT
         // errors in players that tolerate missing ad scripts or tracking pixels.
         return new WebResourceResponse(
