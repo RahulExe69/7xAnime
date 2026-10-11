@@ -91,7 +91,7 @@ if not root_gradle.is_file():
     raise SystemExit(1)
 root_text = root_gradle.read_text(encoding="utf-8")
 root_text, agp_count = re.subn(
-    r"com\\.android\\.tools\\.build:gradle:[0-9.]+",
+    r"com\.android\.tools\.build:gradle:[0-9.]+",
     "com.android.tools.build:gradle:9.1.1",
     root_text,
     count=1,
@@ -108,7 +108,7 @@ if not wrapper_properties.is_file():
 wrapper_text = wrapper_properties.read_text(encoding="utf-8")
 wrapper_text, wrapper_count = re.subn(
     r"(?m)^distributionUrl=.*$",
-    "distributionUrl=https\\\\://services.gradle.org/distributions/gradle-9.3.1-bin.zip",
+    "distributionUrl=https\\://services.gradle.org/distributions/gradle-9.3.1-bin.zip",
     wrapper_text,
     count=1,
 )
