@@ -4,9 +4,11 @@ This work stays in draft PR #2 and is split into four phases. CI verifies compil
 
 ## Phase 1 — Ad and redirect protection
 
-The Android WebView now blocks requests to a conservative list of common advertising/redirect domains, rejects pop-up windows, cancels remote JavaScript alert/confirm/prompt dialogs, and denies remote WebView permission requests. The existing navigation guard keeps external top-level pages from replacing the app.
+The Android WebView blocks requests to a conservative list of known advertising/redirect domains, rejects pop-up windows, denies WebView permission requests from embedded providers, and prevents external top-level pages from replacing the app.
 
-This is best-effort filtering, not a universal ad blocker. Ads loaded from the same host as a player, in-page HTML overlays, obfuscated scripts, new ad domains, and some service-worker paths may still appear. Overblocking can break player bootstrap/video requests, so provider hosts are not blanket-blocked. If a source is stuck, the viewer can select another server.
+**JavaScript dialogs are suppressed unconditionally.** Some Chromium/OEM WebViews can report the top-level app URL when a nested, cross-origin player iframe calls `alert()`, `confirm()`, or `prompt()`. Using that callback URL to decide whether a dialog is trusted can accidentally show the native Android “Verify you are not a bot” / “Click Allow” dialog. 7xAnime does not use JavaScript dialogs for its own UI, so the native WebChromeClient cancels them regardless of the reported URL. Before-unload prompts are accepted to avoid trapping the viewer on an embed page. When a dialog, popup, or external redirect is blocked, the player marks the source failed and advances to another provider (eventually MegaPlay).
+
+This is **best-effort filtering, not a universal ad blocker**. Ads loaded from the same host as a player, in-page HTML overlays, obfuscated scripts, new ad domains, and some service-worker paths may still appear. Blocking a whole provider host can also break its video, so the app prefers to suppress deceptive native dialogs and switch away from a provider when it tries to interrupt playback.
 
 ## Phase 2 — Fullscreen, landscape and swipe
 
