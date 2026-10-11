@@ -71,7 +71,7 @@ public final class AdblockFilterEngine {
 
     /** Start initialization without blocking Android's UI thread. */
     public static void initialize(Context context) {
-        if (context == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return;
+        if (context == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.O || engine != null) return;
         if (!INITIALIZING.compareAndSet(false, true)) return;
 
         Context appContext = context.getApplicationContext();
