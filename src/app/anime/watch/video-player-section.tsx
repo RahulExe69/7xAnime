@@ -742,6 +742,7 @@ const VideoPlayerSection = () => {
     return () => window.removeEventListener("7xanime:blocked-player-action", handleBlockedPlayerAction);
   }, [
     activeEpisodeId,
+    advanceAfterSourceFailure,
     automaticCandidates,
     currentEpNumber,
     currentProviderName,
