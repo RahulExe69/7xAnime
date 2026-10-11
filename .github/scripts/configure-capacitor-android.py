@@ -81,6 +81,21 @@ if not namespace_match or namespace_match.group(1) != "com.sevenx.anime":
     print("ERROR: Android namespace was not configured as expected.", file=sys.stderr)
     raise SystemExit(1)
 
+# AGP 9 rejects the legacy ProGuard default from the Capacitor app template.
+legacy_proguard_files = (
+    "getDefaultProguardFile('proguard-android.txt')",
+    'getDefaultProguardFile("proguard-android.txt")',
+)
+proguard_replacements = sum(text.count(item) for item in legacy_proguard_files)
+for old_proguard in legacy_proguard_files:
+    text = text.replace(
+        old_proguard,
+        old_proguard.replace("proguard-android.txt", "proguard-android-optimize.txt"),
+    )
+if proguard_replacements == 0 and "proguard-android-optimize.txt" not in text:
+    print("ERROR: could not update the generated ProGuard defaults for AGP 9.", file=sys.stderr)
+    raise SystemExit(1)
+
 app_gradle.write_text(text, encoding="utf-8")
 
 # The selected adblock-rust AAR declares compileSdk 37. Align the generated

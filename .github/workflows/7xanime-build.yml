@@ -141,6 +141,8 @@ jobs:
           wrapper = Path("android/gradle/wrapper/gradle-wrapper.properties").read_text(encoding="utf-8")
           if "io.github.mlm-games:adblock:0.1.3" not in app_gradle:
               raise SystemExit("Maintained adblock-rust Android dependency is missing")
+          if "getDefaultProguardFile('proguard-android-optimize.txt')" not in app_gradle and 'getDefaultProguardFile("proguard-android-optimize.txt")' not in app_gradle:
+              raise SystemExit("AGP 9 ProGuard default compatibility patch is missing")
           if "compileSdkVersion = 37" not in variables:
               raise SystemExit("Android compileSdk must be 37 for the adblock-rust AAR")
           if "com.android.tools.build:gradle:9.1.1" not in root_gradle:
