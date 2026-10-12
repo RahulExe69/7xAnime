@@ -11,6 +11,7 @@ export default function SectionHeading({ eyebrow, title, icon, className }: Prop
         {icon ? <span className="shrink-0 text-[#ff3b72]">{icon}</span> : null}
         <span className="min-w-0">{title}</span>
       </h2>
+      <span aria-hidden="true" className="mt-1 block h-[2px] w-10 rounded-full bg-gradient-to-r from-[#ff3b72] via-[#ff9fbe]/70 to-transparent" />
     </div>
   );
 }
