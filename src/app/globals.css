@@ -118,3 +118,13 @@ body {
 html.dark { color-scheme: dark; }
 html.dark ::-webkit-scrollbar-track { background: #100309; }
 html.dark ::-webkit-scrollbar-thumb { background: #612033; }
+
+/* User-selectable accessibility setting. Keep motion reduction scoped to users who enable it. */
+html[data-reduced-motion="true"] *,
+html[data-reduced-motion="true"] *::before,
+html[data-reduced-motion="true"] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  scroll-behavior: auto !important;
+  transition-duration: 0.01ms !important;
+}
