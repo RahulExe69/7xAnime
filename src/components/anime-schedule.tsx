@@ -114,7 +114,7 @@ function AnimeSchedule() {
                       return (
                         <div
                           key={`${anime.id}-${anime.episode}-${idx}`}
-                          className="flex flex-row gap-3 p-3 bg-white border border-[#4b1727] hover:border-[#8b73ed]/60 rounded-xl hover:bg-[#fbfaff] shadow-sm transition group relative overflow-hidden dark:bg-[#19070d] dark:border-[#451321] dark:hover:border-[#7565ce] dark:hover:bg-[#211e30]"
+                          className="flex flex-row gap-3 p-3 bg-white border border-[#4b1727] hover:border-[#ff3b72]/60 rounded-xl hover:bg-[#fbfaff] shadow-sm transition group relative overflow-hidden dark:bg-[#19070d] dark:border-[#451321] dark:hover:border-[#ff3b72] dark:hover:bg-[#230a12]"
                         >
                           {/* Small Poster Thumbnail */}
                           {anime.poster ? (
