@@ -83,7 +83,7 @@ export default function SearchOverlay({ open, onClose }: Props) {
             ) : (
               <div className="rounded-2xl border border-[#40101f] bg-white px-4 py-10 text-center dark:border-[#2c2939] dark:bg-[#19070d]"><Search className="mx-auto mb-3 h-7 w-7 text-[#8e86a8]" /><p className="font-semibold">No matches found</p><p className="mt-1 text-sm text-[#8a849e] dark:text-[#a49eb8]">Try a shorter title or an alternate name.</p></div>
             )}
-            <button onClick={() => submitSearch()} className="mt-4 w-full rounded-xl bg-[#ff3b72] px-4 py-3 text-sm font-bold text-white transition hover:bg-[#513cc4]">Show all results for “{query}”</button>
+            <button onClick={() => submitSearch()} className="mt-4 w-full rounded-xl bg-[#ff3b72] px-4 py-3 text-sm font-bold text-white transition hover:bg-[#ed245c]">Show all results for “{query}”</button>
           </section>
         )}
       </div>
