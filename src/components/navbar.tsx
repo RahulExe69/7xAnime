@@ -87,7 +87,7 @@ export default function NavBar() {
               )}
             </div>
             <Link href={ROUTES.HOME} aria-label="7xAnime home" className="flex shrink-0 items-center gap-2">
-              <Image src="/brand/7xanime-wordmark.png" alt="7xAnime" width={2107} height={698} className="h-10 w-[122px] object-contain object-left sm:h-11 sm:w-[134px] lg:h-12 lg:w-[146px]" />
+              <Image src="/brand/7xanime-wordmark.png" alt="7xAnime" width={2107} height={746} className="h-10 w-[122px] object-contain object-left sm:h-11 sm:w-[134px] lg:h-12 lg:w-[146px]" />
             </Link>
           </div>
           <nav className="hidden items-center gap-5 text-sm font-semibold lg:flex">{menuItems.map((item) => <Link key={item.title} href={item.href} className="transition hover:text-[#ff2f9d] dark:hover:text-[#ff8bc8]">{item.title}</Link>)}</nav>
