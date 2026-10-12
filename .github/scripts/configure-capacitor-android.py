@@ -3,7 +3,6 @@ from pathlib import Path
 import os
 import re
 import sys
-import tempfile
 
 app_gradle = Path("android/app/build.gradle")
 if not app_gradle.is_file():
@@ -81,7 +80,91 @@ if not namespace_match or namespace_match.group(1) != "com.sevenx.anime":
     print("ERROR: Android namespace was not configured as expected.", file=sys.stderr)
     raise SystemExit(1)
 
+# AGP 9 rejects the legacy ProGuard default from the Capacitor app template.
+legacy_proguard_files = (
+    "getDefaultProguardFile('proguard-android.txt')",
+    'getDefaultProguardFile("proguard-android.txt")',
+)
+proguard_replacements = sum(text.count(item) for item in legacy_proguard_files)
+for old_proguard in legacy_proguard_files:
+    text = text.replace(
+        old_proguard,
+        old_proguard.replace("proguard-android.txt", "proguard-android-optimize.txt"),
+    )
+if proguard_replacements == 0 and "proguard-android-optimize.txt" not in text:
+    print("ERROR: could not update the generated ProGuard defaults for AGP 9.", file=sys.stderr)
+    raise SystemExit(1)
+
 app_gradle.write_text(text, encoding="utf-8")
+
+# Capacitor plugins contain their own Android library build files under node_modules.
+# AGP 9 rejects the legacy ProGuard default in those files as well as in :app.
+capacitor_plugin_root = Path("node_modules/@capacitor")
+if capacitor_plugin_root.is_dir():
+    plugin_gradle_files = list(capacitor_plugin_root.rglob("*.gradle"))
+    for plugin_gradle in plugin_gradle_files:
+        plugin_text = plugin_gradle.read_text(encoding="utf-8")
+        updated_plugin_text = plugin_text.replace(
+            "getDefaultProguardFile('proguard-android.txt')",
+            "getDefaultProguardFile('proguard-android-optimize.txt')",
+        ).replace(
+            'getDefaultProguardFile("proguard-android.txt")',
+            'getDefaultProguardFile("proguard-android-optimize.txt")',
+        )
+        if updated_plugin_text != plugin_text:
+            plugin_gradle.write_text(updated_plugin_text, encoding="utf-8")
+
+capacitor_app_gradle = Path("node_modules/@capacitor/app/android/build.gradle")
+if capacitor_app_gradle.is_file():
+    capacitor_app_text = capacitor_app_gradle.read_text(encoding="utf-8")
+    if "getDefaultProguardFile('proguard-android.txt')" in capacitor_app_text or 'getDefaultProguardFile("proguard-android.txt")' in capacitor_app_text:
+        print("ERROR: AGP 9 legacy ProGuard default remains in @capacitor/app.", file=sys.stderr)
+        raise SystemExit(1)
+
+# The selected adblock-rust AAR declares compileSdk 37. Align the generated
+# Capacitor toolchain with the first stable AGP release supporting Android 17.
+root_gradle = Path("android/build.gradle")
+if not root_gradle.is_file():
+    print("ERROR: generated android/build.gradle is missing.", file=sys.stderr)
+    raise SystemExit(1)
+agp_pattern = r"com\.android\.tools\.build:gradle:[0-9.]+"
+agp_files = []
+for gradle_file in Path("android").rglob("*.gradle"):
+    gradle_text = gradle_file.read_text(encoding="utf-8")
+    gradle_text, agp_count = re.subn(
+        agp_pattern,
+        "com.android.tools.build:gradle:9.1.1",
+        gradle_text,
+    )
+    if agp_count:
+        gradle_file.write_text(gradle_text, encoding="utf-8")
+        agp_files.append(gradle_file.resolve())
+if root_gradle.resolve() not in agp_files:
+    print("ERROR: could not update the root Android Gradle Plugin version.", file=sys.stderr)
+    raise SystemExit(1)
+
+# Capacitor copies the core Android library into the generated project; keep its
+# nested buildscript on the same AGP version to avoid mixed plugin classpaths.
+capacitor_gradle = Path("android/capacitor/build.gradle")
+if capacitor_gradle.is_file() and "com.android.tools.build:gradle:9.1.1" not in capacitor_gradle.read_text(encoding="utf-8"):
+    print("ERROR: Capacitor Android module did not inherit AGP 9.1.1.", file=sys.stderr)
+    raise SystemExit(1)
+
+wrapper_properties = Path("android/gradle/wrapper/gradle-wrapper.properties")
+if not wrapper_properties.is_file():
+    print("ERROR: generated Gradle wrapper properties are missing.", file=sys.stderr)
+    raise SystemExit(1)
+wrapper_text = wrapper_properties.read_text(encoding="utf-8")
+wrapper_text, wrapper_count = re.subn(
+    r"(?m)^distributionUrl=.*$",
+    lambda _: r"distributionUrl=https\://services.gradle.org/distributions/gradle-9.3.1-bin.zip",
+    wrapper_text,
+    count=1,
+)
+if wrapper_count != 1:
+    print("ERROR: could not locate the Gradle wrapper distribution URL.", file=sys.stderr)
+    raise SystemExit(1)
+wrapper_properties.write_text(wrapper_text, encoding="utf-8")
 
 strings = Path("android/app/src/main/res/values/strings.xml")
 if strings.is_file():
@@ -125,87 +208,25 @@ debug_strings.write_text(
 )
 
 
-# Generate launcher artwork from the repository's source-of-truth SVGs.
-# CairoSVG is installed explicitly by the Android build workflow.
-try:
-    import cairosvg
-except ImportError as exc:
-    print("ERROR: CairoSVG is required to generate branded Android launcher icons.", file=sys.stderr)
-    raise SystemExit(1) from exc
-
+# Follow the proven 7xTune launcher approach: keep the approved PNG byte-for-byte
+# unchanged as a drawable-nodpi foreground, then reference it from adaptive icons.
+# Android handles scaling for the launcher; do not resample, redraw, or crop the source.
 brand_dir = Path("public/brand")
-brand_mark = brand_dir / "7xanime-mark.svg"
-brand_foreground = brand_dir / "7xanime-foreground.svg"
-brand_monochrome = brand_dir / "7xanime-monochrome.svg"
-for source in (brand_mark, brand_foreground, brand_monochrome):
+brand_icon = brand_dir / "7xanime-icon.png"
+brand_wordmark = brand_dir / "7xanime-wordmark.png"
+for source in (brand_icon, brand_wordmark):
     if not source.is_file():
-        print(f"ERROR: missing 7xAnime brand asset: {source}", file=sys.stderr)
+        print(f"ERROR: missing 7x Brand Studio asset: {source}", file=sys.stderr)
         raise SystemExit(1)
 
 resource_root = Path("android/app/src/main/res")
-density_specs = [
-    ("mdpi", 48, 108),
-    ("hdpi", 72, 162),
-    ("xhdpi", 96, 216),
-    ("xxhdpi", 144, 324),
-    ("xxxhdpi", 192, 432),
-]
-def write_padded_launcher_svg(source: Path, destination: Path, *, has_background: bool, scale: float = 0.76) -> None:
-    """Center the 7x artwork within Android's launcher safe area without altering web assets."""
-    source_text = source.read_text(encoding="utf-8")
-    offset = 512 * (1 - scale) / 2
-    transform = f'<g transform="translate({offset:.2f} {offset:.2f}) scale({scale:.2f})">'
-
-    if has_background:
-        background = '<rect width="512" height="512" rx="112" fill="url(#bg)"/>'
-        if background not in source_text:
-            raise ValueError(f"Could not find the background layer in {source}.")
-        prefix, remainder = source_text.split(background, 1)
-        artwork, suffix = remainder.rsplit("</svg>", 1)
-        padded_text = prefix + background + "\n" + transform + artwork + "\n</g>\n</svg>" + suffix
-    else:
-        title_end = re.search(r"</title>", source_text)
-        if not title_end:
-            raise ValueError(f"Could not find the SVG title in {source}.")
-        prefix = source_text[:title_end.end()]
-        remainder = source_text[title_end.end():]
-        artwork, suffix = remainder.rsplit("</svg>", 1)
-        padded_text = prefix + "\n" + transform + artwork + "\n</g>\n</svg>" + suffix
-
-    destination.write_text(padded_text, encoding="utf-8")
-
-
-# Android launcher masks vary by OEM (circle, squircle, rounded square). Keep the mark
-# inside the central safe area with generous space on every edge. Web/PWA assets stay full-size.
-with tempfile.TemporaryDirectory(prefix="7xanime-launcher-") as temp_dir:
-    temp_root = Path(temp_dir)
-    padded_mark = temp_root / "7xanime-mark-padded.svg"
-    padded_foreground = temp_root / "7xanime-foreground-padded.svg"
-    padded_monochrome = temp_root / "7xanime-monochrome-padded.svg"
-    write_padded_launcher_svg(brand_mark, padded_mark, has_background=True)
-    write_padded_launcher_svg(brand_foreground, padded_foreground, has_background=False)
-    write_padded_launcher_svg(brand_monochrome, padded_monochrome, has_background=False)
-
-    for density, legacy_size, adaptive_size in density_specs:
-        output_dir = resource_root / f"mipmap-{density}"
-        output_dir.mkdir(parents=True, exist_ok=True)
-        for icon_name in ("ic_launcher", "ic_launcher_round"):
-            cairosvg.svg2png(
-                url=str(padded_mark),
-                write_to=str(output_dir / f"{icon_name}.png"),
-                output_width=legacy_size,
-                output_height=legacy_size,
-            )
-        for icon_name, source in (
-            ("ic_launcher_foreground", padded_foreground),
-            ("ic_launcher_monochrome", padded_monochrome),
-        ):
-            cairosvg.svg2png(
-                url=str(source),
-                write_to=str(output_dir / f"{icon_name}.png"),
-                output_width=adaptive_size,
-                output_height=adaptive_size,
-            )
+brand_drawable_dir = resource_root / "drawable-nodpi"
+brand_drawable_dir.mkdir(parents=True, exist_ok=True)
+launcher_icon = brand_drawable_dir / "ic_launcher_brand.png"
+launcher_icon.write_bytes(brand_icon.read_bytes())
+if launcher_icon.read_bytes() != brand_icon.read_bytes():
+    print("ERROR: Android launcher icon differs from the approved source PNG.", file=sys.stderr)
+    raise SystemExit(1)
 
 colors_file = resource_root / "values" / "colors.xml"
 colors_file.parent.mkdir(parents=True, exist_ok=True)
@@ -233,8 +254,7 @@ adaptive_icon_dir.mkdir(parents=True, exist_ok=True)
 adaptive_icon = '''<?xml version="1.0" encoding="utf-8"?>
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
     <background android:drawable="@color/brand_background" />
-    <foreground android:drawable="@mipmap/ic_launcher_foreground" />
-    <monochrome android:drawable="@mipmap/ic_launcher_monochrome" />
+    <foreground android:drawable="@drawable/ic_launcher_brand" />
 </adaptive-icon>
 '''
 (adaptive_icon_dir / "ic_launcher.xml").write_text(adaptive_icon, encoding="utf-8")

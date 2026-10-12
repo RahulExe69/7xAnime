@@ -1,4 +1,8 @@
-![7xAnime brand mark and wordmark](public/brand/7xanime-lockup.svg)
+<p align="center">
+  <img src="public/brand/7xanime-icon.png" alt="7xAnime app icon" width="96" />
+  &nbsp;
+  <img src="public/brand/7xanime-wordmark.png" alt="7xAnime wordmark" width="280" />
+</p>
 
 Watch your favourite anime anywhere, anytime. No Ads.
 
@@ -8,7 +12,7 @@ _7xAnime is still under development and may encounter many bugs. Feel free to op
 
 ## Features
 
-- **No Ads** - No ads, no popups, no redirects, no bullshit.
+- **Ad-filtered playback** - Shared network filter lists plus popup and deceptive JavaScript-dialog blocking across supported embedded player providers.
 - **PWA Support** - 7xAnime is a PWA, which means you can install it on your phone.
 
 ## Contributing
@@ -70,11 +74,11 @@ More details, optional Google OAuth setup, and the Android HTTPS endpoint requir
 
 The Android local backend exposes manual server choices for AniXo, Megavid, AnimeParadise, Cosmic Player, MegaFlix, TryEmbed, CinexStream, and NontonGo, alongside the dedicated MegaPlay Server 1 iframe. The last four are the URL patterns documented by [Wabsa-kh/yomi-anime-api](https://github.com/Wabsa-kh/yomi-anime-api); the repository constructs embed URLs rather than extracting media itself. Cosmic wraps MegaPlay and is a player-UI comparison, not an independent source. All candidates stay out of Auto until verified on a real Android device. See [server notes](docs/SERVERS.md) and the [provider research log](docs/PROVIDER_RESEARCH.md).
 
-Megavid can occasionally display a deceptive “Click Allow” prompt, and NontonGo warns about pop-up ads. Do not grant notification permissions or install anything from those embeds; use MegaPlay or AniXo if suspicious prompts appear. The parent app cannot safely remove content rendered inside a cross-origin iframe. The player now offers Retry or Server 1 after 15 seconds of unresolved stream loading, and an explicitly selected MegaPlay fallback renders without waiting for the background request.
+The shared Android ad-filter engine, known-domain fallback, popup blocking, permission denial, and JavaScript-dialog suppression run for all configured embedded providers—not only Megavid. Provider-served first-party ads or cosmetic HTML overlays may still escape network filtering because those layers are owned by the cross-origin player. The player offers Retry or Server 1 after 15 seconds of unresolved stream loading, and an explicitly selected MegaPlay fallback renders without waiting for the background request.
 
 ## Player experience marathon
 
-The Android player work also includes a best-effort ad/redirect filter, blocked pop-up and remote JavaScript prompt dialogs, a native landscape fullscreen bridge with swipe/Back support, and double-tap ±10-second seeking in the app-owned ArtPlayer player. See [the player marathon notes](docs/PLAYER-MARATHON.md) for exact coverage and cross-origin iframe limitations. Known ad-domain filtering can never remove every in-page ad, especially content served by the player itself.
+The Android player work applies a shared, provider-agnostic best-effort ad/redirect filter to embedded player requests, blocks pop-up windows and remote JavaScript prompt dialogs, a native landscape fullscreen bridge with swipe/Back support, and double-tap ±10-second seeking in the app-owned ArtPlayer player. See [the player marathon notes](docs/PLAYER-MARATHON.md) for exact coverage and cross-origin iframe limitations. Known ad-domain filtering can never remove every in-page ad, especially content served by the player itself.
 
 When playback is detected as failed, 7xAnime keeps the server button visible and tries the next configured server before returning to MegaPlay at the end. Failed servers remain available to retry. A visual ad overlay inside a cross-origin iframe is not reliably detectable by the parent app, so this automatic switching cannot trigger on every in-page ad.
 

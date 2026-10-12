@@ -718,23 +718,21 @@ const VideoPlayerSection = () => {
         setProviderPlaybackOutcomes((previous) => ({ ...previous, [providerKey]: "failed" }));
       }
 
+      // A native JS dialog is a stronger signal than a missing stream: it means
+      // the embed tried to interrupt the viewer with a robot-check/Allow prompt.
+      // Advance immediately for dialogs and blocked redirects/popups; do not leave
+      // the user stuck on the same third-party frame with only an error message.
+      const deceptiveInterstitial = reason.startsWith("javascript-")
+        || reason === "popup"
+        || reason === "top-level-redirect";
+      if (deceptiveInterstitial) {
+        advanceAfterSourceFailure();
+        return;
+      }
+
       if (useFallback || isFallbackActive) {
-        const next = automaticCandidates.find((candidate) =>
-          !attemptedSourceIdsRef.current.has(candidate.id),
-        ) || automaticCandidates.find((candidate) => candidate.id !== activeEpisodeId)
-          || automaticCandidates[0];
-        if (next) {
-          attemptedSourceIdsRef.current.delete(next.id);
-          setIsHindiMode(false);
-          setUseFallback(false);
-          setPreferredCategory(next.category);
-          setManualProviderPlaybackFailed(false);
-          setPlaybackSourceIndex(0);
-          setLastPlayerError(null);
-          setSelectedEpisode(next.id);
-          updateEpisodeUrl(next.id, currentEpNumber);
-          return;
-        }
+        advanceAfterSourceFailure();
+        return;
       }
 
       handlePlayerError(`Blocked ${reason} from ${host}; trying the next server.`);
@@ -744,6 +742,7 @@ const VideoPlayerSection = () => {
     return () => window.removeEventListener("7xanime:blocked-player-action", handleBlockedPlayerAction);
   }, [
     activeEpisodeId,
+    advanceAfterSourceFailure,
     automaticCandidates,
     currentEpNumber,
     currentProviderName,
@@ -1148,22 +1147,6 @@ const VideoPlayerSection = () => {
             ? "Cosmic Player wraps MegaPlay-backed streams. Use this server to compare the player interface; it is not an independent upstream source."
             : `Embedded source: ${getProviderDisplayName(embedProvider)}. External top-level navigation is blocked by Android.`}
         </p>
-        {(embedProvider === "megavid" || embedProvider === "nontongo") && (
-          <Alert className="rounded-2xl border-amber-300/15 bg-amber-300/[0.04] text-zinc-200">
-            <AlertCircle className="h-4 w-4 text-amber-300" />
-            <AlertTitle className="font-bold">{embedProvider === "megavid" ? "Megavid safety note" : "NontonGo safety note"}</AlertTitle>
-            <AlertDescription className="mt-1 flex flex-col gap-3 text-sm text-zinc-400">
-              {embedProvider === "megavid"
-                ? "Megavid may occasionally show a deceptive “Click Allow” / robot-check overlay inside its own player. Do not tap Allow, grant notification permissions, or install anything."
-                : "NontonGo warns that its site can show pop-up ads. If a new page or a fake Allow/notification prompt appears, don't grant permissions or install anything."}
-              Because this is a third-party player, 7xAnime cannot safely remove its internal overlay or control every redirect from the parent page.
-              <div className="flex flex-wrap gap-2">
-                <Button size="sm" variant="secondary" onClick={() => selectFallbackServer()}>Switch to MegaPlay</Button>
-                <Button size="sm" variant="outline" onClick={() => handleProviderSelect("anixo", activeCategory)}>Try AniXo</Button>
-              </div>
-            </AlertDescription>
-          </Alert>
-        )}
         {playerControls}
       </div>
     );

@@ -151,20 +151,31 @@ def patch_app_gradle() -> None:
             else:
                 fail("Could not locate app-level Android plugin declaration.")
 
-    # Chaquopy 17 requires minSdk 24. Set the shared version when present.
+    # Keep minSdk at 26 for the adblock-rust wrapper and compile against API 37,
+    # which is required by the published AAR metadata. Do not change targetSdk.
     variables = ANDROID / "variables.gradle"
     patched_min_sdk = False
+    patched_compile_sdk = False
     if variables.is_file():
         variables_text = variables.read_text(encoding="utf-8")
-        variables_text, count = re.subn(
+        variables_text, min_count = re.subn(
             r"(?m)^(\s*minSdkVersion\s*=\s*)\d+",
-            r"\g<1>24",
+            r"\g<1>26",
             variables_text,
             count=1,
         )
-        if count:
-            variables.write_text(variables_text, encoding="utf-8")
+        variables_text, compile_count = re.subn(
+            r"(?m)^(\s*compileSdkVersion\s*=\s*)\d+",
+            r"\g<1>37",
+            variables_text,
+            count=1,
+        )
+        if min_count:
             patched_min_sdk = True
+        if compile_count:
+            patched_compile_sdk = True
+        if min_count or compile_count:
+            variables.write_text(variables_text, encoding="utf-8")
 
     if not patched_min_sdk:
         patterns = [
@@ -172,12 +183,14 @@ def patch_app_gradle() -> None:
             r"(?m)^(\s*minSdk\s*=\s*)(?:rootProject\.ext\.minSdkVersion|\d+)",
         ]
         for pattern in patterns:
-            text, count = re.subn(pattern, r"\g<1>24", text, count=1)
+            text, count = re.subn(pattern, r"\g<1>26", text, count=1)
             if count:
                 patched_min_sdk = True
                 break
     if not patched_min_sdk:
-        fail("Could not raise Android minSdk to Chaquopy's required API level 24.")
+        fail("Could not raise Android minSdk to API level 26 required by the adblock-rust wrapper.")
+    if not patched_compile_sdk:
+        fail("Could not raise Android compileSdk to API level 37 required by the adblock-rust AAR.")
 
     default_pattern = r"^\s*defaultConfig\s*\{"
     default_match = re.search(default_pattern, text, flags=re.MULTILINE)
@@ -205,6 +218,13 @@ def patch_app_gradle() -> None:
             "}\n"
         )
 
+    if "io.github.mlm-games:adblock:0.1.3" not in text:
+        text = insert_before_block_end(
+            text,
+            r"^dependencies\s*\{",
+            '\n    implementation "io.github.mlm-games:adblock:0.1.3"\n',
+            "app dependencies block",
+        )
     path.write_text(text, encoding="utf-8")
 
 
@@ -312,6 +332,54 @@ def install_navigation_guard(main_activity: Path) -> None:
     )
     if not super_call:
         fail("Could not find MainActivity.onCreate super call to install navigation guard.")
+
+    position = super_call.end()
+    text = text[:position] + "\n        " + statement + text[position:]
+    main_activity.write_text(text, encoding="utf-8")
+
+
+def install_service_worker_filter(main_activity: Path) -> None:
+    """Apply the same known-ad request rules to Service Worker fetches on API 24+."""
+    text = main_activity.read_text(encoding="utf-8")
+    text = add_import(text, "import android.os.Build;")
+    text = add_import(text, "import android.webkit.ServiceWorkerController;")
+    text = add_import(text, "import com.sevenx.anime.StreamingServiceWorkerClient;")
+
+    marker = "StreamingServiceWorkerClient()"
+    if marker in text:
+        return
+
+    super_call = re.search(
+        r"super\.onCreate\s*\(\s*savedInstanceState\s*\)\s*;",
+        text,
+    )
+    if not super_call:
+        fail("Could not find MainActivity.onCreate super call to install service-worker filtering.")
+
+    statement = (
+        "\n        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {"
+        "\n            ServiceWorkerController.getInstance().setServiceWorkerClient(new StreamingServiceWorkerClient());"
+        "\n        }"
+    )
+    position = super_call.end()
+    text = text[:position] + statement + text[position:]
+    main_activity.write_text(text, encoding="utf-8")
+
+
+def install_adblock_filter_engine(main_activity: Path) -> None:
+    """Initialize the rule engine without blocking the Activity startup thread."""
+    text = main_activity.read_text(encoding="utf-8")
+    text = add_import(text, "import com.sevenx.anime.AdblockFilterEngine;")
+    statement = "AdblockFilterEngine.initialize(getApplicationContext());"
+    if statement in text:
+        return
+
+    super_call = re.search(
+        r"super\.onCreate\s*\(\s*savedInstanceState\s*\)\s*;",
+        text,
+    )
+    if not super_call:
+        fail("Could not find MainActivity.onCreate super call to initialize ad filtering.")
 
     position = super_call.end()
     text = text[:position] + "\n        " + statement + text[position:]
@@ -507,6 +575,8 @@ def main() -> None:
     native_sources = {
         "LocalAnimeBackendPlugin.java": ROOT / "android-local-backend/LocalAnimeBackendPlugin.java",
         "StreamingNavigationWebViewClient.java": ROOT / "android-local-backend/StreamingNavigationWebViewClient.java",
+        "StreamingServiceWorkerClient.java": ROOT / "android-local-backend/StreamingServiceWorkerClient.java",
+        "AdblockFilterEngine.java": ROOT / "android-local-backend/AdblockFilterEngine.java",
         "StreamingWebChromeClient.java": ROOT / "android-local-backend/StreamingWebChromeClient.java",
         "PlayerFullscreenPlugin.java": ROOT / "android-local-backend/PlayerFullscreenPlugin.java",
     }
@@ -524,9 +594,11 @@ def main() -> None:
         fail(f"Expected one generated MainActivity.java, found {len(candidates)}.")
     register_plugin(candidates[0])
     install_navigation_guard(candidates[0])
+    install_service_worker_filter(candidates[0])
     install_streaming_chrome_client(candidates[0])
+    install_adblock_filter_engine(candidates[0])
 
-    print("Configured 7xAnime with the on-device API, ad-filtering navigation guard, popup protection, and fullscreen support.")
+    print("Configured 7xAnime with maintained filter-list blocking, domain fallback, popup protection, and fullscreen support.")
 
 
 if __name__ == "__main__":

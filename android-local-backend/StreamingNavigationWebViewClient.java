@@ -16,10 +16,11 @@ import java.util.Locale;
 import java.util.Set;
 
 /**
- * Keeps remote players inside the app and applies a conservative first-party
- * WebView request filter for known ad/redirect networks. Media/player hosts are
- * not blanket-blocked; this deliberately prefers a short host list over broad
- * URL heuristics that might break video segments.
+ * Keeps every remote player provider inside the app and applies the same
+ * provider-agnostic ad-filter engine to all embedded WebView requests. Rules
+ * are evaluated from the request/document context rather than a Megavid-only
+ * condition. Media/player hosts are not blanket-blocked, avoiding broad URL
+ * heuristics that could break video segments.
  */
 public final class StreamingNavigationWebViewClient extends BridgeWebViewClient {
     private static final String TAG = "7xAnimeNavigation";
@@ -93,7 +94,7 @@ public final class StreamingNavigationWebViewClient extends BridgeWebViewClient 
         return false;
     }
 
-    private static boolean isBlockedAdRequest(Uri url) {
+    static boolean isBlockedAdRequest(Uri url) {
         if (url == null || isAppUrl(url)) return false;
         String scheme = url.getScheme();
         if (scheme == null || (!"http".equalsIgnoreCase(scheme) && !"https".equalsIgnoreCase(scheme))) {
@@ -112,7 +113,7 @@ public final class StreamingNavigationWebViewClient extends BridgeWebViewClient 
         view.post(() -> view.evaluateJavascript(script, null));
     }
 
-    private static WebResourceResponse blockedResponse() {
+    static WebResourceResponse blockedResponse() {
         // A successful empty response avoids noisy net::ERR_BLOCKED_BY_CLIENT
         // errors in players that tolerate missing ad scripts or tracking pixels.
         return new WebResourceResponse(
@@ -125,12 +126,30 @@ public final class StreamingNavigationWebViewClient extends BridgeWebViewClient 
         );
     }
 
+    private static String headerSourceUrl(WebResourceRequest request) {
+        String referer = AdblockFilterEngine.header(request, "Referer");
+        return referer == null || referer.isEmpty() ? null : referer;
+    }
+
     @Override
     public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
         Uri url = request == null ? null : request.getUrl();
         if (isBlockedAdRequest(url)) {
-            Log.d(TAG, "Blocked ad resource: " + url.getHost());
+            Log.d(TAG, "Blocked known ad resource: " + url.getHost());
             return blockedResponse();
+        }
+        if (request != null && url != null) {
+            String sourceUrl = headerSourceUrl(request);
+            WebResourceResponse filtered = AdblockFilterEngine.intercept(
+                url.toString(),
+                sourceUrl,
+                AdblockFilterEngine.header(request, "Accept"),
+                request.isForMainFrame()
+            );
+            if (filtered != null) {
+                Log.d(TAG, "Blocked/replaced by filter-list rule: " + url.getHost());
+                return filtered;
+            }
         }
         return super.shouldInterceptRequest(view, request);
     }
