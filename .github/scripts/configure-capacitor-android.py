@@ -296,8 +296,8 @@ if not styles.is_file():
     raise SystemExit(1)
 styles_text = styles.read_text(encoding="utf-8")
 styles_text, splash_refs = re.subn(
-    r'(<item\\s+name="(?:android:background|windowSplashScreenAnimatedIcon)">)\\s*@drawable/splash\\s*(</item>)',
-    r'\\g<1>@drawable/splash_squircle\\g<2>',
+    r'(<item\s+name="(?:android:background|windowSplashScreenAnimatedIcon)">)\s*@drawable/splash\s*(</item>)',
+    r'\g<1>@drawable/splash_squircle\g<2>',
     styles_text,
 )
 if splash_refs < 1:
