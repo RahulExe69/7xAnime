@@ -103,16 +103,16 @@ export default function ContinueWatching({ loading = false }: { loading: boolean
           const total = typeof episode === "string" ? 0 : episode.timestamp || 0;
           const percent = total > 0 ? Math.min(100, (current / total) * 100) : 0;
           return (
-            <Link key={`${item.id}-${index}`} href={ROUTES.watchAnime(item.id, episodeNumber)} className="group flex w-[68%] max-w-[360px] shrink-0 snap-start items-center gap-3 rounded-2xl border border-white/[0.07] bg-[#15121d] p-2.5 transition-colors duration-150 hover:border-[#ff2f9d]/65 dark:border-white/[0.07] dark:bg-[#15121d] dark:hover:border-[#ff2f9d] sm:w-[48%] md:w-[38%] lg:w-[30%]">
-              <div className="relative h-[70px] w-[50px] shrink-0 overflow-hidden rounded-xl bg-[#ebe9f4] dark:bg-[#2b273b]">
+            <Link key={`${item.id}-${index}`} href={ROUTES.watchAnime(item.id, episodeNumber)} className="group flex w-[68%] max-w-[360px] shrink-0 snap-start items-center gap-3 rounded-2xl border border-white/[0.07] bg-[#19070d] p-2.5 transition-colors duration-150 hover:border-[#ff3b72]/65 dark:border-white/[0.07] dark:bg-[#19070d] dark:hover:border-[#ff3b72] sm:w-[48%] md:w-[38%] lg:w-[30%]">
+              <div className="relative h-[70px] w-[50px] shrink-0 overflow-hidden rounded-xl bg-[#ebe9f4] dark:bg-[#3b1020]">
                 <Image src={item.poster || "/brand/7xanime-mark.svg"} alt={item.name} fill sizes="72px" className="object-cover" />
                 <AnimeLanguageBadges animeId={String(item.id)} titles={[item.name, item.jname || ""]} />
                 <span className="absolute inset-0 grid place-items-center bg-black/0 text-white transition group-hover:bg-black/25"><Play className="h-6 w-6 opacity-0 drop-shadow group-hover:opacity-100" /></span>
               </div>
               <div className="min-w-0 flex-1">
                 <p className="line-clamp-2 text-sm font-bold leading-snug text-[#1d1a32] dark:text-white">{item.name}</p>
-                <p className="mt-2 text-xs font-semibold text-[#ff69b4] dark:text-[#ff8bc8]">Ep {episodeNumber}{total > 0 ? ` · ${Math.round(percent)}% watched` : ""}</p>
-                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#e4e0ef] dark:bg-[#343044]"><div className="h-full rounded-full bg-[#6650d8]" style={{ width: `${percent}%` }} /></div>
+                <p className="mt-2 text-xs font-semibold text-[#ff7398] dark:text-[#ff9fbe]">Ep {episodeNumber}{total > 0 ? ` · ${Math.round(percent)}% watched` : ""}</p>
+                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#40101f] dark:bg-[#401020]"><div className="h-full rounded-full bg-[#ff3b72]" style={{ width: `${percent}%` }} /></div>
               </div>
             </Link>
           );
