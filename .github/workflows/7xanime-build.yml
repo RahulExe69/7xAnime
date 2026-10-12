@@ -212,19 +212,44 @@ jobs:
               raise SystemExit("Approved 7xAnime icon/wordmark PNG assets are missing")
           navbar = Path("src/components/navbar.tsx").read_text(encoding="utf-8")
           manifest = Path("public/manifest.json").read_text(encoding="utf-8")
-          launcher_layouts = list(Path("android/app/src/main/res/mipmap-anydpi-v26").glob("ic_launcher*.xml"))
           if '/brand/7xanime-wordmark.png' not in navbar:
               raise SystemExit("The application header does not use the approved wordmark")
           if '/brand/7xanime-icon.png' not in manifest:
               raise SystemExit("The PWA manifest does not use the approved app icon")
-          launcher_icon = Path("android/app/src/main/res/drawable-nodpi/ic_launcher_brand.png")
-          if not launcher_icon.is_file() or launcher_icon.read_bytes() != brand_icon.read_bytes():
-              raise SystemExit("Android launcher icon must be a byte-for-byte copy of the approved source PNG")
-          if len(launcher_layouts) < 2 or any(
-              '@drawable/ic_launcher_brand' not in layout.read_text(encoding="utf-8")
-              for layout in launcher_layouts
-          ):
-              raise SystemExit("Adaptive launcher icons are not wired to the original drawable-nodpi PNG")
+          launcher_dir = Path("android/app/src/main/res/mipmap-nodpi")
+          launcher_names = (
+              "ic_launcher.png",
+              "ic_launcher_round.png",
+              "ic_launcher_static.png",
+              "ic_launcher_static_round.png",
+          )
+          missing_or_changed = [
+              name for name in launcher_names
+              if not (launcher_dir / name).is_file()
+              or (launcher_dir / name).read_bytes() != brand_icon.read_bytes()
+          ]
+          if missing_or_changed:
+              raise SystemExit(
+                  "No-crop launcher bitmaps must be exact copies of the approved PNG: "
+                  + ", ".join(missing_or_changed)
+              )
+          adaptive_icons = list(Path("android/app/src/main/res").rglob("ic_launcher*.xml"))
+          if adaptive_icons:
+              raise SystemExit(
+                  "Adaptive launcher XML would mask/crop the approved full artwork: "
+                  + ", ".join(str(path) for path in adaptive_icons)
+              )
+          stale_density_icons = [
+              path
+              for folder in Path("android/app/src/main/res").glob("mipmap-*")
+              if folder != launcher_dir and folder.is_dir()
+              for path in folder.glob("ic_launcher*.png")
+          ]
+          if stale_density_icons:
+              raise SystemExit(
+                  "Old resized launcher bitmaps remain outside mipmap-nodpi: "
+                  + ", ".join(str(path) for path in stale_density_icons)
+              )
           if "Megavid safety note" in watch_section or "NontonGo safety note" in watch_section:
               raise SystemExit("Provider-specific warning cards should not be shown in the player UI")
           if "public/brand/7xanime-icon.png" not in Path("README.md").read_text(encoding="utf-8"):
@@ -232,8 +257,10 @@ jobs:
           if "public/brand/7xanime-wordmark.png" not in Path("README.md").read_text(encoding="utf-8"):
               raise SystemExit("README does not use the approved wordmark branding")
           launcher_script = Path(".github/scripts/configure-capacitor-android.py").read_text(encoding="utf-8")
-          if 'brand_icon = brand_dir / "7xanime-icon.png"' not in launcher_script or "7xanime-mark.svg" in launcher_script:
-              raise SystemExit("Android launcher generation must use the approved PNG icon")
+          if 'brand_icon = brand_dir / "7xanime-icon.png"' not in launcher_script or 'launcher_dir = resource_root / "mipmap-nodpi"' not in launcher_script:
+              raise SystemExit("Android launcher generation must use the approved PNG as a no-density bitmap")
+          if "adaptive-icon" not in launcher_script or "ic_launcher*.xml" not in launcher_script:
+              raise SystemExit("Launcher generation must explicitly remove adaptive icon XML to avoid mask-driven cropping")
           if "Image.Resampling.LANCZOS" in launcher_script or "ic_launcher_foreground.png" in launcher_script:
               raise SystemExit("Launcher script must not resize or redraw the approved source icon")
           print("Provider-agnostic filter-list engine, warning-card removal, approved 7xAnime branding, fullscreen and seeking gestures are wired.")
