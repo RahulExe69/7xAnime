@@ -208,9 +208,10 @@ debug_strings.write_text(
 )
 
 
-# Follow the proven 7xTune launcher approach: keep the approved PNG byte-for-byte
-# unchanged as a drawable-nodpi foreground, then reference it from adaptive icons.
-# Android handles scaling for the launcher; do not resample, redraw, or crop the source.
+# Match 7xTune's proven no-crop launcher strategy: do not use Android adaptive-icon
+# XML for this artwork. That XML treats the complete icon image as a foreground layer and
+# applies an OEM-dependent mask/scale to it, which clips the outer 7x mark on some launchers.
+# Copy the approved PNG byte-for-byte into mipmap-nodpi and point @mipmap launcher refs at it.
 brand_dir = Path("public/brand")
 brand_icon = brand_dir / "7xanime-icon.png"
 brand_wordmark = brand_dir / "7xanime-wordmark.png"
@@ -220,44 +221,34 @@ for source in (brand_icon, brand_wordmark):
         raise SystemExit(1)
 
 resource_root = Path("android/app/src/main/res")
-brand_drawable_dir = resource_root / "drawable-nodpi"
-brand_drawable_dir.mkdir(parents=True, exist_ok=True)
-launcher_icon = brand_drawable_dir / "ic_launcher_brand.png"
-launcher_icon.write_bytes(brand_icon.read_bytes())
-if launcher_icon.read_bytes() != brand_icon.read_bytes():
-    print("ERROR: Android launcher icon differs from the approved source PNG.", file=sys.stderr)
-    raise SystemExit(1)
+launcher_dir = resource_root / "mipmap-nodpi"
+launcher_dir.mkdir(parents=True, exist_ok=True)
 
-colors_file = resource_root / "values" / "colors.xml"
-colors_file.parent.mkdir(parents=True, exist_ok=True)
-if colors_file.is_file():
-    colors_text = colors_file.read_text(encoding="utf-8")
-else:
-    colors_text = '<?xml version="1.0" encoding="utf-8"?>\n<resources>\n</resources>\n'
-if re.search(r'<color name="brand_background">.*?</color>', colors_text):
-    colors_text = re.sub(
-        r'<color name="brand_background">.*?</color>',
-        '<color name="brand_background">#09090F</color>',
-        colors_text,
-        count=1,
-    )
-else:
-    colors_text = colors_text.replace(
-        "</resources>",
-        '    <color name="brand_background">#09090F</color>\n</resources>',
-        1,
-    )
-colors_file.write_text(colors_text, encoding="utf-8")
+# Remove all template-generated adaptive icon definitions so Android cannot prefer them
+# over the exact source bitmap on Android 8+.
+for existing_xml in resource_root.rglob("ic_launcher*.xml"):
+    existing_xml.unlink()
 
-adaptive_icon_dir = resource_root / "mipmap-anydpi-v26"
-adaptive_icon_dir.mkdir(parents=True, exist_ok=True)
-adaptive_icon = '''<?xml version="1.0" encoding="utf-8"?>
-<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
-    <background android:drawable="@color/brand_background" />
-    <foreground android:drawable="@drawable/ic_launcher_brand" />
-</adaptive-icon>
-'''
-(adaptive_icon_dir / "ic_launcher.xml").write_text(adaptive_icon, encoding="utf-8")
-(adaptive_icon_dir / "ic_launcher_round.xml").write_text(adaptive_icon, encoding="utf-8")
+# Remove generated density-specific launcher PNGs. Leaving them in place can cause Android
+# to pick an old, resized template icon instead of the no-density source below.
+for mipmap_dir in resource_root.glob("mipmap-*"):
+    if not mipmap_dir.is_dir() or mipmap_dir == launcher_dir:
+        continue
+    for generated_icon in mipmap_dir.glob("ic_launcher*.png"):
+        generated_icon.unlink()
 
-print(f"Configured com.sevenx.anime version {version_name} ({version_code}) with a separate debug id com.sevenx.anime.debug.")
+approved_icon_bytes = brand_icon.read_bytes()
+launcher_names = (
+    "ic_launcher.png",
+    "ic_launcher_round.png",
+    "ic_launcher_static.png",
+    "ic_launcher_static_round.png",
+)
+for name in launcher_names:
+    output = launcher_dir / name
+    output.write_bytes(approved_icon_bytes)
+    if output.read_bytes() != approved_icon_bytes:
+        print(f"ERROR: launcher bitmap differs from approved source: {output}", file=sys.stderr)
+        raise SystemExit(1)
+
+print(f"Configured com.sevenx.anime version {version_name} ({version_code}) with byte-identical no-crop launcher bitmaps.")
