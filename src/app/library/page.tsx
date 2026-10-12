@@ -113,11 +113,11 @@ export default function LibraryPage() {
 
   return (
     <Container className="min-h-[75vh] space-y-6 pb-14 pt-24 text-white sm:pt-28">
-      <header className="relative overflow-hidden rounded-3xl border border-white/[0.09] bg-gradient-to-br from-[#21152e] via-[#171321] to-[#100e18] p-5 sm:p-7">
-        <div className="pointer-events-none absolute -right-12 -top-20 h-56 w-56 rounded-full bg-[#ff2f9d]/10 blur-3xl" />
+      <header className="relative overflow-hidden rounded-3xl border border-white/[0.09] bg-gradient-to-br from-[#3a0819] via-[#1a0710] to-[#100e18] p-5 sm:p-7">
+        <div className="pointer-events-none absolute -right-12 -top-20 h-56 w-56 rounded-full bg-[#ff3b72]/10 blur-3xl" />
         <div className="relative flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
           <div className="max-w-xl">
-            <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-[#ff2f9d]/25 bg-[#ff2f9d]/10 px-3 py-1.5 text-xs font-bold uppercase tracking-[0.16em] text-[#ff9acb]">
+            <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-[#ff3b72]/25 bg-[#ff3b72]/10 px-3 py-1.5 text-xs font-bold uppercase tracking-[0.16em] text-[#ffbad0]">
               <Bookmark className="h-3.5 w-3.5" /> Personal library
             </div>
             <h1 className="text-3xl font-black tracking-tight sm:text-4xl">My List</h1>
@@ -125,7 +125,7 @@ export default function LibraryPage() {
               Keep track of what you&apos;re watching, what you want to start, and the series you&apos;ve finished.
             </p>
           </div>
-          <Link href={ROUTES.SEARCH} className="inline-flex h-10 shrink-0 items-center justify-center gap-2 self-start rounded-xl bg-[#ff2f9d] px-4 text-sm font-bold text-white transition hover:bg-[#e51e86] sm:self-auto">
+          <Link href={ROUTES.SEARCH} className="inline-flex h-10 shrink-0 items-center justify-center gap-2 self-start rounded-xl bg-[#ff3b72] px-4 text-sm font-bold text-white transition hover:bg-[#ed245c] sm:self-auto">
             <Compass className="h-4 w-4" /> Explore anime
           </Link>
         </div>
@@ -153,7 +153,7 @@ export default function LibraryPage() {
               {localMode ? "Based on watch history saved on this device." : auth ? "Your saved statuses and latest episode progress." : "Sign in to keep a synced list across devices."}
             </p>
           </div>
-          <label className="flex h-10 w-full items-center gap-2 rounded-xl border border-white/[0.09] bg-[#15121d] px-3 text-[#aaa2bd] sm:max-w-xs">
+          <label className="flex h-10 w-full items-center gap-2 rounded-xl border border-white/[0.09] bg-[#19070d] px-3 text-[#aaa2bd] sm:max-w-xs">
             <Search className="h-4 w-4 shrink-0" />
             <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Find anime in your list" aria-label="Search your list" className="min-w-0 flex-1 bg-transparent text-sm text-white outline-none placeholder:text-[#79728e]" />
             {search && <button type="button" onClick={() => setSearch("")} aria-label="Clear search" className="rounded p-1 hover:bg-white/10"><X className="h-3.5 w-3.5" /></button>}
@@ -165,8 +165,8 @@ export default function LibraryPage() {
             const count = filter.value === "all" ? rows.length : rows.filter((item) => item.status === filter.value).length;
             const active = selectedStatus === filter.value;
             return (
-              <button key={filter.value} type="button" onClick={() => setSelectedStatus(filter.value)} aria-pressed={active} className={`inline-flex shrink-0 items-center gap-2 rounded-full border px-3.5 py-2 text-xs font-bold transition ${active ? "border-[#ff2f9d]/45 bg-[#ff2f9d]/15 text-[#ff9acb]" : "border-white/[0.08] bg-white/[0.03] text-[#aaa2bd] hover:border-white/20 hover:text-white"}`}>
-                {filter.label}<span className={`rounded-full px-1.5 py-0.5 text-[10px] tabular-nums ${active ? "bg-[#ff2f9d]/20 text-white" : "bg-white/[0.07] text-[#aaa2bd]"}`}>{count}</span>
+              <button key={filter.value} type="button" onClick={() => setSelectedStatus(filter.value)} aria-pressed={active} className={`inline-flex shrink-0 items-center gap-2 rounded-full border px-3.5 py-2 text-xs font-bold transition ${active ? "border-[#ff3b72]/45 bg-[#ff3b72]/15 text-[#ffbad0]" : "border-white/[0.08] bg-white/[0.03] text-[#aaa2bd] hover:border-white/20 hover:text-white"}`}>
+                {filter.label}<span className={`rounded-full px-1.5 py-0.5 text-[10px] tabular-nums ${active ? "bg-[#ff3b72]/20 text-white" : "bg-white/[0.07] text-[#aaa2bd]"}`}>{count}</span>
               </button>
             );
           })}
