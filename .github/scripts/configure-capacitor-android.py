@@ -279,7 +279,7 @@ draw.rounded_rectangle(
     radius=radius,
     fill=255,
 )
-mask = mask_large.resize((width, height), Image.Resampling.LANCZOS)
+mask = mask_large.resize((width, height), getattr(Image.Resampling, "LANCZOS"))
 splash_source.putalpha(Image.composite(splash_source.getchannel("A"), Image.new("L", (width, height), 0), mask))
 
 splash_dir = resource_root / "drawable-nodpi"
