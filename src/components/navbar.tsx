@@ -108,4 +108,5 @@ export default function NavBar() {
       </header>
       {searchOpen && <SearchOverlay open={searchOpen} onClose={() => setSearchOpen(false)} />}
     </>
+  );
 }
