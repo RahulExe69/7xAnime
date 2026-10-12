@@ -2,139 +2,130 @@
 @tailwind components;
 @tailwind utilities;
 
+/* 7xAnime — Sakura Chrome: lacquer-black surfaces, cherry-pink highlights, blossom glow. */
 html {
   color-scheme: dark;
   scroll-behavior: auto;
+  --sakura: #ff3b72;
+  --sakura-hot: #ff1765;
+  --sakura-soft: #ff9fbe;
+  --sakura-pale: #ffe3ed;
+  --sakura-ink: #0b0307;
+  --sakura-panel: #16070d;
+  --sakura-panel-raised: #210b14;
+  --sakura-border: rgba(255, 91, 135, 0.19);
+  --sakura-glow: rgba(255, 28, 91, 0.16);
 }
 
 body {
   font-family: Arial, Helvetica, sans-serif;
-  background: hsl(var(--background));
+  background-color: hsl(var(--background));
+  background-image:
+    radial-gradient(ellipse at 12% -8%, rgba(255, 32, 91, 0.10), transparent 34rem),
+    radial-gradient(ellipse at 100% 18%, rgba(146, 15, 55, 0.11), transparent 31rem);
+  background-attachment: fixed;
   color: hsl(var(--foreground));
   -webkit-tap-highlight-color: transparent;
 }
 
-::selection {
-  background: rgb(255 47 157 / 35%);
-  color: #fff;
-}
+::selection { background: rgb(255 45 105 / 42%); color: #fff; }
+:focus-visible { outline-color: var(--sakura); }
 
 @layer utilities {
-  .text-balance {
-    text-wrap: balance;
+  .text-balance { text-wrap: balance; }
+  .sakura-glow {
+    box-shadow: 0 0 0 1px rgba(255, 74, 121, .13), 0 12px 36px rgba(255, 23, 101, .10);
+  }
+  .sakura-divider {
+    background: linear-gradient(90deg, transparent, rgba(255, 59, 114, .6), rgba(255, 159, 190, .22), transparent);
   }
 }
 
 @layer base {
   :root {
-    --background: 240 25% 4%;
-    --foreground: 0 0% 98%;
-    --card: 240 18% 7%;
-    --card-foreground: 0 0% 98%;
-    --popover: 240 18% 7%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 252 58% 57%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 240 12% 12%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 240 12% 12%;
-    --muted-foreground: 240 5% 64.9%;
-    --accent: 329 52% 18%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 240 10% 16%;
-    --input: 240 10% 16%;
-    --ring: 252 58% 57%;
-    --radius: 0.5rem;
-    --chart-1: 12 76% 61%;
-    --chart-2: 173 58% 39%;
-    --chart-3: 197 37% 24%;
-    --chart-4: 43 74% 66%;
-    --chart-5: 27 87% 67%;
+    --background: 344 44% 3.5%;
+    --foreground: 340 25% 97%;
+    --card: 344 39% 6.5%;
+    --card-foreground: 340 25% 97%;
+    --popover: 344 39% 7.5%;
+    --popover-foreground: 340 25% 97%;
+    --primary: 345 100% 62%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 344 32% 13%;
+    --secondary-foreground: 340 25% 96%;
+    --muted: 344 28% 12%;
+    --muted-foreground: 342 12% 67%;
+    --accent: 345 67% 19%;
+    --accent-foreground: 340 25% 97%;
+    --destructive: 0 77% 57%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 344 28% 18%;
+    --input: 344 28% 18%;
+    --ring: 345 100% 65%;
+    --radius: 0.75rem;
+    --chart-1: 345 100% 62%;
+    --chart-2: 337 75% 72%;
+    --chart-3: 8 83% 64%;
+    --chart-4: 288 32% 70%;
+    --chart-5: 352 77% 48%;
   }
 
   .dark {
-    --background: 240 25% 4%;
-    --foreground: 0 0% 98%;
-    --card: 240 18% 7%;
-    --card-foreground: 0 0% 98%;
-    --popover: 240 18% 7%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 329 100% 59%;
+    --background: 344 44% 3.5%;
+    --foreground: 340 25% 97%;
+    --card: 344 39% 6.5%;
+    --card-foreground: 340 25% 97%;
+    --popover: 344 39% 7.5%;
+    --popover-foreground: 340 25% 97%;
+    --primary: 345 100% 62%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 240 12% 12%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 240 12% 12%;
-    --muted-foreground: 240 5% 64.9%;
-    --accent: 329 52% 18%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 240 10% 16%;
-    --input: 240 10% 16%;
-    --ring: 329 100% 59%;
-    --chart-1: 220 70% 50%;
-    --chart-2: 160 60% 45%;
-    --chart-3: 30 80% 55%;
-    --chart-4: 280 65% 60%;
-    --chart-5: 340 75% 55%;
-  }
-}
-
-@layer base {
-  * {
-    @apply border-border;
+    --secondary: 344 32% 13%;
+    --secondary-foreground: 340 25% 96%;
+    --muted: 344 28% 12%;
+    --muted-foreground: 342 12% 67%;
+    --accent: 345 67% 19%;
+    --accent-foreground: 340 25% 97%;
+    --destructive: 0 62.8% 42%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 344 28% 18%;
+    --input: 344 28% 18%;
+    --ring: 345 100% 65%;
+    --chart-1: 345 100% 62%;
+    --chart-2: 337 75% 72%;
+    --chart-3: 8 83% 64%;
+    --chart-4: 288 32% 70%;
+    --chart-5: 352 77% 48%;
   }
 
-  body {
-    @apply bg-background text-foreground;
-  }
+  * { @apply border-border; }
+  body { @apply bg-background text-foreground; }
 }
 
-::-webkit-scrollbar {
-  width: 5px;
-}
+/* Remap leftover legacy purple utilities into the 7xAnime sakura palette. */
+html.dark [class*="text-violet-"],
+html.dark [class*="text-purple-"] { color: var(--sakura-soft) !important; }
 
-/* Track */
-::-webkit-scrollbar-track {
-  background: hsl(var(--background));
-}
+html.dark [class*="bg-violet-"],
+html.dark [class*="bg-purple-"] { background-color: rgba(255, 59, 114, 0.14) !important; }
 
-/* Handle */
-::-webkit-scrollbar-thumb {
-  background: #393447;
-  border-radius: 999px;
-}
+html.dark [class*="border-violet-"],
+html.dark [class*="border-purple-"] { border-color: rgba(255, 91, 135, 0.32) !important; }
 
-/* Handle on hover */
-::-webkit-scrollbar-thumb:hover {
-  background: #555;
-}
+html.dark [class*="ring-violet-"],
+html.dark [class*="ring-purple-"] { --tw-ring-color: rgba(255, 91, 135, 0.72) !important; }
 
-/*
- * react-calendar-heatmap styles
- *
- * All of the styles in this file are optional and configurable!
- * The github and gitlab color scales are provided for reference.
- */
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: #100309; }
+::-webkit-scrollbar-thumb { background: #612033; border-radius: 999px; }
+::-webkit-scrollbar-thumb:hover { background: #a62a50; }
 
-.react-calendar-heatmap text {
-  font-size: 10px;
-  fill: #aaa;
-}
-
-.react-calendar-heatmap .react-calendar-heatmap-small-text {
-  font-size: 5px;
-}
-
-.react-calendar-heatmap rect:hover {
-  stroke: #555;
-  stroke-width: 1px;
-}
+.react-calendar-heatmap text { font-size: 10px; fill: #c49ba9; }
+.react-calendar-heatmap .react-calendar-heatmap-small-text { font-size: 5px; }
+.react-calendar-heatmap rect:hover { stroke: #ff608e; stroke-width: 1px; }
 
 .anime-shelf-scroll { scrollbar-width: none; -ms-overflow-style: none; }
 .anime-shelf-scroll::-webkit-scrollbar { display: none; }
+
 html.dark { color-scheme: dark; }
-html.dark ::-webkit-scrollbar-track { background: #12111a; }
-html.dark ::-webkit-scrollbar-thumb { background: #393447; }
+html.dark ::-webkit-scrollbar-track { background: #100309; }
+html.dark ::-webkit-scrollbar-thumb { background: #612033; }
