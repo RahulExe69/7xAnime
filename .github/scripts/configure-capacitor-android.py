@@ -208,14 +208,9 @@ debug_strings.write_text(
 )
 
 
-# Generate launcher artwork directly from the approved 7x Brand Studio PNG.
-# The supplied icon is the source of truth; only density resampling is performed.
-try:
-    from PIL import Image
-except ImportError as exc:
-    print("ERROR: Pillow is required to generate branded Android launcher icons.", file=sys.stderr)
-    raise SystemExit(1) from exc
-
+# Follow the proven 7xTune launcher approach: keep the approved PNG byte-for-byte
+# unchanged as a drawable-nodpi foreground, then reference it from adaptive icons.
+# Android handles scaling for the launcher; do not resample, redraw, or crop the source.
 brand_dir = Path("public/brand")
 brand_icon = brand_dir / "7xanime-icon.png"
 brand_wordmark = brand_dir / "7xanime-wordmark.png"
@@ -225,37 +220,20 @@ for source in (brand_icon, brand_wordmark):
         raise SystemExit(1)
 
 resource_root = Path("android/app/src/main/res")
-density_specs = [
-    ("mdpi", 48, 108),
-    ("hdpi", 72, 162),
-    ("xhdpi", 96, 216),
-    ("xxhdpi", 144, 324),
-    ("xxxhdpi", 192, 432),
-]
-
-with Image.open(brand_icon) as source_image:
-    icon = source_image.convert("RGBA")
-if icon.width != icon.height:
-    print(f"ERROR: launcher icon must be square, got {icon.width}x{icon.height}.", file=sys.stderr)
+brand_drawable_dir = resource_root / "drawable-nodpi"
+brand_drawable_dir.mkdir(parents=True, exist_ok=True)
+launcher_icon = brand_drawable_dir / "ic_launcher_brand.png"
+launcher_icon.write_bytes(brand_icon.read_bytes())
+if launcher_icon.read_bytes() != brand_icon.read_bytes():
+    print("ERROR: Android launcher icon differs from the approved source PNG.", file=sys.stderr)
     raise SystemExit(1)
-
-for density, legacy_size, adaptive_size in density_specs:
-    output_dir = resource_root / f"mipmap-{density}"
-    output_dir.mkdir(parents=True, exist_ok=True)
-    for icon_name in ("ic_launcher", "ic_launcher_round"):
-        icon.resize((legacy_size, legacy_size), Image.Resampling.LANCZOS).save(
-            output_dir / f"{icon_name}.png", format="PNG", optimize=True
-        )
-    icon.resize((adaptive_size, adaptive_size), Image.Resampling.LANCZOS).save(
-        output_dir / "ic_launcher_foreground.png", format="PNG", optimize=True
-    )
 
 colors_file = resource_root / "values" / "colors.xml"
 colors_file.parent.mkdir(parents=True, exist_ok=True)
 if colors_file.is_file():
     colors_text = colors_file.read_text(encoding="utf-8")
 else:
-    colors_text = '<?xml version="1.0" encoding="utf-8"?>\n<resources>\n</resources>\n'
+    colors_text = '<?xml version="1.0" encoding="utf-8"?>\\n<resources>\\n</resources>\\n'
 if re.search(r'<color name="brand_background">.*?</color>', colors_text):
     colors_text = re.sub(
         r'<color name="brand_background">.*?</color>',
@@ -266,19 +244,19 @@ if re.search(r'<color name="brand_background">.*?</color>', colors_text):
 else:
     colors_text = colors_text.replace(
         "</resources>",
-        '    <color name="brand_background">#09090F</color>\n</resources>',
+        '    <color name="brand_background">#09090F</color>\\n</resources>',
         1,
     )
 colors_file.write_text(colors_text, encoding="utf-8")
 
 adaptive_icon_dir = resource_root / "mipmap-anydpi-v26"
 adaptive_icon_dir.mkdir(parents=True, exist_ok=True)
-adaptive_icon = '''<?xml version="1.0" encoding="utf-8"?>
+adaptive_icon = \'\'\'<?xml version="1.0" encoding="utf-8"?>
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
     <background android:drawable="@color/brand_background" />
-    <foreground android:drawable="@mipmap/ic_launcher_foreground" />
+    <foreground android:drawable="@drawable/ic_launcher_brand" />
 </adaptive-icon>
-'''
+\'\'\'
 (adaptive_icon_dir / "ic_launcher.xml").write_text(adaptive_icon, encoding="utf-8")
 (adaptive_icon_dir / "ic_launcher_round.xml").write_text(adaptive_icon, encoding="utf-8")
 
