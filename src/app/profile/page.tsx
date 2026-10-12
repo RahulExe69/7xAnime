@@ -160,7 +160,7 @@ function ProfilePageContent() {
           <div className="flex flex-col items-center">
             <h2 className="text-lg font-bold tracking-tight text-white">@{targetUser.username}</h2>
             {isOwner && (
-              <span className="text-[11px] font-semibold text-violet-200 bg-violet-500/10 px-2.5 py-0.5 rounded-full border border-violet-400/20 mt-1">
+              <span className="text-[11px] font-semibold text-rose-200 bg-rose-500/10 px-2.5 py-0.5 rounded-full border border-rose-400/20 mt-1">
                 Your Profile
               </span>
             )}
