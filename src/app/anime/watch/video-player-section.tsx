@@ -832,14 +832,14 @@ const VideoPlayerSection = () => {
     <div className="flex w-full flex-col gap-3 rounded-2xl border border-white/[0.07] bg-[#101018] p-3 sm:p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-1.5 rounded-xl border border-white/[0.08] bg-black/20 p-1">
-          <Button size="sm" variant="ghost" disabled={nativeCatalogueComplete && !hasSub} onClick={() => handleCategoryChange("sub")} className={`h-8 rounded-lg px-3 text-xs font-bold transition ${!isHindiMode && activeCategory === "sub" ? "bg-[#ff2f9d] text-white hover:bg-[#ff56ad]" : "text-zinc-400 hover:text-white"}`}>
+          <Button size="sm" variant="ghost" disabled={nativeCatalogueComplete && !hasSub} onClick={() => handleCategoryChange("sub")} className={`h-8 rounded-lg px-3 text-xs font-bold transition ${!isHindiMode && activeCategory === "sub" ? "bg-[#ff3b72] text-white hover:bg-[#ff56ad]" : "text-zinc-400 hover:text-white"}`}>
             <Captions className="mr-1.5 h-3.5 w-3.5" /> SUB
           </Button>
-          <Button size="sm" variant="ghost" disabled={nativeCatalogueComplete && !hasDub} onClick={() => handleCategoryChange("dub")} className={`h-8 rounded-lg px-3 text-xs font-bold transition ${!isHindiMode && activeCategory === "dub" ? "bg-[#ff2f9d] text-white hover:bg-[#ff56ad]" : "text-zinc-400 hover:text-white"}`}>
+          <Button size="sm" variant="ghost" disabled={nativeCatalogueComplete && !hasDub} onClick={() => handleCategoryChange("dub")} className={`h-8 rounded-lg px-3 text-xs font-bold transition ${!isHindiMode && activeCategory === "dub" ? "bg-[#ff3b72] text-white hover:bg-[#ff56ad]" : "text-zinc-400 hover:text-white"}`}>
             <Mic className="mr-1.5 h-3.5 w-3.5" /> ENGLISH
           </Button>
           {hindiStreams.length > 0 && (
-            <Button size="sm" variant="ghost" onClick={selectHindiMode} className={`h-8 rounded-lg px-3 text-xs font-bold transition ${isHindiMode ? "bg-[#ff2f9d] text-white hover:bg-[#ff56ad]" : "text-zinc-400 hover:text-white"}`}>
+            <Button size="sm" variant="ghost" onClick={selectHindiMode} className={`h-8 rounded-lg px-3 text-xs font-bold transition ${isHindiMode ? "bg-[#ff3b72] text-white hover:bg-[#ff56ad]" : "text-zinc-400 hover:text-white"}`}>
               <span className="mr-1.5">हिं</span> HINDI
             </Button>
           )}
@@ -853,11 +853,11 @@ const VideoPlayerSection = () => {
         <span className="mr-1 text-xs font-extrabold tracking-wide text-zinc-400">Server:</span>
         {isHindiMode ? (
           hindiStreams.map((stream, index) => (
-            <Button key={stream.embed} size="sm" title={`Server ${index + 1} — Hindi dub — ${stream.host}`} aria-label={`Server ${index + 1} — Hindi dub — ${stream.host}`} onClick={() => setSelectedHindiServer(index)} className={`h-9 min-w-9 rounded-xl px-3 text-xs font-extrabold transition ${activeServerNumber === index + 1 ? "bg-[#ff2f9d] text-white" : "border border-white/[0.08] bg-white/[0.035] text-zinc-300 hover:border-[#ff2f9d]/30 hover:bg-[#ff2f9d]/10"}`}>{index + 1}</Button>
+            <Button key={stream.embed} size="sm" title={`Server ${index + 1} — Hindi dub — ${stream.host}`} aria-label={`Server ${index + 1} — Hindi dub — ${stream.host}`} onClick={() => setSelectedHindiServer(index)} className={`h-9 min-w-9 rounded-xl px-3 text-xs font-extrabold transition ${activeServerNumber === index + 1 ? "bg-[#ff3b72] text-white" : "border border-white/[0.08] bg-white/[0.035] text-zinc-300 hover:border-[#ff3b72]/30 hover:bg-[#ff3b72]/10"}`}>{index + 1}</Button>
           ))
         ) : (
           <>
-            <Button size="sm" title="Server 1 — MegaPlay" aria-label="Server 1 — MegaPlay" onClick={() => selectFallbackServer()} className={`h-10 min-w-12 rounded-xl px-2.5 text-xs font-extrabold transition ${activeServerNumber === 1 && (useFallback || isFallbackActive) ? "bg-[#ff2f9d] text-white" : "border border-white/[0.08] bg-white/[0.035] text-zinc-300 hover:border-[#ff2f9d]/30 hover:bg-[#ff2f9d]/10"}`}>
+            <Button size="sm" title="Server 1 — MegaPlay" aria-label="Server 1 — MegaPlay" onClick={() => selectFallbackServer()} className={`h-10 min-w-12 rounded-xl px-2.5 text-xs font-extrabold transition ${activeServerNumber === 1 && (useFallback || isFallbackActive) ? "bg-[#ff3b72] text-white" : "border border-white/[0.08] bg-white/[0.035] text-zinc-300 hover:border-[#ff3b72]/30 hover:bg-[#ff3b72]/10"}`}>
               <span className="flex flex-col items-center gap-0.5 leading-none"><span>1</span><span className="text-[8px] font-semibold opacity-80">MegaPlay</span></span>
             </Button>
             {visibleServerProviderNames.map((providerName, index) => {
@@ -871,7 +871,7 @@ const VideoPlayerSection = () => {
                   title={supportsAudio ? getServerProviderTitle(visibleServerProviderNames, providerName) : `${serverName} supports SUB only; tap to switch audio`}
                   aria-label={supportsAudio ? getServerProviderTitle(visibleServerProviderNames, providerName) : `${serverName}, SUB only; tap to switch audio`}
                   onClick={() => handleProviderSelect(providerName, activeCategory)}
-                  className={`h-10 min-w-12 rounded-xl px-2.5 text-xs font-extrabold transition ${currentProviderName === providerName && !useFallback && !isHindiMode ? "bg-[#ff2f9d] text-white" : failed ? "border border-rose-400/35 bg-rose-400/[0.06] text-zinc-300 hover:border-rose-300/60" : "border border-white/[0.08] bg-white/[0.035] text-zinc-300 hover:border-[#ff2f9d]/30 hover:bg-[#ff2f9d]/10"}`}
+                  className={`h-10 min-w-12 rounded-xl px-2.5 text-xs font-extrabold transition ${currentProviderName === providerName && !useFallback && !isHindiMode ? "bg-[#ff3b72] text-white" : failed ? "border border-rose-400/35 bg-rose-400/[0.06] text-zinc-300 hover:border-rose-300/60" : "border border-white/[0.08] bg-white/[0.035] text-zinc-300 hover:border-[#ff3b72]/30 hover:bg-[#ff3b72]/10"}`}
                 >
                   <span className="flex flex-col items-center gap-0.5 leading-none">
                     <span>{index + 2}</span>
@@ -962,7 +962,7 @@ const VideoPlayerSection = () => {
         onClick={() => window.dispatchEvent(new Event("7xanime:navigate-back"))}
         aria-label="Back to previous page"
         title="Back"
-        className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-white/10 bg-white/[0.04] text-zinc-200 transition hover:border-[#ff2f9d]/40 hover:bg-[#ff2f9d]/10 hover:text-white"
+        className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-white/10 bg-white/[0.04] text-zinc-200 transition hover:border-[#ff3b72]/40 hover:bg-[#ff3b72]/10 hover:text-white"
       >
         <ArrowLeft className="h-5 w-5" />
       </button>
@@ -976,7 +976,7 @@ const VideoPlayerSection = () => {
       </div>
       <Link
         href="#episode-list"
-        className="shrink-0 rounded-lg px-2 py-2 text-xs font-semibold text-[#ff70bd] transition hover:bg-[#ff2f9d]/10 sm:px-3"
+        className="shrink-0 rounded-lg px-2 py-2 text-xs font-semibold text-[#ff70bd] transition hover:bg-[#ff3b72]/10 sm:px-3"
       >
         Episodes
       </Link>
@@ -987,11 +987,11 @@ const VideoPlayerSection = () => {
     return (
       <div className="space-y-3">
         {playerHeader}
-        <div role="status" aria-live="polite" className="flex aspect-video w-full flex-col items-center justify-center gap-3 rounded-2xl border border-[#dedbea] bg-white text-sm text-[#716b87] dark:border-[#302c40] dark:bg-[#14121c] dark:text-zinc-400">
-          <span className="h-7 w-7 animate-spin rounded-full border-2 border-[#604bd3]/25 border-t-[#604bd3]" />
+        <div role="status" aria-live="polite" className="flex aspect-video w-full flex-col items-center justify-center gap-3 rounded-2xl border border-[#4b1727] bg-white text-sm text-[#716b87] dark:border-[#302c40] dark:bg-[#14121c] dark:text-zinc-400">
+          <span className="h-7 w-7 animate-spin rounded-full border-2 border-[#ff3b72]/25 border-t-[#ff3b72]" />
           <span>Finding Hindi dub for episode {currentEpNumber}…</span>
         </div>
-        <p className="text-xs text-[#77728f] dark:text-zinc-500">Hindi sources come from a community-maintained catalogue, so some anime or episodes may be missing.</p>
+        <p className="text-xs text-[#d49aaf] dark:text-zinc-500">Hindi sources come from a community-maintained catalogue, so some anime or episodes may be missing.</p>
         {playerControls}
       </div>
     );
