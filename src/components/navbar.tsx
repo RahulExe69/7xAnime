@@ -65,20 +65,20 @@ export default function NavBar() {
 
   return (
     <>
-      <header className="fixed inset-x-0 top-0 z-[100] border-b border-white/[0.07] bg-[#100e19]/95 text-[#d4cfea] shadow-[0_6px_24px_rgba(0,0,0,0.18)] backdrop-blur-xl">
+      <header className="fixed inset-x-0 top-0 z-[100] border-b border-white/[0.07] bg-[#100309]/95 text-[#ffeaf0] shadow-[0_6px_24px_rgba(0,0,0,0.18)] backdrop-blur-xl">
         <Container className="flex h-[62px] items-center justify-between gap-3 px-3 sm:px-5 lg:h-[72px] lg:gap-6">
           <div className="flex min-w-0 shrink-0 items-center gap-2">
             <div className="relative lg:hidden">
               <button type="button" aria-label={mobileMenuOpen ? "Close navigation menu" : "Open navigation menu"} aria-expanded={mobileMenuOpen} title="Navigation"
                 onClick={() => setMobileMenuOpen((open) => !open)}
-                className="grid h-9 w-9 place-items-center rounded-xl text-[#bdb5d6] transition-colors hover:bg-white/[0.07] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff2f9d]">
+                className="grid h-9 w-9 place-items-center rounded-xl text-[#d7a6b7] transition-colors hover:bg-white/[0.07] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff3b72]">
                 {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
               </button>
               {mobileMenuOpen && (
-                <nav aria-label="Mobile navigation" className="absolute left-0 top-[calc(100%+0.65rem)] z-[120] w-56 rounded-2xl border border-white/[0.08] bg-[#171421] p-2 shadow-2xl shadow-black/40">
+                <nav aria-label="Mobile navigation" className="absolute left-0 top-[calc(100%+0.65rem)] z-[120] w-56 rounded-2xl border border-white/[0.08] bg-[#1b0710] p-2 shadow-2xl shadow-black/40">
                   {menuItems.map((item) => (
                     <Link key={item.title} href={item.href} onClick={() => setMobileMenuOpen(false)}
-                      className={`flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold transition-colors hover:bg-white/[0.06] hover:text-white ${(item.href === ROUTES.HOME ? pathname === ROUTES.HOME : pathname.startsWith(item.href)) ? "bg-[#ff2f9d]/10 text-[#ff9acb]" : "text-[#c6bfd8]"}`}>
+                      className={`flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold transition-colors hover:bg-white/[0.06] hover:text-white ${(item.href === ROUTES.HOME ? pathname === ROUTES.HOME : pathname.startsWith(item.href)) ? "bg-[#ff3b72]/10 text-[#ffbad0]" : "text-[#c6bfd8]"}`}>
                       {item.title === "Home" ? <Home className="h-4 w-4" /> : item.title === "Explore" ? <Compass className="h-4 w-4" /> : <Bookmark className="h-4 w-4" />}
                       <span>{item.title}</span>
                     </Link>
@@ -90,9 +90,9 @@ export default function NavBar() {
               <Image src="/brand/7xanime-wordmark.png" alt="7xAnime" width={2107} height={746} className="h-10 w-[122px] object-contain object-left sm:h-11 sm:w-[134px] lg:h-12 lg:w-[146px]" />
             </Link>
           </div>
-          <nav className="hidden items-center gap-5 text-sm font-semibold lg:flex">{menuItems.map((item) => <Link key={item.title} href={item.href} className="transition hover:text-[#ff2f9d] dark:hover:text-[#ff8bc8]">{item.title}</Link>)}</nav>
+          <nav className="hidden items-center gap-5 text-sm font-semibold lg:flex">{menuItems.map((item) => <Link key={item.title} href={item.href} className="transition hover:text-[#ff3b72] dark:hover:text-[#ff9fbe]">{item.title}</Link>)}</nav>
           <div className="flex min-w-0 items-center justify-end gap-1.5 sm:gap-2 lg:gap-2.5">
-            <button type="button" onClick={() => setSearchOpen(true)} aria-label="Search anime" title="Search anime" className="grid h-9 w-9 shrink-0 place-items-center rounded-xl text-[#bdb5d6] transition-colors hover:bg-white/[0.07] hover:text-white"><Search className="h-[22px] w-[22px]" /></button>
+            <button type="button" onClick={() => setSearchOpen(true)} aria-label="Search anime" title="Search anime" className="grid h-9 w-9 shrink-0 place-items-center rounded-xl text-[#d7a6b7] transition-colors hover:bg-white/[0.07] hover:text-white"><Search className="h-[22px] w-[22px]" /></button>
             {auth.auth ? <NavbarAvatar auth={auth} /> : <LoginPopoverButton />}
           </div>
         </Container>
