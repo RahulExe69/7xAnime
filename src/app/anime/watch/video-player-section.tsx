@@ -270,7 +270,7 @@ const VideoPlayerSection = () => {
     setUseFallback(false);
     setIsHindiMode(false);
     setSelectedHindiServer(0);
-    setPreferredCategory("dub");
+    setPreferredCategory(localStorage.getItem("preferredAudio") === "sub" ? "sub" : "dub");
   }, [animeIdParam, currentEpNumber]);
 
   useEffect(() => {
