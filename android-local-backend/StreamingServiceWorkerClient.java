@@ -7,8 +7,9 @@ import android.webkit.WebResourceRequest;
 import android.webkit.WebResourceResponse;
 
 /**
- * Applies the same conservative known-ad host rules to Service Worker fetches.
- * This is installed only on API 24+ and leaves non-ad requests to WebView's
+ * Applies the same provider-agnostic filter engine and known-ad fallback to
+ * Service Worker fetches regardless of which embedded provider initiated them.
+ * This is installed only on API 24+ and leaves nonmatching requests to WebView's
  * normal service-worker handling by returning null.
  */
 public final class StreamingServiceWorkerClient extends ServiceWorkerClient {

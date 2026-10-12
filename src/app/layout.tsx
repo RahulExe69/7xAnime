@@ -73,7 +73,7 @@ export default function RootLayout({
 
           gtag('config', 'G-X9RZ58XPH1');`}
         </Script>
-        <link rel="icon" href="/brand/7xanime-mark.svg" type="image/svg+xml" sizes="any" />
+        <link rel="icon" href="/brand/7xanime-icon.png" type="image/png" />
       </head>
       <body
         className={`${geistSans.className} antialiased max-w-[100vw] overflow-x-clip bg-background text-foreground`}

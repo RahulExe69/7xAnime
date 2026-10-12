@@ -10,16 +10,10 @@
   "orientation": "portrait-primary",
   "icons": [
     {
-      "src": "/brand/7xanime-mark.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
+      "src": "/brand/7xanime-icon.png",
+      "sizes": "1254x1254",
+      "type": "image/png",
       "purpose": "any"
-    },
-    {
-      "src": "/brand/7xanime-foreground.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
-      "purpose": "maskable"
     }
   ]
 }

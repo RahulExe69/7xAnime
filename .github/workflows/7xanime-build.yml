@@ -51,8 +51,8 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install SVG renderer for Android launcher icons
-        run: python -m pip install --disable-pip-version-check cairosvg
+      - name: Install image tooling for Android launcher icons
+        run: python -m pip install --disable-pip-version-check Pillow
 
       - name: Install Android backend test dependencies
         run: python -m pip install --disable-pip-version-check -r android-local-backend/requirements-android.txt
@@ -203,7 +203,31 @@ jobs:
           if "SWIPE_THRESHOLD" not in viewport or "enterNativePlayerFullscreen" not in viewport:
               raise SystemExit("Player swipe/fullscreen wiring missing")
 
-          print("Maintained filter-list engine, known-domain fallback, popup prompt protection, auto-switch event, fullscreen and seeking gestures are wired.")
+          # The shared WebView interception layer must stay provider-agnostic.
+          if "megavid" in nav.lower() or "nontongo" in nav.lower():
+              raise SystemExit("Ad-filter routing must not be restricted to selected provider names")
+          brand_icon = Path("public/brand/7xanime-icon.png")
+          brand_wordmark = Path("public/brand/7xanime-wordmark.png")
+          if not brand_icon.is_file() or not brand_wordmark.is_file():
+              raise SystemExit("Approved 7xAnime icon/wordmark PNG assets are missing")
+          navbar = Path("src/components/navbar.tsx").read_text(encoding="utf-8")
+          manifest = Path("public/manifest.json").read_text(encoding="utf-8")
+          launcher_layouts = list(Path("android/app/src/main/res/mipmap-anydpi-v26").glob("ic_launcher*.xml"))
+          if '/brand/7xanime-wordmark.png' not in navbar:
+              raise SystemExit("The application header does not use the approved wordmark")
+          if '/brand/7xanime-icon.png' not in manifest:
+              raise SystemExit("The PWA manifest does not use the approved app icon")
+          if len(launcher_layouts) < 2 or any(
+              '@mipmap/ic_launcher_foreground' not in layout.read_text(encoding="utf-8")
+              for layout in launcher_layouts
+          ):
+              raise SystemExit("Adaptive launcher icons are not wired to the approved PNG")
+          for density in ("mdpi", "hdpi", "xhdpi", "xxhdpi", "xxxhdpi"):
+              icon_dir = Path("android/app/src/main/res") / f"mipmap-{density}"
+              for filename in ("ic_launcher.png", "ic_launcher_round.png", "ic_launcher_foreground.png"):
+                  if not (icon_dir / filename).is_file():
+                      raise SystemExit(f"Missing generated launcher asset: {icon_dir / filename}")
+          print("Provider-agnostic filter-list engine, known-domain fallback, popup prompt protection, approved 7xAnime branding, fullscreen and seeking gestures are wired.")
           PY
 
       # Test the exact patched Python tree that Chaquopy packages in the APK,

@@ -16,10 +16,11 @@ import java.util.Locale;
 import java.util.Set;
 
 /**
- * Keeps remote players inside the app and applies a conservative first-party
- * WebView request filter for known ad/redirect networks. Media/player hosts are
- * not blanket-blocked; this deliberately prefers a short host list over broad
- * URL heuristics that might break video segments.
+ * Keeps every remote player provider inside the app and applies the same
+ * provider-agnostic ad-filter engine to all embedded WebView requests. Rules
+ * are evaluated from the request/document context rather than a Megavid-only
+ * condition. Media/player hosts are not blanket-blocked, avoiding broad URL
+ * heuristics that could break video segments.
  */
 public final class StreamingNavigationWebViewClient extends BridgeWebViewClient {
     private static final String TAG = "7xAnimeNavigation";

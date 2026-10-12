@@ -3,7 +3,6 @@ from pathlib import Path
 import os
 import re
 import sys
-import tempfile
 
 app_gradle = Path("android/app/build.gradle")
 if not app_gradle.is_file():
@@ -209,21 +208,20 @@ debug_strings.write_text(
 )
 
 
-# Generate launcher artwork from the repository's source-of-truth SVGs.
-# CairoSVG is installed explicitly by the Android build workflow.
+# Generate launcher artwork directly from the approved 7x Brand Studio PNG.
+# The supplied icon is the source of truth; only density resampling is performed.
 try:
-    import cairosvg
+    from PIL import Image
 except ImportError as exc:
-    print("ERROR: CairoSVG is required to generate branded Android launcher icons.", file=sys.stderr)
+    print("ERROR: Pillow is required to generate branded Android launcher icons.", file=sys.stderr)
     raise SystemExit(1) from exc
 
 brand_dir = Path("public/brand")
-brand_mark = brand_dir / "7xanime-mark.svg"
-brand_foreground = brand_dir / "7xanime-foreground.svg"
-brand_monochrome = brand_dir / "7xanime-monochrome.svg"
-for source in (brand_mark, brand_foreground, brand_monochrome):
+brand_icon = brand_dir / "7xanime-icon.png"
+brand_wordmark = brand_dir / "7xanime-wordmark.png"
+for source in (brand_icon, brand_wordmark):
     if not source.is_file():
-        print(f"ERROR: missing 7xAnime brand asset: {source}", file=sys.stderr)
+        print(f"ERROR: missing 7x Brand Studio asset: {source}", file=sys.stderr)
         raise SystemExit(1)
 
 resource_root = Path("android/app/src/main/res")
@@ -234,62 +232,23 @@ density_specs = [
     ("xxhdpi", 144, 324),
     ("xxxhdpi", 192, 432),
 ]
-def write_padded_launcher_svg(source: Path, destination: Path, *, has_background: bool, scale: float = 0.76) -> None:
-    """Center the 7x artwork within Android's launcher safe area without altering web assets."""
-    source_text = source.read_text(encoding="utf-8")
-    offset = 512 * (1 - scale) / 2
-    transform = f'<g transform="translate({offset:.2f} {offset:.2f}) scale({scale:.2f})">'
 
-    if has_background:
-        background = '<rect width="512" height="512" rx="112" fill="url(#bg)"/>'
-        if background not in source_text:
-            raise ValueError(f"Could not find the background layer in {source}.")
-        prefix, remainder = source_text.split(background, 1)
-        artwork, suffix = remainder.rsplit("</svg>", 1)
-        padded_text = prefix + background + "\n" + transform + artwork + "\n</g>\n</svg>" + suffix
-    else:
-        title_end = re.search(r"</title>", source_text)
-        if not title_end:
-            raise ValueError(f"Could not find the SVG title in {source}.")
-        prefix = source_text[:title_end.end()]
-        remainder = source_text[title_end.end():]
-        artwork, suffix = remainder.rsplit("</svg>", 1)
-        padded_text = prefix + "\n" + transform + artwork + "\n</g>\n</svg>" + suffix
+with Image.open(brand_icon) as source_image:
+    icon = source_image.convert("RGBA")
+if icon.width != icon.height:
+    print(f"ERROR: launcher icon must be square, got {icon.width}x{icon.height}.", file=sys.stderr)
+    raise SystemExit(1)
 
-    destination.write_text(padded_text, encoding="utf-8")
-
-
-# Android launcher masks vary by OEM (circle, squircle, rounded square). Keep the mark
-# inside the central safe area with generous space on every edge. Web/PWA assets stay full-size.
-with tempfile.TemporaryDirectory(prefix="7xanime-launcher-") as temp_dir:
-    temp_root = Path(temp_dir)
-    padded_mark = temp_root / "7xanime-mark-padded.svg"
-    padded_foreground = temp_root / "7xanime-foreground-padded.svg"
-    padded_monochrome = temp_root / "7xanime-monochrome-padded.svg"
-    write_padded_launcher_svg(brand_mark, padded_mark, has_background=True)
-    write_padded_launcher_svg(brand_foreground, padded_foreground, has_background=False)
-    write_padded_launcher_svg(brand_monochrome, padded_monochrome, has_background=False)
-
-    for density, legacy_size, adaptive_size in density_specs:
-        output_dir = resource_root / f"mipmap-{density}"
-        output_dir.mkdir(parents=True, exist_ok=True)
-        for icon_name in ("ic_launcher", "ic_launcher_round"):
-            cairosvg.svg2png(
-                url=str(padded_mark),
-                write_to=str(output_dir / f"{icon_name}.png"),
-                output_width=legacy_size,
-                output_height=legacy_size,
-            )
-        for icon_name, source in (
-            ("ic_launcher_foreground", padded_foreground),
-            ("ic_launcher_monochrome", padded_monochrome),
-        ):
-            cairosvg.svg2png(
-                url=str(source),
-                write_to=str(output_dir / f"{icon_name}.png"),
-                output_width=adaptive_size,
-                output_height=adaptive_size,
-            )
+for density, legacy_size, adaptive_size in density_specs:
+    output_dir = resource_root / f"mipmap-{density}"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    for icon_name in ("ic_launcher", "ic_launcher_round"):
+        icon.resize((legacy_size, legacy_size), Image.Resampling.LANCZOS).save(
+            output_dir / f"{icon_name}.png", format="PNG", optimize=True
+        )
+    icon.resize((adaptive_size, adaptive_size), Image.Resampling.LANCZOS).save(
+        output_dir / "ic_launcher_foreground.png", format="PNG", optimize=True
+    )
 
 colors_file = resource_root / "values" / "colors.xml"
 colors_file.parent.mkdir(parents=True, exist_ok=True)
@@ -318,7 +277,6 @@ adaptive_icon = '''<?xml version="1.0" encoding="utf-8"?>
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
     <background android:drawable="@color/brand_background" />
     <foreground android:drawable="@mipmap/ic_launcher_foreground" />
-    <monochrome android:drawable="@mipmap/ic_launcher_monochrome" />
 </adaptive-icon>
 '''
 (adaptive_icon_dir / "ic_launcher.xml").write_text(adaptive_icon, encoding="utf-8")
