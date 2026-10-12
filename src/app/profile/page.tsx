@@ -8,8 +8,6 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { pb } from "@/lib/pocketbase";
 import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
-import Image from "next/image";
-import CoverImage from "@/assets/cover.png";
 import AnimeLists from "./components/anime-lists";
 import ActivityProgression from "./components/activity-progression";
 import Loading from "@/app/loading";
@@ -106,108 +104,125 @@ function ProfilePageContent() {
 
   return (
     <>
-      <div className="relative h-36 w-full overflow-hidden sm:h-44 md:h-56">
-        <Image
-          src={CoverImage.src}
-          alt="cover"
-          fill
-          className="object-cover opacity-80"
-          priority
-          placeholder="blur"
-          blurDataURL={CoverImage.blurDataURL}
-        />
-      </div>
-
-      <Container className="relative z-10 -mt-12 flex min-h-[70vh] flex-col gap-6 pb-16 sm:-mt-16 md:-mt-20 md:flex-row md:items-start md:gap-8">
-        {/* User Sidebar Info */}
-        <div className="flex w-full flex-col items-center gap-4 rounded-2xl border border-white/[0.08] bg-[#101018]/95 p-5 shadow-xl shadow-black/20 backdrop-blur-xl md:w-1/3">
-          <div className="relative group rounded-full overflow-hidden shrink-0">
-            <Avatar
-              className="h-28 w-28 cursor-pointer sm:h-32 sm:w-32"
-              username={targetUser.username}
-              url={targetUser.avatar}
-              collectionID={targetUser.collectionId}
-              id={targetUser.id}
-              onClick={() => {
-                if (isOwner && fileInputRef.current) {
-                  fileInputRef.current.click();
-                }
-              }}
-            />
-
-            {/* Owner Hover Camera & Tooltip Overlay */}
-            {isOwner && (
-              <div
-                onClick={() => fileInputRef.current?.click()}
-                className="absolute inset-0 bg-black/60 backdrop-blur-xs opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center cursor-pointer text-white p-2 text-center select-none"
-              >
-                <Camera className="h-7 w-7 text-white mb-1 drop-shadow-md animate-bounce" />
-                <span className="text-xs font-bold tracking-wide">Change Avatar</span>
+      <Container className="min-h-[75vh] space-y-6 pb-16 pt-24 text-white sm:pt-28">
+        <header className="relative overflow-hidden rounded-[28px] border border-[#ff3b72]/25 bg-gradient-to-br from-[#4a0b20]/90 via-[#210811] to-[#100e18] p-5 shadow-[0_18px_50px_rgba(0,0,0,0.18)] sm:p-7">
+          <div className="pointer-events-none absolute -right-12 -top-20 h-56 w-56 rounded-full bg-[#ff3b72]/15 blur-3xl" />
+          <div className="relative flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex min-w-0 items-center gap-4">
+              <div className="group relative shrink-0">
+                <Avatar
+                  className="h-[62px] w-[62px] cursor-pointer border-2 border-[#ff9fbe]/35 shadow-lg shadow-black/20 sm:h-[76px] sm:w-[76px]"
+                  username={targetUser.username}
+                  url={targetUser.avatar}
+                  collectionID={targetUser.collectionId}
+                  id={targetUser.id}
+                  onClick={() => {
+                    if (isOwner) fileInputRef.current?.click();
+                  }}
+                />
+                {isOwner && (
+                  <button
+                    type="button"
+                    aria-label="Change avatar"
+                    title="Change avatar"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="absolute -bottom-1 -right-1 grid h-7 w-7 place-items-center rounded-full border-2 border-[#1b0710] bg-[#ff3b72] text-white shadow-lg transition-colors hover:bg-[#ff5a88] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ffd4e0]"
+                  >
+                    <Camera className="h-3.5 w-3.5" />
+                  </button>
+                )}
               </div>
-            )}
-          </div>
-
-          {isOwner && (
-            <input
-              type="file"
-              ref={fileInputRef}
-              accept="image/*"
-              onChange={handleFileChange}
-              className="hidden"
-            />
-          )}
-
-          <div className="flex flex-col items-center">
-            <h2 className="text-lg font-bold tracking-tight text-white">@{targetUser.username}</h2>
+              <div className="min-w-0">
+                <p className="mb-1 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.2em] text-[#ff9fbe]">
+                  <span className="h-1.5 w-1.5 rounded-full bg-[#ff3b72] shadow-[0_0_10px_rgba(255,59,114,0.8)]" />
+                  7xAnime Profile
+                </p>
+                <h1 className="break-words text-2xl font-black tracking-tight text-[#fff3f7] sm:text-3xl">
+                  {isOwner ? "Your Anime Profile" : `@${targetUser.username}`}
+                </h1>
+                <p className="mt-1 max-w-xl text-sm leading-6 text-[#d0b4bf]">
+                  {isOwner
+                    ? "Your anime lists, watch activity and progress, all in one place."
+                    : "Explore this viewer’s anime lists and watch activity."}
+                </p>
+                <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-medium text-[#c29daa]">
+                  <span>@{targetUser.username}</span>
+                  <span aria-hidden="true" className="text-[#ff6d97]">·</span>
+                  <span>Member since {new Date(targetUser.created).getFullYear()}</span>
+                  {isOwner && (
+                    <>
+                      <span aria-hidden="true" className="text-[#ff6d97]">·</span>
+                      <span className="rounded-full border border-[#ff9fbe]/20 bg-[#ff3b72]/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#ffc1d4]">
+                        Your profile
+                      </span>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
             {isOwner && (
-              <span className="text-[11px] font-semibold text-rose-200 bg-rose-500/10 px-2.5 py-0.5 rounded-full border border-rose-400/20 mt-1">
-                Your Profile
-              </span>
-            )}
-          </div>
-        </div>
-
-        {/* User Activity & Lists Section */}
-        <div className="w-full min-w-0 md:w-2/3">
-          <div className="w-full">
-            {isOwner && (
-              <div className="float-right flex gap-2 items-center mb-2">
-                <p className="text-sm text-gray-500">Import:</p>
+              <div className="flex shrink-0 items-center gap-3 self-start rounded-xl border border-[#ff9fbe]/15 bg-black/15 px-3 py-2 sm:self-center">
+                <div>
+                  <p className="text-xs font-bold text-[#ffeaf0]">Import your lists</p>
+                  <p className="mt-0.5 text-[10px] text-[#b49aa4]">Bring your AniList library</p>
+                </div>
                 <AnilistImport />
               </div>
             )}
-
-            <Tabs defaultValue="watching" className="w-full">
-              <TabsList className="grid h-auto w-full grid-cols-2 gap-1 rounded-xl border border-white/[0.06] bg-white/[0.03] p-1 sm:grid-cols-5">
-                <TabsTrigger className="rounded-lg px-2 py-2 text-xs sm:text-sm" value="watching">Watching</TabsTrigger>
-                <TabsTrigger className="rounded-lg px-2 py-2 text-xs sm:text-sm" value="plan-to-watch">Plan To Watch</TabsTrigger>
-                <TabsTrigger className="rounded-lg px-2 py-2 text-xs sm:text-sm" value="on-hold">On Hold</TabsTrigger>
-                <TabsTrigger className="rounded-lg px-2 py-2 text-xs sm:text-sm" value="completed">Completed</TabsTrigger>
-                <TabsTrigger className="rounded-lg px-2 py-2 text-xs sm:text-sm" value="dropped">Dropped</TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="watching" className="mt-4">
-                <AnimeLists status="watching" userId={targetUser.id} />
-              </TabsContent>
-              <TabsContent value="plan-to-watch" className="mt-4">
-                <AnimeLists status="plan to watch" userId={targetUser.id} />
-              </TabsContent>
-              <TabsContent value="on-hold" className="mt-4">
-                <AnimeLists status="on hold" userId={targetUser.id} />
-              </TabsContent>
-              <TabsContent value="completed" className="mt-4">
-                <AnimeLists status="completed" userId={targetUser.id} />
-              </TabsContent>
-              <TabsContent value="dropped" className="mt-4">
-                <AnimeLists status="dropped" userId={targetUser.id} />
-              </TabsContent>
-            </Tabs>
           </div>
+        </header>
 
-          <div className="my-10">
-            <ActivityProgression targetUser={targetUser} />
+        {isOwner && (
+          <input
+            type="file"
+            ref={fileInputRef}
+            accept="image/*"
+            onChange={handleFileChange}
+            className="hidden"
+          />
+        )}
+
+        <section className="space-y-4">
+          <div>
+            <h2 className="text-lg font-extrabold tracking-tight text-[#fff3f7]">Your anime shelf</h2>
+            <p className="mt-1 text-xs leading-5 text-[#ad929d]">
+              Browse series by their place in your watch journey.
+            </p>
           </div>
-        </div>
+          <Tabs defaultValue="watching" className="w-full">
+            <TabsList className="grid h-auto w-full grid-cols-2 gap-1.5 rounded-2xl border border-white/[0.07] bg-[#16070d]/90 p-1.5 sm:grid-cols-5">
+              <TabsTrigger className="rounded-xl px-2 py-2.5 text-xs font-bold sm:text-sm" value="watching">Watching</TabsTrigger>
+              <TabsTrigger className="rounded-xl px-2 py-2.5 text-xs font-bold sm:text-sm" value="plan-to-watch">Plan to watch</TabsTrigger>
+              <TabsTrigger className="rounded-xl px-2 py-2.5 text-xs font-bold sm:text-sm" value="on-hold">On hold</TabsTrigger>
+              <TabsTrigger className="rounded-xl px-2 py-2.5 text-xs font-bold sm:text-sm" value="completed">Completed</TabsTrigger>
+              <TabsTrigger className="rounded-xl px-2 py-2.5 text-xs font-bold sm:text-sm" value="dropped">Dropped</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="watching" className="mt-4">
+              <AnimeLists status="watching" userId={targetUser.id} />
+            </TabsContent>
+            <TabsContent value="plan-to-watch" className="mt-4">
+              <AnimeLists status="plan to watch" userId={targetUser.id} />
+            </TabsContent>
+            <TabsContent value="on-hold" className="mt-4">
+              <AnimeLists status="on hold" userId={targetUser.id} />
+            </TabsContent>
+            <TabsContent value="completed" className="mt-4">
+              <AnimeLists status="completed" userId={targetUser.id} />
+            </TabsContent>
+            <TabsContent value="dropped" className="mt-4">
+              <AnimeLists status="dropped" userId={targetUser.id} />
+            </TabsContent>
+          </Tabs>
+        </section>
+
+        <section className="space-y-3 rounded-2xl border border-white/[0.07] bg-[#16070d]/65 p-4 sm:p-6">
+          <div>
+            <h2 className="text-lg font-extrabold tracking-tight text-[#fff3f7]">Activity & progress</h2>
+            <p className="mt-1 text-xs leading-5 text-[#ad929d]">A snapshot of this viewer’s anime journey.</p>
+          </div>
+          <ActivityProgression targetUser={targetUser} />
+        </section>
       </Container>
     </>
   );
