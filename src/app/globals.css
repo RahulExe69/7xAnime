@@ -23,7 +23,7 @@ body {
   background-image:
     radial-gradient(ellipse at 12% -8%, rgba(255, 32, 91, 0.10), transparent 34rem),
     radial-gradient(ellipse at 100% 18%, rgba(146, 15, 55, 0.11), transparent 31rem);
-  background-attachment: fixed;
+  background-attachment: scroll;
   color: hsl(var(--foreground));
   -webkit-tap-highlight-color: transparent;
 }
