@@ -51,9 +51,6 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install image tooling for Android launcher icons
-        run: python -m pip install --disable-pip-version-check Pillow
-
       - name: Install Android backend test dependencies
         run: python -m pip install --disable-pip-version-check -r android-local-backend/requirements-android.txt
 
@@ -220,16 +217,14 @@ jobs:
               raise SystemExit("The application header does not use the approved wordmark")
           if '/brand/7xanime-icon.png' not in manifest:
               raise SystemExit("The PWA manifest does not use the approved app icon")
+          launcher_icon = Path("android/app/src/main/res/drawable-nodpi/ic_launcher_brand.png")
+          if not launcher_icon.is_file() or launcher_icon.read_bytes() != brand_icon.read_bytes():
+              raise SystemExit("Android launcher icon must be a byte-for-byte copy of the approved source PNG")
           if len(launcher_layouts) < 2 or any(
-              '@mipmap/ic_launcher_foreground' not in layout.read_text(encoding="utf-8")
+              '@drawable/ic_launcher_brand' not in layout.read_text(encoding="utf-8")
               for layout in launcher_layouts
           ):
-              raise SystemExit("Adaptive launcher icons are not wired to the approved PNG")
-          for density in ("mdpi", "hdpi", "xhdpi", "xxhdpi", "xxxhdpi"):
-              icon_dir = Path("android/app/src/main/res") / f"mipmap-{density}"
-              for filename in ("ic_launcher.png", "ic_launcher_round.png", "ic_launcher_foreground.png"):
-                  if not (icon_dir / filename).is_file():
-                      raise SystemExit(f"Missing generated launcher asset: {icon_dir / filename}")
+              raise SystemExit("Adaptive launcher icons are not wired to the original drawable-nodpi PNG")
           if "Megavid safety note" in watch_section or "NontonGo safety note" in watch_section:
               raise SystemExit("Provider-specific warning cards should not be shown in the player UI")
           if "public/brand/7xanime-icon.png" not in Path("README.md").read_text(encoding="utf-8"):
@@ -239,6 +234,8 @@ jobs:
           launcher_script = Path(".github/scripts/configure-capacitor-android.py").read_text(encoding="utf-8")
           if 'brand_icon = brand_dir / "7xanime-icon.png"' not in launcher_script or "7xanime-mark.svg" in launcher_script:
               raise SystemExit("Android launcher generation must use the approved PNG icon")
+          if "Image.Resampling.LANCZOS" in launcher_script or "ic_launcher_foreground.png" in launcher_script:
+              raise SystemExit("Launcher script must not resize or redraw the approved source icon")
           print("Provider-agnostic filter-list engine, warning-card removal, approved 7xAnime branding, fullscreen and seeking gestures are wired.")
           PY
 
