@@ -251,18 +251,4 @@ for name in launcher_names:
         print(f"ERROR: launcher bitmap differs from approved source: {output}", file=sys.stderr)
         raise SystemExit(1)
 
-# Keep PNG crunching from needlessly rewriting the approved full-artwork launcher assets.
-app_gradle_text = app_gradle.read_text(encoding="utf-8")
-if "isCrunchPngs = false" not in app_gradle_text:
-    app_gradle_text = re.sub(
-        r"(?m)^\\s*buildTypes\\s*\\{",
-        "    buildTypes {\\n        debug {\\n            isCrunchPngs = false\\n        }",
-        app_gradle_text,
-        count=1,
-    )
-    if "isCrunchPngs = false" not in app_gradle_text:
-        print("ERROR: could not disable PNG crunching for the launcher icon.", file=sys.stderr)
-        raise SystemExit(1)
-app_gradle.write_text(app_gradle_text, encoding="utf-8")
-
 print(f"Configured com.sevenx.anime version {version_name} ({version_code}) with byte-identical no-crop launcher bitmaps.")
