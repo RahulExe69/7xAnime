@@ -78,6 +78,13 @@ const VideoPlayerSection = () => {
 
   const { data: allEpisodesData, isLoading: isEpisodesLoading } = useGetAllEpisodes(animeIdParam);
   const [preferredCategory, setPreferredCategory] = useState<"sub" | "dub">("dub");
+
+  useEffect(() => {
+    const savedAudio = localStorage.getItem("preferredAudio");
+    if (savedAudio === "sub" || savedAudio === "dub") {
+      setPreferredCategory(savedAudio);
+    }
+  }, []);
   const requestedEpisodeNumber = Math.max(1, Number(epParam) || 1);
 
   const rawProviders = useMemo(
@@ -370,6 +377,7 @@ const VideoPlayerSection = () => {
     setIsHindiMode(false);
     setUseFallback(false);
     setPreferredCategory(cat);
+    localStorage.setItem("preferredAudio", cat);
 
     const categoryProviders = providerNames.filter(
       (name) => (rawProviders[name]?.episodes?.[cat] || []).length > 0,
