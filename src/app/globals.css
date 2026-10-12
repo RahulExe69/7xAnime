@@ -101,18 +101,7 @@ body {
   body { @apply bg-background text-foreground; }
 }
 
-/* Remap leftover legacy purple utilities into the 7xAnime sakura palette. */
-html.dark [class*="text-violet-"],
-html.dark [class*="text-purple-"] { color: var(--sakura-soft) !important; }
-
-html.dark [class*="bg-violet-"],
-html.dark [class*="bg-purple-"] { background-color: rgba(255, 59, 114, 0.14) !important; }
-
-html.dark [class*="border-violet-"],
-html.dark [class*="border-purple-"] { border-color: rgba(255, 91, 135, 0.32) !important; }
-
-html.dark [class*="ring-violet-"],
-html.dark [class*="ring-purple-"] { --tw-ring-color: rgba(255, 91, 135, 0.72) !important; }
+/* Components use the native rose family for one consistent sakura accent. */
 
 ::-webkit-scrollbar { width: 5px; }
 ::-webkit-scrollbar-track { background: #100309; }
