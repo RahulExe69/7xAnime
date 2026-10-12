@@ -27,7 +27,7 @@ const RecentCommentsSection = () => {
   return (
     <Container className="space-y-6 my-12">
       <div className="flex items-center justify-between">
-        <SectionHeading eyebrow="Community" title="Latest Activities" icon={<MessageSquare className="h-5 w-5 text-violet-400" />} />
+        <SectionHeading eyebrow="Community" title="Latest Activities" icon={<MessageSquare className="h-5 w-5 text-rose-400" />} />
       </div>
 
       {isLoading ? (
@@ -52,7 +52,7 @@ const RecentCommentsSection = () => {
             return (
               <div
                 key={comment.id}
-                className="group flex flex-col justify-between rounded-2xl border border-white/5 bg-[#141414] p-4 shadow-sm transition hover:border-violet-500/30"
+                className="group flex flex-col justify-between rounded-2xl border border-white/5 bg-[#141414] p-4 shadow-sm transition hover:border-rose-500/30"
               >
                 <div className="flex flex-col gap-2.5">
                   {/* Header: User Info */}
@@ -87,7 +87,7 @@ const RecentCommentsSection = () => {
                     >
                       {comment.animeTitle || "Anime"}
                     </span>
-                    <span className="text-[10px] font-bold bg-violet-600 text-white px-2 py-0.5 rounded shrink-0">
+                    <span className="text-[10px] font-bold bg-rose-600 text-white px-2 py-0.5 rounded shrink-0">
                       Ep {comment.episodeNumber}
                     </span>
                   </div>
@@ -121,7 +121,7 @@ const RecentCommentsSection = () => {
                 {/* Footer Link to Episode */}
                 <Link
                   href={`/anime/watch?anime=${comment.animeId}&ep=${comment.episodeNumber}`}
-                  className="flex items-center justify-center gap-1.5 mt-3 pt-2.5 border-t border-slate-800/80 text-xs font-bold text-gray-400 group-hover:text-violet-400 transition"
+                  className="flex items-center justify-center gap-1.5 mt-3 pt-2.5 border-t border-slate-800/80 text-xs font-bold text-gray-400 group-hover:text-rose-400 transition"
                 >
                   <Play className="h-3 w-3 fill-current" /> Watch Episode{" "}
                   {comment.episodeNumber}
