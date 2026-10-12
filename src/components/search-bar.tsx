@@ -135,7 +135,7 @@ const SearchBar = ({
               className="w-full"
               href={`${ROUTES.SEARCH}?q=${encodeURIComponent(searchValue)}`}
             >
-              <Button className="w-full bg-[#8b5cf6] text-white">
+              <Button className="w-full bg-[#ff3b72] text-white">
                 Show More
               </Button>
             </Link>
