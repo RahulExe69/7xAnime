@@ -259,7 +259,7 @@ jobs:
           launcher_script = Path(".github/scripts/configure-capacitor-android.py").read_text(encoding="utf-8")
           if 'brand_icon = brand_dir / "7xanime-icon.png"' not in launcher_script or 'launcher_dir = resource_root / "mipmap-nodpi"' not in launcher_script:
               raise SystemExit("Android launcher generation must use the approved PNG as a no-density bitmap")
-          if "adaptive-icon" not in launcher_script or "ic_launcher*.xml" not in launcher_script:
+          if "adaptive icon" not in launcher_script or "ic_launcher*.xml" not in launcher_script:
               raise SystemExit("Launcher generation must explicitly remove adaptive icon XML to avoid mask-driven cropping")
           if "Image.Resampling.LANCZOS" in launcher_script or "ic_launcher_foreground.png" in launcher_script:
               raise SystemExit("Launcher script must not resize or redraw the approved source icon")
