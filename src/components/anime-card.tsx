@@ -49,7 +49,7 @@ const AnimeCard = ({ displayDetails = true, variant = "sm", ...props }: Props) =
 
   return (
     <article className={cn(
-      "group relative isolate w-full min-w-0 overflow-hidden rounded-xl border border-white/[0.09] bg-[#19070d] shadow-[0_8px_22px_rgba(0,0,0,0.18)] transition-colors duration-150 hover:border-[#ff3b72]/70 hover:shadow-[0_10px_28px_rgba(255,47,157,0.10)]",
+      "group relative isolate w-full min-w-0 overflow-hidden rounded-xl border border-white/[0.09] bg-[#19070d] shadow-[0_8px_22px_rgba(0,0,0,0.18)] transition-colors duration-150 hover:border-[#ff3b72]/70 hover:shadow-[0_10px_28px_rgba(255,59,114,0.13)]",
       variant === "sm" && "max-w-[11.5rem]",
       variant === "lg" && "max-w-[15rem]",
       props.className,
