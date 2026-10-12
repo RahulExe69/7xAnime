@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import React, { useEffect, useState } from "react";
-import { Bookmark, Compass, Home, Menu, Search, X } from "lucide-react";
+import { Bookmark, Compass, Home, Search, Settings } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { toast } from "sonner";
 
@@ -17,16 +17,16 @@ import { pb } from "@/lib/pocketbase";
 import SearchOverlay from "./search-overlay";
 
 const menuItems = [
-  { title: "Home", href: ROUTES.HOME },
-  { title: "Explore", href: ROUTES.SEARCH },
-  { title: "My List", href: "/library" },
+  { title: "Home", href: ROUTES.HOME, icon: Home },
+  { title: "Explore", href: ROUTES.SEARCH, icon: Compass },
+  { title: "My List", href: "/library", icon: Bookmark },
+  { title: "Settings", href: "/settings", icon: Settings },
 ];
 
 export default function NavBar() {
   const pathname = usePathname() || ROUTES.HOME;
   const auth = useAuthStore();
   const [searchOpen, setSearchOpen] = useState(false);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     const refreshAuth = async () => {
@@ -59,45 +59,53 @@ export default function NavBar() {
     void refreshAuth();
   }, []);
 
-  useEffect(() => { setMobileMenuOpen(false); }, [pathname]);
 
   if (pathname === ROUTES.WATCH || pathname === `${ROUTES.WATCH}/`) return null;
+
+  const isActive = (href: string) =>
+    href === ROUTES.HOME
+      ? pathname === ROUTES.HOME
+      : pathname === href || pathname.startsWith(`${href}/`);
 
   return (
     <>
       <header className="fixed inset-x-0 top-0 z-[100] border-b border-white/[0.07] bg-[#100309]/95 text-[#ffeaf0] shadow-[0_6px_24px_rgba(0,0,0,0.18)] backdrop-blur-xl">
-        <Container className="flex h-[62px] items-center justify-between gap-3 px-3 sm:px-5 lg:h-[72px] lg:gap-6">
-          <div className="flex min-w-0 shrink-0 items-center gap-2">
-            <div className="relative lg:hidden">
-              <button type="button" aria-label={mobileMenuOpen ? "Close navigation menu" : "Open navigation menu"} aria-expanded={mobileMenuOpen} title="Navigation"
-                onClick={() => setMobileMenuOpen((open) => !open)}
-                className="grid h-9 w-9 place-items-center rounded-xl text-[#d7a6b7] transition-colors hover:bg-white/[0.07] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff3b72]">
-                {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-              </button>
-              {mobileMenuOpen && (
-                <nav aria-label="Mobile navigation" className="absolute left-0 top-[calc(100%+0.65rem)] z-[120] w-56 rounded-2xl border border-white/[0.08] bg-[#1b0710] p-2 shadow-2xl shadow-black/40">
-                  {menuItems.map((item) => (
-                    <Link key={item.title} href={item.href} onClick={() => setMobileMenuOpen(false)}
-                      className={`flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold transition-colors hover:bg-white/[0.06] hover:text-white ${(item.href === ROUTES.HOME ? pathname === ROUTES.HOME : pathname.startsWith(item.href)) ? "bg-[#ff3b72]/10 text-[#ffbad0]" : "text-[#c6bfd8]"}`}>
-                      {item.title === "Home" ? <Home className="h-4 w-4" /> : item.title === "Explore" ? <Compass className="h-4 w-4" /> : <Bookmark className="h-4 w-4" />}
-                      <span>{item.title}</span>
-                    </Link>
-                  ))}
-                </nav>
-              )}
-            </div>
-            <Link href={ROUTES.HOME} aria-label="7xAnime home" className="flex shrink-0 items-center gap-2">
+        <Container className="flex flex-col gap-1 px-3 py-1.5 sm:px-5 lg:h-[72px] lg:flex-row lg:items-center lg:justify-between lg:gap-6 lg:py-0">
+          <div className="flex h-[43px] min-w-0 items-center justify-between gap-2 lg:contents">
+            <Link href={ROUTES.HOME} aria-label="7xAnime home" className="flex min-w-0 shrink-0 items-center">
               <Image src="/brand/7xanime-wordmark.png" alt="7xAnime" width={2107} height={746} className="h-10 w-[122px] object-contain object-left sm:h-11 sm:w-[134px] lg:h-12 lg:w-[146px]" />
             </Link>
+            <nav aria-label="Primary navigation" className="hidden items-center gap-5 text-sm font-semibold lg:flex">
+              {menuItems.map((item) => {
+                const active = isActive(item.href);
+                return (
+                  <Link key={item.title} href={item.href} aria-current={active ? "page" : undefined}
+                    className={`rounded-lg px-1 py-2 transition-colors hover:text-[#ff9fbe] ${active ? "text-[#ff9fbe]" : "text-[#ffeaf0]"}`}>
+                    {item.title}
+                  </Link>
+                );
+              })}
+            </nav>
+            <div className="ml-auto flex shrink-0 items-center justify-end gap-1.5 sm:gap-2 lg:ml-0 lg:gap-2.5">
+              <button type="button" onClick={() => setSearchOpen(true)} aria-label="Search anime" title="Search anime" className="grid h-9 w-9 shrink-0 place-items-center rounded-xl text-[#d7a6b7] transition-colors hover:bg-white/[0.07] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff3b72]"><Search className="h-[22px] w-[22px]" /></button>
+              {auth.auth ? <NavbarAvatar auth={auth} /> : <LoginPopoverButton />}
+            </div>
           </div>
-          <nav className="hidden items-center gap-5 text-sm font-semibold lg:flex">{menuItems.map((item) => <Link key={item.title} href={item.href} className="transition hover:text-[#ff3b72] dark:hover:text-[#ff9fbe]">{item.title}</Link>)}</nav>
-          <div className="flex min-w-0 items-center justify-end gap-1.5 sm:gap-2 lg:gap-2.5">
-            <button type="button" onClick={() => setSearchOpen(true)} aria-label="Search anime" title="Search anime" className="grid h-9 w-9 shrink-0 place-items-center rounded-xl text-[#d7a6b7] transition-colors hover:bg-white/[0.07] hover:text-white"><Search className="h-[22px] w-[22px]" /></button>
-            {auth.auth ? <NavbarAvatar auth={auth} /> : <LoginPopoverButton />}
-          </div>
+          <nav aria-label="Mobile navigation" className="flex h-8 w-full items-stretch justify-between gap-1 lg:hidden">
+            {menuItems.map((item) => {
+              const active = isActive(item.href);
+              const Icon = item.icon;
+              return (
+                <Link key={item.title} href={item.href} aria-current={active ? "page" : undefined}
+                  className={`flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg px-1 text-[10px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff3b72] ${active ? "bg-[#ff3b72]/10 text-[#ffbad0]" : "text-[#c6aeb8] hover:bg-white/[0.05] hover:text-white"}`}>
+                  <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                  <span className="truncate">{item.title}</span>
+                </Link>
+              );
+            })}
+          </nav>
         </Container>
       </header>
       {searchOpen && <SearchOverlay open={searchOpen} onClose={() => setSearchOpen(false)} />}
     </>
-  );
 }
