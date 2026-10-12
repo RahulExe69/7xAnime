@@ -1038,7 +1038,7 @@ const VideoPlayerSection = () => {
           aria-live="polite"
           className="flex aspect-video w-full flex-col items-center justify-center gap-3 rounded-2xl border border-white/[0.06] bg-white/[0.035] text-sm text-zinc-400"
         >
-          <span className="h-7 w-7 animate-spin rounded-full border-2 border-violet-400/25 border-t-violet-300" />
+          <span className="h-7 w-7 animate-spin rounded-full border-2 border-rose-400/25 border-t-rose-300" />
           <span>{activeEpisodeId ? "Finding a playable stream…" : "Preparing episode…"}</span>
         </div>
         {playerControls}
