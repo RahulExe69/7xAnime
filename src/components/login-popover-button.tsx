@@ -164,14 +164,14 @@ function LoginPopoverButton() {
     return (
       <Popover>
         <PopoverTrigger asChild>
-          <button type="button" aria-label="Guest profile" title="Guest profile" className="relative grid h-9 w-9 shrink-0 place-items-center rounded-full border border-white/10 bg-white/[0.04] text-[#d7cfea] transition hover:border-[#ff2f9d]/45 hover:bg-white/[0.08] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff2f9d]">
+          <button type="button" aria-label="Guest profile" title="Guest profile" className="relative grid h-9 w-9 shrink-0 place-items-center rounded-full border border-white/10 bg-white/[0.04] text-[#d7cfea] transition hover:border-[#ff3b72]/45 hover:bg-white/[0.08] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff3b72]">
             <UserRound className="h-5 w-5" aria-hidden="true" />
-            <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-[#100e19] bg-amber-400" />
+            <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-[#100309] bg-amber-400" />
           </button>
         </PopoverTrigger>
-        <PopoverContent align="end" side="bottom" className="mt-2 w-64 rounded-2xl border-white/10 bg-[#171421] p-4 text-white shadow-2xl shadow-black/40">
+        <PopoverContent align="end" side="bottom" className="mt-2 w-64 rounded-2xl border-white/10 bg-[#1b0710] p-4 text-white shadow-2xl shadow-black/40">
           <div className="flex items-center gap-3">
-            <div className="grid h-10 w-10 place-items-center rounded-full bg-[#ff2f9d]/15 text-[#ff8bc8]"><UserRound className="h-5 w-5" /></div>
+            <div className="grid h-10 w-10 place-items-center rounded-full bg-[#ff3b72]/15 text-[#ff9fbe]"><UserRound className="h-5 w-5" /></div>
             <div className="min-w-0"><p className="font-bold">Guest profile</p><p className="text-xs text-zinc-400">No account signed in</p></div>
           </div>
           <p className="mt-3 text-xs leading-relaxed text-zinc-400">Your watch progress is stored on this device.</p>
@@ -192,7 +192,7 @@ function LoginPopoverButton() {
           variant="outline"
           aria-label="Sign in or open profile"
           title="Sign in"
-          className="grid h-9 w-9 place-items-center rounded-full border-white/10 bg-white/[0.04] p-0 text-zinc-200 transition hover:border-[#ff2f9d]/40 hover:bg-[#ff2f9d]/10 hover:text-white"
+          className="grid h-9 w-9 place-items-center rounded-full border-white/10 bg-white/[0.04] p-0 text-zinc-200 transition hover:border-[#ff3b72]/40 hover:bg-[#ff3b72]/10 hover:text-white"
         >
           <UserRound className="h-5 w-5" aria-hidden="true" />
           <span className="sr-only">Sign in</span>
@@ -200,7 +200,7 @@ function LoginPopoverButton() {
       </PopoverTrigger>
       <PopoverContent
         side="bottom"
-        className="w-[300px] rounded-2xl border-white/10 bg-[#171421] text-white shadow-2xl shadow-black/40"
+        className="w-[300px] rounded-2xl border-white/10 bg-[#1b0710] text-white shadow-2xl shadow-black/40"
       >
         <Tabs
           defaultValue={tabValue}

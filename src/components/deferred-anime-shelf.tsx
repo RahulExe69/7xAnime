@@ -30,7 +30,7 @@ function ShelfSkeleton({ title, eyebrow, icon }: Pick<Props, "title" | "eyebrow"
       </div>
       <div className="anime-shelf-scroll flex gap-3 overflow-hidden px-4 sm:gap-4 sm:px-6 lg:px-8">
         {[0, 1, 2, 3, 4].map((item) => <div key={item} className="w-[42vw] max-w-[11.5rem] shrink-0 sm:w-[28vw] md:w-[22vw] lg:w-[16vw]">
-          <div className="aspect-[2/3] animate-pulse rounded-xl border border-white/[0.07] bg-[#17131f] sm:rounded-2xl" />
+          <div className="aspect-[2/3] animate-pulse rounded-xl border border-white/[0.07] bg-[#1b0710] sm:rounded-2xl" />
         </div>)}
       </div>
     </section>
@@ -43,7 +43,7 @@ function CurrentlyAiring({ ...props }: Props) {
 }
 function Trending({ ...props }: Props) {
   const { data, isLoading } = useGetTrendingAnime(1, 18);
-  return <AnimeShelf title={props.title} eyebrow={props.eyebrow} icon={props.icon || <TrendingUp className="h-5 w-5 text-[#ff2f9d]" />} viewAllHref={props.viewAllHref} items={data?.results || []} loading={isLoading} />;
+  return <AnimeShelf title={props.title} eyebrow={props.eyebrow} icon={props.icon || <TrendingUp className="h-5 w-5 text-[#ff3b72]" />} viewAllHref={props.viewAllHref} items={data?.results || []} loading={isLoading} />;
 }
 function Popular({ ...props }: Props) {
   const { data, isLoading } = useGetPopularAnime(1, 18);
@@ -51,7 +51,7 @@ function Popular({ ...props }: Props) {
 }
 function Upcoming({ ...props }: Props) {
   const { data, isLoading } = useGetUpcomingAnime(1, 18);
-  return <AnimeShelf title={props.title} eyebrow={props.eyebrow} icon={props.icon || <CalendarClock className="h-5 w-5 text-[#ff2f9d]" />} viewAllHref={props.viewAllHref} items={data?.results || []} loading={isLoading} />;
+  return <AnimeShelf title={props.title} eyebrow={props.eyebrow} icon={props.icon || <CalendarClock className="h-5 w-5 text-[#ff3b72]" />} viewAllHref={props.viewAllHref} items={data?.results || []} loading={isLoading} />;
 }
 function TopAiring({ ...props }: Props) {
   const { data, isLoading } = useGetFilteredAnime("RELEASING", "SCORE_DESC", 18);

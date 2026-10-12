@@ -89,6 +89,9 @@ jobs:
       - name: Sync Capacitor Android
         run: npx cap sync android
 
+      - name: Install splash image tooling
+        run: python -m pip install --disable-pip-version-check Pillow
+
       - name: Configure Android debug build
         run: |
           python3 .github/scripts/configure-capacitor-android.py

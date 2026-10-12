@@ -70,14 +70,14 @@ const AnimeSections = ({
           <Button
             onClick={() => onPageChange(Math.max(page - 1, 1))}
             disabled={page <= 1}
-            className="h-9 w-9 rounded-full border border-white/10 bg-white/5 p-0 hover:bg-violet-500/15 disabled:opacity-40"
+            className="h-9 w-9 rounded-full border border-white/10 bg-white/5 p-0 hover:bg-rose-500/15 disabled:opacity-40"
           >
             <ArrowLeft className="h-4 w-4 text-white" />
           </Button>
           <Button
             onClick={() => onPageChange(page + 1)}
             disabled={!hasNextPage}
-            className="h-9 w-9 rounded-full border border-white/10 bg-white/5 p-0 hover:bg-violet-500/15 disabled:opacity-40"
+            className="h-9 w-9 rounded-full border border-white/10 bg-white/5 p-0 hover:bg-rose-500/15 disabled:opacity-40"
           >
             <ArrowRight className="h-4 w-4 text-white" />
           </Button>

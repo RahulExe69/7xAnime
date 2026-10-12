@@ -353,12 +353,12 @@ const ActivityProgression = ({ targetUser }: Props) => {
           </div>
 
           {/* First Joined Milestone Card */}
-          <div className="flex items-center gap-3 bg-gradient-to-r from-purple-950/40 to-slate-900/60 p-4 rounded-2xl border border-purple-900/40 shadow-sm">
-            <div className="h-10 w-10 rounded-xl bg-purple-600/20 border border-purple-500/30 flex items-center justify-center shrink-0">
-              <Sparkles className="h-5 w-5 text-purple-400" />
+          <div className="flex items-center gap-3 bg-gradient-to-r from-rose-950/40 to-slate-900/60 p-4 rounded-2xl border border-rose-900/40 shadow-sm">
+            <div className="h-10 w-10 rounded-xl bg-rose-600/20 border border-rose-500/30 flex items-center justify-center shrink-0">
+              <Sparkles className="h-5 w-5 text-rose-400" />
             </div>
             <div className="flex flex-col">
-              <span className="text-xs font-bold text-purple-300 uppercase tracking-wider">
+              <span className="text-xs font-bold text-rose-300 uppercase tracking-wider">
                 Joined Kitsune
               </span>
               <span className="text-xs text-gray-300 font-semibold mt-0.5">

@@ -18,7 +18,7 @@ export default function Home() {
   const { data: recentRes, isLoading: loadingRecent } = useGetRecentAnime(1, 18);
 
   return (
-    <main className="min-h-screen overflow-x-clip bg-[#0c0b12] pb-10 text-white">
+    <main className="min-h-screen overflow-x-clip bg-transparent pb-10 text-white">
       <HeroSection spotlightAnime={spotlightList} isDataLoading={loadingSpotlight} />
       <div id="continue-watching" className="scroll-mt-20">
         <ContinueWatching loading={false} />

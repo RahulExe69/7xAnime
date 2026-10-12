@@ -61,7 +61,7 @@ function AnimeSchedule() {
         className="w-full flex flex-col md:flex-row gap-6"
       >
         {/* Vertical Tabs List */}
-        <TabsList className="flex h-auto w-full shrink-0 flex-row items-stretch justify-start gap-2 overflow-x-auto rounded-xl border border-[#dedbea] bg-white p-2 md:h-fit md:w-56 md:flex-col dark:border-[#302c40] dark:bg-[#191724]">
+        <TabsList className="flex h-auto w-full shrink-0 flex-row items-stretch justify-start gap-2 overflow-x-auto rounded-xl border border-[#4b1727] bg-white p-2 md:h-fit md:w-56 md:flex-col dark:border-[#302c40] dark:bg-[#19070d]">
           {daysOfWeek.map((day) => {
             const dateObj = getDateForWeekday(day);
             const isToday = day === currentDay;
@@ -70,7 +70,7 @@ function AnimeSchedule() {
               <TabsTrigger
                 key={day}
                 value={day}
-                className="shrink-0 flex items-center justify-between px-4 py-3 rounded-lg text-left transition-all data-[state=active]:bg-[#604bd3] data-[state=active]:text-white text-[#625d79] hover:bg-[#f0eef9] dark:text-zinc-300 dark:hover:bg-white/5"
+                className="shrink-0 flex items-center justify-between px-4 py-3 rounded-lg text-left transition-all data-[state=active]:bg-[#ff3b72] data-[state=active]:text-white text-[#d1a3b3] hover:bg-[#f0eef9] dark:text-zinc-300 dark:hover:bg-white/5"
               >
                 <div className="flex flex-col items-start">
                   <span className="font-bold text-sm uppercase tracking-wider">
@@ -114,7 +114,7 @@ function AnimeSchedule() {
                       return (
                         <div
                           key={`${anime.id}-${anime.episode}-${idx}`}
-                          className="flex flex-row gap-3 p-3 bg-white border border-[#dedbea] hover:border-[#8b73ed]/60 rounded-xl hover:bg-[#fbfaff] shadow-sm transition group relative overflow-hidden dark:bg-[#191724] dark:border-[#332f47] dark:hover:border-[#7565ce] dark:hover:bg-[#211e30]"
+                          className="flex flex-row gap-3 p-3 bg-white border border-[#4b1727] hover:border-[#ff3b72]/60 rounded-xl hover:bg-[#fbfaff] shadow-sm transition group relative overflow-hidden dark:bg-[#19070d] dark:border-[#451321] dark:hover:border-[#ff3b72] dark:hover:bg-[#230a12]"
                         >
                           {/* Small Poster Thumbnail */}
                           {anime.poster ? (
@@ -128,7 +128,7 @@ function AnimeSchedule() {
                               />
                             </div>
                           ) : (
-                            <div className="h-24 w-16 shrink-0 bg-[#ebe9f4] dark:bg-[#2b273b] rounded-lg flex items-center justify-center">
+                            <div className="h-24 w-16 shrink-0 bg-[#ebe9f4] dark:bg-[#3b1020] rounded-lg flex items-center justify-center">
                               <Clock className="h-6 w-6 text-gray-500" />
                             </div>
                           )}
@@ -136,7 +136,7 @@ function AnimeSchedule() {
                           {/* Info Column */}
                           <div className="flex flex-col justify-between flex-1 min-w-0 py-0.5">
                             <div className="flex flex-col gap-1">
-                              <span className="text-xs text-[#77728f] dark:text-[#aaa5c0] flex items-center gap-1 font-medium">
+                              <span className="text-xs text-[#d49aaf] dark:text-[#aaa5c0] flex items-center gap-1 font-medium">
                                 <Clock className="h-3 w-3 text-[#8b5cf6]" />
                                 {timeFormatted}
                               </span>
@@ -152,7 +152,7 @@ function AnimeSchedule() {
                               <Link href={ROUTES.animeDetails(anime.id)}>
                                 <Button
                                   size="sm"
-                                  className="h-7 text-xs bg-[#604bd3] hover:bg-[#5140c4] text-white px-2.5 rounded-lg flex items-center gap-1 transition"
+                                  className="h-7 text-xs bg-[#ff3b72] hover:bg-[#5140c4] text-white px-2.5 rounded-lg flex items-center gap-1 transition"
                                 >
                                   <Play className="h-3 w-3 fill-current" /> Details
                                 </Button>
@@ -179,21 +179,21 @@ const LoadingSkeleton = () => {
       {[1, 2, 3, 4, 5, 6].map((idx) => (
         <div
           key={idx}
-          className="flex flex-row gap-3 p-3 bg-white border border-[#dedbea] dark:bg-[#191724] dark:border-[#332f47] rounded-xl animate-pulse"
+          className="flex flex-row gap-3 p-3 bg-white border border-[#4b1727] dark:bg-[#19070d] dark:border-[#451321] rounded-xl animate-pulse"
         >
           {/* Poster Skeleton */}
-          <div className="h-24 w-16 shrink-0 bg-[#e9e7f2] dark:bg-[#2b273b] rounded-lg"></div>
+          <div className="h-24 w-16 shrink-0 bg-[#e9e7f2] dark:bg-[#3b1020] rounded-lg"></div>
 
           {/* Lines Skeleton */}
           <div className="flex flex-col justify-between flex-1 min-w-0 py-0.5">
             <div className="flex flex-col gap-2">
-              <div className="h-3 w-16 bg-[#e9e7f2] dark:bg-[#2b273b] rounded"></div>
-              <div className="h-4 w-4/5 bg-[#e9e7f2] dark:bg-[#2b273b] rounded"></div>
+              <div className="h-3 w-16 bg-[#e9e7f2] dark:bg-[#3b1020] rounded"></div>
+              <div className="h-4 w-4/5 bg-[#e9e7f2] dark:bg-[#3b1020] rounded"></div>
             </div>
 
             <div className="flex items-center justify-between gap-2 mt-2">
-              <div className="h-5 w-12 bg-[#e9e7f2] dark:bg-[#2b273b] rounded-full"></div>
-              <div className="h-7 w-16 bg-[#e9e7f2] dark:bg-[#2b273b] rounded-lg"></div>
+              <div className="h-5 w-12 bg-[#e9e7f2] dark:bg-[#3b1020] rounded-full"></div>
+              <div className="h-7 w-16 bg-[#e9e7f2] dark:bg-[#3b1020] rounded-lg"></div>
             </div>
           </div>
         </div>

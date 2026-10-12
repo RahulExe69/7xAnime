@@ -150,17 +150,17 @@ const PageContent = () => {
           </div>
         </div>
         <Tabs defaultValue="overview" className="w-full">
-          <TabsList className="flex h-fit w-full items-center justify-start gap-1 overflow-x-auto rounded-xl border border-[#dedbea] bg-white p-1 text-base dark:border-[#302c40] dark:bg-[#191724]">
+          <TabsList className="flex h-fit w-full items-center justify-start gap-1 overflow-x-auto rounded-xl border border-[#4b1727] bg-white p-1 text-base dark:border-[#302c40] dark:bg-[#19070d]">
             <TabsTrigger
               value="overview"
-              className="rounded-lg px-3 py-2 text-sm font-semibold text-[#625d79] data-[state=active]:bg-[#eae6fb] data-[state=active]:text-[#604bd3] dark:text-zinc-300 dark:data-[state=active]:bg-[#30294a] dark:data-[state=active]:text-[#c5baff] sm:text-base"
+              className="rounded-lg px-3 py-2 text-sm font-semibold text-[#d1a3b3] data-[state=active]:bg-[#531426] data-[state=active]:text-[#ff3b72] dark:text-zinc-300 dark:data-[state=active]:bg-[#491323] dark:data-[state=active]:text-[#ff9fbe] sm:text-base"
             >
               Overview
             </TabsTrigger>
 
             <TabsTrigger
               value="episodes"
-              className="md:text-2xl text-lg font-semibold text-[#625d79] data-[state=active]:text-[#604bd3] dark:text-zinc-300 dark:data-[state=active]:text-[#c5baff]"
+              className="md:text-2xl text-lg font-semibold text-[#d1a3b3] data-[state=active]:text-[#ff3b72] dark:text-zinc-300 dark:data-[state=active]:text-[#ff9fbe]"
             >
               Episodes
             </TabsTrigger>
@@ -213,7 +213,7 @@ const PageContent = () => {
             </div>
             <div className="col-span-4 flex flex-col gap-3">
               <h3 className="text-xl font-semibold">Description</h3>
-              <div className="text-sm leading-7 text-[#625d79] dark:text-zinc-300">
+              <div className="text-sm leading-7 text-[#d1a3b3] dark:text-zinc-300">
                 {parse(anime.anime.info.description || "")}
               </div>
             </div>

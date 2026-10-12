@@ -55,7 +55,7 @@ const HeroSection = (props: IHeroSectionProps) => {
       </Carousel>
       <div className="absolute bottom-3 left-1/2 z-50 flex -translate-x-1/2 items-center gap-2 md:bottom-5">
         {props.spotlightAnime.map((anime, index) => (
-          <button key={anime.id || index} type="button" aria-label={`Show spotlight ${index + 1}`} aria-current={selectedSlide === index ? "true" : undefined} onClick={() => api?.scrollTo(index)} className={`h-2 rounded-full transition-all duration-200 ${selectedSlide === index ? "w-7 bg-[#ff2f9d]" : "w-2 bg-[#77728f]/30 hover:bg-[#77728f]/55 dark:bg-white/25 dark:hover:bg-white/50"}`} />
+          <button key={anime.id || index} type="button" aria-label={`Show spotlight ${index + 1}`} aria-current={selectedSlide === index ? "true" : undefined} onClick={() => api?.scrollTo(index)} className={`h-2 rounded-full transition-all duration-200 ${selectedSlide === index ? "w-7 bg-[#ff3b72]" : "w-2 bg-[#d49aaf]/30 hover:bg-[#d49aaf]/55 dark:bg-white/25 dark:hover:bg-white/50"}`} />
         ))}
       </div>
       <div className="absolute hidden md:flex items-center gap-5 right-10 3xl:bottom-10 bottom-20 z-50 isolate">
@@ -63,13 +63,13 @@ const HeroSection = (props: IHeroSectionProps) => {
           onClick={() => {
             api?.scrollPrev();
           }}
-          className="h-10 w-10 rounded-full border border-white/20 bg-black/40 text-white backdrop-blur hover:bg-[#ff2f9d]"
+          className="h-10 w-10 rounded-full border border-white/20 bg-black/40 text-white backdrop-blur hover:bg-[#ff3b72]"
         >
           <ArrowLeft className="shrink-0" />
         </Button>
         <Button
           onClick={() => api?.scrollNext()}
-          className="rounded-full bg-transparent border border-white h-10 w-10 hover:bg-slate-500"
+          className="rounded-full border border-white/25 bg-black/25 text-white backdrop-blur h-10 w-10 hover:border-[#ff3b72]/70 hover:bg-[#ff3b72]"
         >
           <ArrowRight className="shrink-0" />
         </Button>
@@ -94,7 +94,7 @@ const HeroCarouselItem = ({ anime }: { anime: MediaList }) => {
     >
       {/* Gradient Overlay */}
       <div className="absolute h-full w-full inset-0 m-auto bg-gradient-to-r from-black/75 via-black/40 to-transparent z-10"></div>
-      <div className="absolute h-full w-full inset-0 m-auto bg-gradient-to-t from-[#0b0a10] via-[#0b0a10]/30 to-transparent z-10"></div>
+      <div className="absolute h-full w-full inset-0 m-auto bg-gradient-to-t from-[#0b0307] via-[#0b0307]/30 to-transparent z-10"></div>
 
       {/* Content Section */}
       <div className="relative z-20 h-full w-full">
@@ -106,7 +106,7 @@ const HeroCarouselItem = ({ anime }: { anime: MediaList }) => {
 
             <div className="flex flex-wrap items-center gap-2 text-xs">
               {anime.format && (
-                <Badge className="border-0 bg-[#ff2f9d] text-white font-semibold">
+                <Badge className="border-0 bg-[#ff3b72] text-white font-semibold">
                   {anime.format}
                 </Badge>
               )}
@@ -131,7 +131,7 @@ const HeroCarouselItem = ({ anime }: { anime: MediaList }) => {
               <ButtonLink
                 href={ROUTES.watchAnime(anime.id)}
                 LeftIcon={Play}
-                className="h-12 rounded-xl bg-[#ff2f9d] px-5 text-sm font-bold text-white shadow-lg shadow-[#ff2f9d]/25 transition hover:bg-[#e51e86]"
+                className="h-12 rounded-xl bg-[#ff3b72] px-5 text-sm font-bold text-white shadow-lg shadow-[#ff3b72]/25 transition hover:bg-[#ed245c]"
               >
                 Watch Now
               </ButtonLink>
