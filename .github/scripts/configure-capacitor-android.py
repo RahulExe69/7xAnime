@@ -251,4 +251,60 @@ for name in launcher_names:
         print(f"ERROR: launcher bitmap differs from approved source: {output}", file=sys.stderr)
         raise SystemExit(1)
 
+# Render the native launch artwork as a true transparent squircle. Keep the approved
+# source image and launcher icons untouched; only the splash-specific copy receives
+# an antialiased alpha mask, so the splash no longer shows a hard square edge.
+try:
+    from PIL import Image
+except ImportError:
+    print("ERROR: Pillow is required to generate the antialiased squircle splash asset.", file=sys.stderr)
+    raise SystemExit(1)
+
+from PIL import ImageDraw
+
+splash_source = Image.open(brand_icon).convert("RGBA")
+width, height = splash_source.size
+if width != height:
+    print("ERROR: the approved splash artwork must be square to form a squircle.", file=sys.stderr)
+    raise SystemExit(1)
+
+scale = 4
+mask_large = Image.new("L", (width * scale, height * scale), 0)
+draw = ImageDraw.Draw(mask_large)
+# A 22% corner radius gives the soft, squircle-like silhouette seen across 7x apps.
+inset = int(round(min(width, height) * 0.012 * scale))
+radius = int(round(min(width, height) * 0.22 * scale))
+draw.rounded_rectangle(
+    (inset, inset, width * scale - inset - 1, height * scale - inset - 1),
+    radius=radius,
+    fill=255,
+)
+mask = mask_large.resize((width, height), Image.Resampling.LANCZOS)
+splash_source.putalpha(Image.composite(splash_source.getchannel("A"), Image.new("L", (width, height), 0), mask))
+
+splash_dir = resource_root / "drawable-nodpi"
+splash_dir.mkdir(parents=True, exist_ok=True)
+splash_output = splash_dir / "splash_squircle.png"
+splash_source.save(splash_output, format="PNG", optimize=True)
+
+# Capacitor's generated launch theme references @drawable/splash for both legacy
+# window background and Android 12+ launch icon. Point those references to our
+# squircle-masked copy, leaving the original source art and launcher icons unchanged.
+styles = resource_root / "values" / "styles.xml"
+if not styles.is_file():
+    print("ERROR: generated Android styles.xml is missing; cannot configure squircle splash.", file=sys.stderr)
+    raise SystemExit(1)
+styles_text = styles.read_text(encoding="utf-8")
+styles_text, splash_refs = re.subn(
+    r'(<item\\s+name="(?:android:background|windowSplashScreenAnimatedIcon)">)\\s*@drawable/splash\\s*(</item>)',
+    r'\\g<1>@drawable/splash_squircle\\g<2>',
+    styles_text,
+)
+if splash_refs < 1:
+    print("ERROR: could not find the generated @drawable/splash theme reference to replace.", file=sys.stderr)
+    raise SystemExit(1)
+styles.write_text(styles_text, encoding="utf-8")
+
+print(f"Configured native squircle splash from {brand_icon} ({width}x{height}); original artwork and launcher assets remain unchanged.")
+
 print(f"Configured com.sevenx.anime version {version_name} ({version_code}) with byte-identical no-crop launcher bitmaps.")
