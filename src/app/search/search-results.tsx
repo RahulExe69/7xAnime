@@ -207,9 +207,9 @@ const SearchResults = () => {
                 size="sm"
                 className={cn(
                   "rounded-full border border-[#4b1727] bg-[#f8f7fd] text-[#d1a3b3] hover:border-[#8b79e3] hover:text-[#ff3b72] hover:bg-[#eeeafb] dark:border-[#393449] dark:bg-[#201d2a] dark:text-[#c7c1dc] dark:hover:bg-[#302b42]",
-                  "data-[state=on]:border-[#8b79e3] data-[state=on]:text-[#4935bd] data-[state=on]:bg-[#e5e0fb] dark:data-[state=on]:border-[#8b79e3] dark:data-[state=on]:text-white dark:data-[state=on]:bg-violet-500/30",
+                  "data-[state=on]:border-[#8b79e3] data-[state=on]:text-[#4935bd] data-[state=on]:bg-[#e5e0fb] dark:data-[state=on]:border-[#8b79e3] dark:data-[state=on]:text-white dark:data-[state=on]:bg-rose-500/30",
                   filters.genres?.split(",").includes(genre.value)
-                    ? "bg-[#e5e0fb] text-[#4935bd] dark:bg-violet-500/30 dark:text-white"
+                    ? "bg-[#e5e0fb] text-[#4935bd] dark:bg-rose-500/30 dark:text-white"
                     : "text-[#d1a3b3] dark:text-slate-300",
                 )}
               >
@@ -258,7 +258,7 @@ const SearchResults = () => {
       )}
       {!isLoading && searchResults?.animes?.length === 0 && (
         <div className="flex flex-col items-center justify-center rounded-2xl border border-[#4b1727] bg-white px-5 py-12 text-center dark:border-[#302c40] dark:bg-[#19070d]">
-          <SearchX className="mb-3 h-8 w-8 text-violet-300" />
+          <SearchX className="mb-3 h-8 w-8 text-rose-300" />
           <h3 className="text-base font-semibold text-[#211e38] dark:text-white">No anime found</h3>
           <p className="mt-1 max-w-sm text-sm text-[#d49aaf] dark:text-zinc-400">Try a different title or loosen a few filters.</p>
         </div>
