@@ -9,6 +9,7 @@ import {
   ChevronRight,
   CircleHelp,
   Eye,
+  Info,
   PlayCircle,
   RotateCcw,
   Settings2,
@@ -239,6 +240,22 @@ export default function SettingsPage() {
           <RotateCcw className="h-3.5 w-3.5" /> Reset preferences
         </button>
       </div>
+
+      <Link
+        href="/settings/about"
+        className="group flex items-center justify-between gap-4 rounded-2xl border border-white/[0.08] bg-[#16070d]/90 p-4 transition-colors hover:border-[#ff3b72]/30 hover:bg-[#210811] sm:p-5"
+      >
+        <div className="flex items-center gap-3">
+          <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-[#ff9fbe]/15 bg-[#ff3b72]/10 text-[#ff9fbe]">
+            <Info className="h-5 w-5" />
+          </div>
+          <div>
+            <p className="text-sm font-bold text-[#ffeaf0]">About 7xAnime</p>
+            <p className="mt-1 text-xs leading-5 text-[#b49aa4]">A little about 7xAnime and its creator.</p>
+          </div>
+        </div>
+        <ChevronRight className="h-4 w-4 shrink-0 text-[#a88995] transition-transform group-hover:translate-x-0.5" />
+      </Link>
     </Container>
   );
 }
