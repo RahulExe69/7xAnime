@@ -69,7 +69,7 @@ const HeroSection = (props: IHeroSectionProps) => {
         </Button>
         <Button
           onClick={() => api?.scrollNext()}
-          className="rounded-full bg-transparent border border-white h-10 w-10 hover:bg-slate-500"
+          className="rounded-full border border-white/25 bg-black/25 text-white backdrop-blur h-10 w-10 hover:border-[#ff3b72]/70 hover:bg-[#ff3b72]"
         >
           <ArrowRight className="shrink-0" />
         </Button>
