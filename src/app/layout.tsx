@@ -1,5 +1,5 @@
 import "./globals.css";
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Suspense } from "react";
 import localFont from "next/font/local";
 
@@ -26,6 +26,11 @@ const geistSans = localFont({
 const APP_NAME = "7xAnime";
 const APP_DEFAULT_TITLE = "7xAnime | Anime Streaming";
 const APP_DESCRIPTION = "Stream your favourite anime with ease and no ads";
+
+export const viewport: Viewport = {
+  themeColor: "#0b0307",
+  colorScheme: "dark",
+};
 
 export const metadata: Metadata = {
   applicationName: APP_NAME,
