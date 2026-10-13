@@ -29,6 +29,7 @@ public final class UpdateBridge {
     private final Activity activity;
     private final AtomicBoolean cancelled = new AtomicBoolean(false);
     private volatile boolean downloading = false;
+    private volatile boolean awaitingInstallPermission = false;
     private volatile File pendingInstallApk;
 
     public UpdateBridge(Activity activity) {
@@ -61,8 +62,8 @@ public final class UpdateBridge {
             notifyProgress(0, 0, 0, "downloading", "The update download is already running.");
             return;
         }
-        if (!isAllowedUrl(rawUrl)) {
-            notifyProgress(0, 0, 0, "error", "The update URL is not a trusted GitHub release URL.");
+        if (!isOfficialReleaseUrl(rawUrl)) {
+            notifyProgress(0, 0, 0, "error", "The update URL is not from the official 7xAnime release repository.");
             return;
         }
         cancelled.set(false);
@@ -120,6 +121,7 @@ public final class UpdateBridge {
 
     @JavascriptInterface
     public void openInstallPermissionSettings() {
+        awaitingInstallPermission = true;
         activity.runOnUiThread(() -> {
             try {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
@@ -143,10 +145,12 @@ public final class UpdateBridge {
     public void cancelUpdateDownload() { cancelled.set(true); }
 
     public void resumePendingInstall() {
+        if (!awaitingInstallPermission) return;
         File apk = pendingInstallApk;
         if (apk == null || !apk.isFile() || apk.length() == 0) return;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
             !activity.getPackageManager().canRequestPackageInstalls()) return;
+        awaitingInstallPermission = false;
         launchInstallerIfAllowed(apk);
     }
 
@@ -154,6 +158,7 @@ public final class UpdateBridge {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
             !activity.getPackageManager().canRequestPackageInstalls()) {
             pendingInstallApk = apk;
+            awaitingInstallPermission = true;
             notifyProgress(apk.length(), apk.length(), 100, "permission",
                 "Allow 7xAnime to install apps in Android settings, then return here.");
             try {
@@ -251,6 +256,17 @@ public final class UpdateBridge {
             if (input.read() != 'P' || input.read() != 'K') {
                 throw new IllegalStateException("The download is not a valid APK archive.");
             }
+        }
+    }
+
+    private boolean isOfficialReleaseUrl(String value) {
+        try {
+            URL url = new URL(value);
+            return "https".equalsIgnoreCase(url.getProtocol())
+                && "github.com".equalsIgnoreCase(url.getHost())
+                && url.getPath().startsWith("/RahulExe69/7xAnime-Releases/releases/download/");
+        } catch (Exception ignored) {
+            return false;
         }
     }
 
