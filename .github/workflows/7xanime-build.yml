@@ -1,4 +1,4 @@
-name: 7xAnime Android Debug
+name: 7xAnime APK Builder
 
 on:
   pull_request:
@@ -6,21 +6,35 @@ on:
       - master
   workflow_dispatch:
     inputs:
+      build_type:
+        description: Choose which APK to build
+        required: true
+        type: choice
+        options:
+          - debug
+          - release
+        default: debug
       version_name:
         description: MAJOR.MINOR.PATCH
         required: true
         type: string
         default: "1.0.0"
+      release_notes:
+        description: Optional release notes (release builds only)
+        required: false
+        type: string
+        default: ""
 
 permissions:
   contents: read
 
 concurrency:
-  group: 7xanime-android-debug-${{ github.ref }}
+  group: 7xanime-apk-${{ github.ref }}-${{ inputs.build_type || 'debug' }}
   cancel-in-progress: true
 
 jobs:
   debug-apk:
+    if: github.event_name == 'pull_request' || inputs.build_type == 'debug'
     name: Build Debug APK
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -414,3 +428,12 @@ jobs:
           path: artifacts/7xAnime-v${{ env.VERSION_NAME }}-debug.apk.sha256
           if-no-files-found: error
           retention-days: 30
+
+  signed-release:
+    if: github.event_name == 'workflow_dispatch' && inputs.build_type == 'release'
+    name: Build and publish signed Release APK
+    uses: ./.github/workflows/7xanime-release.yml
+    with:
+      version: ${{ inputs.version_name }}
+      release_notes: ${{ inputs.release_notes }}
+    secrets: inherit
