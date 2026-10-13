@@ -3,7 +3,7 @@ import Avatar from "./common/avatar";
 import { IAuthStore } from "@/store/auth-store";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import Link from "next/link";
-import { Bookmark, LogOut, UserRound } from "lucide-react";
+import { LogOut, UserRound } from "lucide-react";
 import { pb } from "@/lib/pocketbase";
 import { ROUTES } from "@/constants/routes";
 
@@ -39,9 +39,6 @@ function NavbarAvatar({ auth }: Props) {
         <div className="mt-2 flex flex-col gap-1 border-t border-white/[0.07] pt-2">
           <Link href={ROUTES.profile(auth.auth.username)} onClick={() => setOpen(false)} className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-[#ffeaf0] transition-colors hover:bg-white/[0.06] hover:text-white">
             <UserRound className="h-4 w-4 text-[#ff9fbe]" /> Profile
-          </Link>
-          <Link href="/library" onClick={() => setOpen(false)} className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-[#ffeaf0] transition-colors hover:bg-white/[0.06] hover:text-white">
-            <Bookmark className="h-4 w-4 text-[#ff9fbe]" /> My List
           </Link>
           <button type="button" onClick={logout} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-[#ff9bb9] transition-colors hover:bg-[#ff3b72]/10">
             <LogOut className="h-4 w-4" /> Log out
