@@ -627,7 +627,7 @@ def install_update_bridge(main_activity: Path) -> None:
         close = text.rfind("}")
         method = (
             "\n    @Override\n"
-            "    protected void onResume() {\n"
+            "    public void onResume() {\n"
             "        super.onResume();\n"
             "        if (updateBridge != null) updateBridge.resumePendingInstall();\n"
             "    }\n"
