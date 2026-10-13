@@ -1366,7 +1366,7 @@ const VideoPlayerSection = () => {
           <iframe
             ref={externalEmbedFrameRef}
             key={`${fallbackAnimeId}-${fallbackEpId}-${activeCategory}:${playerRetryKey}`}
-            src={`${fallbackSrc}?color=%23ff3b72&autoplay=true`}
+            src={fallbackSrc}
             title={`${anime?.anime?.info?.name || "Anime"} episode ${currentEpNumber} via MegaPlay`}
             width="100%"
             height="100%"
