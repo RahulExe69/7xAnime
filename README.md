@@ -74,13 +74,13 @@ More details, optional Google OAuth setup, and the Android HTTPS endpoint requir
 
 The Android local backend exposes manual server choices for AniXo, Megavid, AnimeParadise, MegaFlix, TryEmbed, CinexStream, and NontonGo, alongside the dedicated MegaPlay Server 1 iframe. The four Yomi-derived adapters construct documented embed URLs rather than extracting media themselves. Manual candidates stay out of Auto until verified on a real Android device. See [server notes](docs/SERVERS.md) and the [provider research log](docs/PROVIDER_RESEARCH.md).
 
-The shared Android ad-filter engine, known-domain fallback, popup blocking, permission denial, and JavaScript-dialog suppression run for all configured embedded providers—not only Megavid. Provider-served first-party ads or cosmetic HTML overlays may still escape network filtering because those layers are owned by the cross-origin player. The player offers Retry or Server 1 after 15 seconds of unresolved stream loading, and an explicitly selected MegaPlay fallback renders without waiting for the background request.
+The shared Android ad-filter engine, known-domain fallback, popup blocking, permission denial, and JavaScript-dialog suppression run for all configured embedded providers—not only Megavid. Provider-served first-party ads or cosmetic HTML overlays may still escape network filtering because those layers are owned by the cross-origin player. Stream resolution retries the selected route twice, and event-reporting embeds are watched for stalled playback; after retries fail, 7xAnime moves to another configured server. MegaPlay fallback renders without waiting for the background request.
 
 ## Player experience marathon
 
 The Android player work applies a shared, provider-agnostic best-effort ad/redirect filter to embedded player requests, blocks pop-up windows and remote JavaScript prompt dialogs, a native landscape fullscreen bridge with swipe/Back support, and double-tap ±10-second seeking in the app-owned ArtPlayer player. See [the player marathon notes](docs/PLAYER-MARATHON.md) for exact coverage and cross-origin iframe limitations. Known ad-domain filtering can never remove every in-page ad, especially content served by the player itself.
 
-When playback is detected as failed, 7xAnime keeps the server button visible and tries the next configured server before returning to MegaPlay at the end. Failed servers remain available to retry. A visual ad overlay inside a cross-origin iframe is not reliably detectable by the parent app, so this automatic switching cannot trigger on every in-page ad.
+When playback is detected as failed, 7xAnime saves the latest available timestamp, retries the current player twice, then tries another configured server before returning to MegaPlay at the end. Failed servers remain available for manual selection. A visual ad overlay inside a cross-origin iframe is not reliably detectable or dismissible by the parent app; blocked network requests/pop-ups and stalled event-reporting embeds can trigger recovery, but this cannot guarantee removal of every in-page ad.
 
 ## Android APK with an on-device API
 
