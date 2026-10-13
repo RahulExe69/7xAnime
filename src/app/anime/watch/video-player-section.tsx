@@ -781,7 +781,7 @@ const VideoPlayerSection = () => {
     isLocalBackendEnabled() &&
     currentProviderName === "auto" &&
     !isHindiMode &&
-    !useFallback;
+    !isFallbackActive;
   const actualProviderName = episodeData?.provider || "";
   const activeServerLabel = isAutomaticServerActive
     ? actualProviderName && actualProviderName !== "auto"
