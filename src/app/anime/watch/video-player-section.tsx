@@ -149,11 +149,14 @@ const VideoPlayerSection = () => {
   const blockedPlayerActionAtRef = useRef(0);
   const playbackRetriesRef = useRef<{ key: string; count: number }>({ key: "", count: 0 });
   const resolutionRetriesRef = useRef<Record<string, number>>({});
-  const resolutionRetryInFlightRef = useRef(false);
+  const resolutionRetryInFlightRef = useRef<string | null>(null);
+  const resolutionRetryReleaseTimerRef = useRef<number | null>(null);
   const lastEmbedProgressRef = useRef<{
     animeId: string; episodeId: string; episodeNumber: number; animeTitle: string;
     poster: string; current: number; duration: number;
   } | null>(null);
+  const embedLoadStartedAtRef = useRef(0);
+  const lastEmbedSignalAtRef = useRef(0);
   const externalEmbedFrameRef = useRef<HTMLIFrameElement | null>(null);
 
   const flushLatestEmbedProgress = useCallback(() => {
@@ -172,7 +175,13 @@ const VideoPlayerSection = () => {
     setLastPlayerError(null);
     playbackRetriesRef.current = { key: `${activeEpisodeId}|0`, count: 0 };
     resolutionRetriesRef.current[activeEpisodeId] = 0;
-    resolutionRetryInFlightRef.current = false;
+    resolutionRetryInFlightRef.current = null;
+    if (resolutionRetryReleaseTimerRef.current !== null) {
+      window.clearTimeout(resolutionRetryReleaseTimerRef.current);
+      resolutionRetryReleaseTimerRef.current = null;
+    }
+    embedLoadStartedAtRef.current = 0;
+    lastEmbedSignalAtRef.current = 0;
     setRetryingPlayback(null);
     setRetryingResolution(null);
   }, [activeEpisodeId, flushLatestEmbedProgress]);
@@ -333,7 +342,7 @@ const VideoPlayerSection = () => {
       resolutionRetriesRef.current[activeEpisodeId] = 0;
       return;
     }
-    if (resolutionRetryInFlightRef.current) return;
+    if (resolutionRetryInFlightRef.current === activeEpisodeId) return;
 
     // Retry the currently selected route twice before marking it unavailable
     // or moving servers. Keep the route selected during each request attempt.
@@ -341,20 +350,31 @@ const VideoPlayerSection = () => {
     if (attempts < 2) {
       const attempt = attempts + 1;
       resolutionRetriesRef.current[activeEpisodeId] = attempt;
-      resolutionRetryInFlightRef.current = true;
+      resolutionRetryInFlightRef.current = activeEpisodeId;
       setRetryingResolution({ episodeId: activeEpisodeId, attempt });
+      const retryEpisode = activeEpisodeId;
+      const release = () => {
+        if (resolutionRetryInFlightRef.current !== retryEpisode) return;
+        resolutionRetryInFlightRef.current = null;
+        if (resolutionRetryReleaseTimerRef.current !== null) {
+          window.clearTimeout(resolutionRetryReleaseTimerRef.current);
+          resolutionRetryReleaseTimerRef.current = null;
+        }
+        setRetryingResolution((current) =>
+          current?.episodeId === retryEpisode ? null : current,
+        );
+      };
       const timer = window.setTimeout(() => {
-        void retryEpisodeData().finally(() => {
-          resolutionRetryInFlightRef.current = false;
-          setRetryingResolution((current) =>
-            current?.episodeId === activeEpisodeId ? null : current,
-          );
-        });
+        void retryEpisodeData().finally(release);
+        // A stalled request must not lock recovery forever; allow the timeout
+        // watchdog to make the next decision even if the upstream never settles.
+        resolutionRetryReleaseTimerRef.current = window.setTimeout(release, 12000);
       }, 350);
       return () => window.clearTimeout(timer);
     }
 
     resolutionRetriesRef.current[activeEpisodeId] = 0;
+    resolutionRetryInFlightRef.current = null;
     setRetryingResolution((current) =>
       current?.episodeId === activeEpisodeId ? null : current,
     );
@@ -384,6 +404,54 @@ const VideoPlayerSection = () => {
     isEpisodeDataError, isEpisodesLoading, isHindiMode, isLoadingData, isFetchingEpisodeData,
     retryEpisodeData, streamRequestFailed, useFallback, hasManualProviderSelection,
   ]);
+  // A provider can hang without ever returning an HTTP/stream error. Treat the
+  // 15-second timeout like a failure: retry the same route twice, then switch.
+  useEffect(() => {
+    if (!streamResolutionTimedOut || !isLoadingData || isHindiMode || useFallback || !activeEpisodeId) return;
+    if (resolutionRetryInFlightRef.current === activeEpisodeId) return;
+
+    const attempts = resolutionRetriesRef.current[activeEpisodeId] || 0;
+    if (attempts >= 2) {
+      resolutionRetriesRef.current[activeEpisodeId] = 0;
+      resolutionRetryInFlightRef.current = null;
+      setRetryingResolution(null);
+      if (isLocalBackendEnabled() && activeEpisodeId.startsWith("watch/auto/")) {
+        setUseFallback(true);
+      } else {
+        advanceAfterSourceFailure();
+      }
+      return;
+    }
+
+    const attempt = attempts + 1;
+    const retryEpisode = activeEpisodeId;
+    resolutionRetriesRef.current[retryEpisode] = attempt;
+    resolutionRetryInFlightRef.current = retryEpisode;
+    setRetryingResolution({ episodeId: retryEpisode, attempt });
+    setStreamResolutionTimedOut(false);
+    setStreamRetryKey((previous) => previous + 1);
+
+    const release = () => {
+      if (resolutionRetryInFlightRef.current !== retryEpisode) return;
+      resolutionRetryInFlightRef.current = null;
+      if (resolutionRetryReleaseTimerRef.current !== null) {
+        window.clearTimeout(resolutionRetryReleaseTimerRef.current);
+        resolutionRetryReleaseTimerRef.current = null;
+      }
+      setRetryingResolution((current) =>
+        current?.episodeId === retryEpisode ? null : current,
+      );
+    };
+
+    void retryEpisodeData().finally(release);
+    resolutionRetryReleaseTimerRef.current = window.setTimeout(release, 12000);
+    // Intentionally no effect cleanup: turning off the timed-out UI immediately
+    // must not cancel the in-flight recovery attempt's release guard.
+  }, [
+    streamResolutionTimedOut, isLoadingData, isHindiMode, useFallback, activeEpisodeId,
+    advanceAfterSourceFailure, retryEpisodeData,
+  ]);
+
   const animeTitleOptions = useMemo(
     () => [...new Set([
       anime?.anime?.info?.name || "",
@@ -525,6 +593,7 @@ const VideoPlayerSection = () => {
         // Keep the freshest position in memory even when persisted updates are
         // throttled; flush it immediately before an automatic server switch.
         lastEmbedProgressRef.current = progress;
+        lastEmbedSignalAtRef.current = Date.now();
         const now = Math.floor(currentTime);
         // Throttle updates every 10 seconds or on complete
         if (isComplete || Math.abs(now - lastSyncedTimeRef.current) >= 10) {
@@ -822,28 +891,10 @@ const VideoPlayerSection = () => {
       const host = String(detail.host || "third-party player");
       const providerKey = useFallback || isFallbackActive ? "megaplay" : currentProviderName;
 
-      if (providerKey && providerKey !== "auto") {
-        setProviderPlaybackOutcomes((previous) => ({ ...previous, [providerKey]: "failed" }));
-      }
-
-      // A native JS dialog is a stronger signal than a missing stream: it means
-      // the embed tried to interrupt the viewer with a robot-check/Allow prompt.
-      // Advance immediately for dialogs and blocked redirects/popups; do not leave
-      // the user stuck on the same third-party frame with only an error message.
-      const deceptiveInterstitial = reason.startsWith("javascript-")
-        || reason === "popup"
-        || reason === "top-level-redirect";
-      if (deceptiveInterstitial) {
-        advanceAfterSourceFailure();
-        return;
-      }
-
-      if (useFallback || isFallbackActive) {
-        advanceAfterSourceFailure();
-        return;
-      }
-
-      handlePlayerError(`Blocked ${reason} from ${host}; trying the next server.`);
+      // Blocked popups, JS dialogs and top-level redirects are recovery signals,
+      // not a reason to skip the retry sequence. Remount the current frame twice;
+      // repeated interruption then advances to another configured server.
+      handlePlayerError(`Blocked ${reason} from ${host}; reconnecting to the current server.`);
     };
 
     window.addEventListener("7xanime:blocked-player-action", handleBlockedPlayerAction);
@@ -904,6 +955,9 @@ const VideoPlayerSection = () => {
         ["aniembed:play", "aniembed:ended"].includes(String(payload.type || "").toLowerCase()) ||
         ["play", "playing", "time", "progress", "timeupdate", "watching-log", "complete"].includes(eventType);
       if (playbackObserved) {
+        lastEmbedSignalAtRef.current = Date.now();
+        playbackRetriesRef.current = { key: `${activeEpisodeId}|${playbackSourceIndex}`, count: 0 };
+        setRetryingPlayback(null);
         setProviderPlaybackOutcomes((previous) =>
           previous[observedEmbedProvider] === "playing"
             ? previous
@@ -920,6 +974,37 @@ const VideoPlayerSection = () => {
     observedEmbedSource?.url,
     handlePlayerError,
     useFallback,
+  ]);
+
+  // Known event-reporting iframe players (MegaPlay, AniXo, Megavid, MegaFlix)
+  // should emit playback/progress signals. If their page remains stuck on an
+  // upstream error or interstitial and never reports progress, retry the same
+  // iframe twice before switching providers. We cannot inspect/click inside a
+  // cross-origin iframe, so this watchdog relies on its documented event API.
+  useEffect(() => {
+    const watchedProviders = ["megaplay", "anixo", "megavid", "megaflix"];
+    if (
+      !isLocalBackendEnabled() ||
+      (!useFallback && observedEmbedSource?.type !== "embed") ||
+      !watchedProviders.includes(observedEmbedProvider)
+    ) return;
+
+    embedLoadStartedAtRef.current = Date.now();
+    lastEmbedSignalAtRef.current = 0;
+    const interval = window.setInterval(() => {
+      const lastSignal = Math.max(embedLoadStartedAtRef.current, lastEmbedSignalAtRef.current);
+      if (Date.now() - lastSignal < 18000) return;
+      // Reset the baseline before calling into React so rapid repeated timer
+      // ticks cannot consume both retries for the same stalled frame.
+      embedLoadStartedAtRef.current = Date.now();
+      handlePlayerError(`${getProviderDisplayName(observedEmbedProvider)} stopped reporting playback; retrying this player.`);
+    }, 2500);
+
+    return () => window.clearInterval(interval);
+  }, [
+    activeEpisodeId, playbackSourceIndex, playerRetryKey,
+    observedEmbedProvider, observedEmbedSource?.type, observedEmbedSource?.url,
+    useFallback, handlePlayerError,
   ]);
 
   const playerAnimeInfo = useMemo(
@@ -1153,7 +1238,9 @@ const VideoPlayerSection = () => {
           className="flex aspect-video w-full flex-col items-center justify-center gap-3 rounded-2xl border border-white/[0.06] bg-white/[0.035] text-sm text-zinc-400"
         >
           <span className="h-7 w-7 animate-spin rounded-full border-2 border-rose-400/25 border-t-rose-300" />
-          <span>{activeEpisodeId ? "Finding a playable stream…" : "Preparing episode…"}</span>
+          <span>{retryingResolution?.episodeId === activeEpisodeId
+            ? `Retrying server response · attempt ${retryingResolution.attempt}/2…`
+            : activeEpisodeId ? "Finding a playable stream…" : "Preparing episode…"}</span>
         </div>
         {playerControls}
       </div>
