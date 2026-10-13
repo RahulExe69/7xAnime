@@ -1318,6 +1318,26 @@ const VideoPlayerSection = () => {
     );
   }
 
+  if (isFallbackActive && fallbackPlaybackFailed) {
+    return (
+      <div className="space-y-3">
+        {playerHeader}
+        <Alert className="rounded-2xl border-rose-300/15 bg-rose-300/[0.04] text-zinc-200">
+          <AlertCircle className="h-4 w-4 text-rose-300" />
+          <AlertTitle className="font-bold">Playback could not recover</AlertTitle>
+          <AlertDescription className="mt-1 flex flex-col gap-3 text-sm text-zinc-400">
+            MegaPlay and the available servers could not start this episode after automatic retries. Your latest saved timestamp is kept where a player reported it.
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" onClick={selectAutomaticServer}>Try Auto again</Button>
+            </div>
+            <span className="text-xs text-zinc-500">You can also choose another server below. Embedded providers may not expose a seek command, so exact resume is not guaranteed on every iframe.</span>
+          </AlertDescription>
+        </Alert>
+        {playerControls}
+      </div>
+    );
+  }
+
   if (isFallbackActive || (streamRequestFailed && !hasManualProviderSelection)) {
     const fallbackAnimeId = animeIdParam || anime?.anime?.info?.id || "1";
     const fallbackEpId = currentEpNumber || "1";
