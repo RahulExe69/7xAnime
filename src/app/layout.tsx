@@ -81,7 +81,7 @@ export default function RootLayout({
         <link rel="icon" href="/brand/7xanime-icon.png" type="image/png" />
       </head>
       <body
-        className={`${geistSans.className} antialiased max-w-[100vw] overflow-x-clip bg-background text-foreground`}
+        className={`${geistSans.className} antialiased max-w-[100vw] overflow-x-clip bg-background text-foreground pb-[calc(4.5rem+env(safe-area-inset-bottom))] lg:pb-0`}
       >
         <ThemeProvider
           attribute="class"
