@@ -204,7 +204,7 @@ jobs:
             echo "- Android versionCode: ${VERSION_CODE}"
             echo "- APK: $(basename "${OUTPUT}")"
             echo "- Size: ${SIZE_MB} MB"
-            echo "- SHA-256: ${SHA256}
+            echo "- SHA-256: ${SHA256}"
             echo "- Signing: permanent 7xAnime release keystore; signature verified"
           } >> "${GITHUB_STEP_SUMMARY}"
 
