@@ -787,7 +787,7 @@ const VideoPlayerSection = () => {
     ? actualProviderName && actualProviderName !== "auto"
       ? `Auto → ${getProviderDisplayName(actualProviderName)}`
       : "Auto"
-    : !useFallback && !isHindiMode && providerPlaybackOutcomes[currentProviderName] === "failed"
+    : !isFallbackActive && !isHindiMode && providerPlaybackOutcomes[currentProviderName] === "failed"
       ? `${getProviderDisplayName(currentProviderName)} unavailable`
       : activeServerNumber === 1
         ? "Server 1 — MegaPlay"
@@ -932,7 +932,7 @@ const VideoPlayerSection = () => {
   const observedEmbedProvider = (isFallbackActive ? "megaplay" : episodeData?.provider || currentProviderName || "").toLowerCase();
   const observedEmbedSource = isFallbackActive ? { type: "embed", url: "" } : episodeData?.sources?.[playbackSourceIndex];
   useEffect(() => {
-    if (!isLocalBackendEnabled() || (!useFallback && observedEmbedSource?.type !== "embed")) return;
+    if (!isLocalBackendEnabled() || (!isFallbackActive && observedEmbedSource?.type !== "embed")) return;
 
     const expectedHosts: Record<string, string> = {
       megaplay: "megaplay.buzz",
@@ -989,7 +989,7 @@ const VideoPlayerSection = () => {
     observedEmbedSource?.type,
     observedEmbedSource?.url,
     handlePlayerError,
-    useFallback,
+    isFallbackActive,
   ]);
 
   // Known event-reporting iframe players (MegaPlay, AniXo, Megavid, MegaFlix)
