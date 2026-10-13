@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import localFont from "next/font/local";
 
 import NavBar from "@/components/navbar";
+import ForceUpdateGate from "@/components/force-update-gate";
 import Footer from "@/components/footer";
 import NativeBackHandler from "@/components/native-back-handler";
 import Script from "next/script";
@@ -91,6 +92,7 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <QueryProvider>
+            <ForceUpdateGate />
             <Suspense fallback={null}>
               <NativeBackHandler />
             </Suspense>

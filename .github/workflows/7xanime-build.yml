@@ -94,8 +94,13 @@ jobs:
 
       - name: Configure Android debug build
         run: |
+          set -euo pipefail
           python3 .github/scripts/configure-capacitor-android.py
           python3 .github/scripts/configure-local-anime-backend.py
+          test -s android/app/src/main/java/com/sevenx/anime/UpdateBridge.java
+          grep -q 'addJavascriptInterface(updateBridge, "Android")' android/app/src/main/java/com/sevenx/anime/MainActivity.java
+          grep -q 'android.permission.REQUEST_INSTALL_PACKAGES' android/app/src/main/AndroidManifest.xml
+          test -s android/app/src/main/res/xml/file_paths.xml
 
       - name: Verify native ad blocking and fullscreen wiring
         run: |
