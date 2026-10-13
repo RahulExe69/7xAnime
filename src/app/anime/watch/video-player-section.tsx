@@ -137,6 +137,7 @@ const VideoPlayerSection = () => {
   const [isHindiMode, setIsHindiMode] = useState<boolean>(false);
   const [selectedHindiServer, setSelectedHindiServer] = useState<number>(0);
   const [manualProviderPlaybackFailed, setManualProviderPlaybackFailed] = useState(false);
+  const [fallbackPlaybackFailed, setFallbackPlaybackFailed] = useState(false);
   const [playbackSourceIndex, setPlaybackSourceIndex] = useState(0);
   const [lastPlayerError, setLastPlayerError] = useState<string | null>(null);
   const [streamResolutionTimedOut, setStreamResolutionTimedOut] = useState(false);
@@ -172,6 +173,7 @@ const VideoPlayerSection = () => {
       lastEmbedProgressRef.current = null;
     }
     setManualProviderPlaybackFailed(false);
+    setFallbackPlaybackFailed(false);
     setPlaybackSourceIndex(0);
     setLastPlayerError(null);
     playbackRetriesRef.current = { key: `${activeEpisodeId}|0`, count: 0 };
@@ -201,6 +203,9 @@ const VideoPlayerSection = () => {
     );
   const streamRequestFailed = isEpisodeDataError ||
     (!!episodeData && !hasPlayableSources);
+  const isFallbackActive = !isHindiMode && (
+    useFallback || (streamRequestFailed && !hasManualProviderSelection)
+  );
 
   // Never leave the video area in an endless loading state. Provider requests
   // may finish later, but the viewer gets a usable retry/fallback action quickly.
@@ -326,6 +331,7 @@ const VideoPlayerSection = () => {
     const next = orderedCandidates.find((candidate) => !attemptedSourceIdsRef.current.has(candidate.id));
     if (next) {
       attemptedSourceIdsRef.current.add(next.id);
+      setFallbackPlaybackFailed(false);
       setUseFallback(false);
       setIsHindiMode(false);
       setPreferredCategory(next.category);
@@ -333,8 +339,16 @@ const VideoPlayerSection = () => {
       updateEpisodeUrl(next.id, currentEpNumber);
       return;
     }
-    setUseFallback(true);
-  }, [activeEpisodeId, automaticCandidates, currentEpNumber, flushLatestEmbedProgress, setSelectedEpisode]);
+    if (!isFallbackActive) {
+      playbackRetriesRef.current = { key: `${activeEpisodeId}|0`, count: 0 };
+      setPlaybackSourceIndex(0);
+      setFallbackPlaybackFailed(false);
+      setUseFallback(true);
+      return;
+    }
+    setFallbackPlaybackFailed(true);
+    setLastPlayerError("All configured servers failed to start playback for this episode.");
+  }, [activeEpisodeId, automaticCandidates, currentEpNumber, flushLatestEmbedProgress, isFallbackActive, setSelectedEpisode]);
 
   useEffect(() => {
     if (!activeEpisodeId || isHindiMode || useFallback || isLoadingData || isFetchingEpisodeData) return;
@@ -523,10 +537,6 @@ const VideoPlayerSection = () => {
     }
   };
 
-  const isFallbackActive = !isHindiMode && (
-    useFallback
-  );
-
   // Listen to postMessage events from Fallback Player iframe (megaplay.buzz / megacloud)
   useEffect(() => {
     fallbackWatchedRecordIdRef.current = null;
@@ -664,6 +674,7 @@ const VideoPlayerSection = () => {
     if (targetId) {
       const retryCurrentServer = activeEpisodeId === targetId;
       flushLatestEmbedProgress();
+      setFallbackPlaybackFailed(false);
       playbackRetriesRef.current = { key: `${targetId}|0`, count: 0 };
       resolutionRetriesRef.current[targetId] = 0;
       setRetryingPlayback(null);
@@ -784,6 +795,8 @@ const VideoPlayerSection = () => {
 
   const selectFallbackServer = (category?: "sub" | "dub") => {
     flushLatestEmbedProgress();
+    setFallbackPlaybackFailed(false);
+    playbackRetriesRef.current = { key: `${activeEpisodeId}|0`, count: 0 };
     setRetryingPlayback(null);
     if (category) setPreferredCategory(category);
     setIsHindiMode(false);
@@ -808,6 +821,8 @@ const VideoPlayerSection = () => {
 
   const selectAutomaticServer = () => {
     flushLatestEmbedProgress();
+    setFallbackPlaybackFailed(false);
+    playbackRetriesRef.current = { key: `${activeEpisodeId}|0`, count: 0 };
     setRetryingPlayback(null);
     setIsHindiMode(false);
     setUseFallback(false);
@@ -822,7 +837,7 @@ const VideoPlayerSection = () => {
     if (playbackRetriesRef.current.key !== retryKey) {
       playbackRetriesRef.current = { key: retryKey, count: 0 };
     }
-    const providerKey = useFallback ? "megaplay" : episodeData?.provider || currentProviderName;
+    const providerKey = isFallbackActive ? "megaplay" : episodeData?.provider || currentProviderName;
 
     // Persist the last known point before restarting the current player.
     flushLatestEmbedProgress();
@@ -875,7 +890,7 @@ const VideoPlayerSection = () => {
     if (providerKey && providerKey !== "auto") {
       setProviderPlaybackOutcomes((previous) => ({ ...previous, [providerKey]: "playing" }));
     }
-  }, [activeEpisodeId, currentProviderName, episodeData?.provider, playbackSourceIndex, useFallback]);
+  }, [activeEpisodeId, currentProviderName, episodeData?.provider, playbackSourceIndex, isFallbackActive]);
 
   // Native WebView ad protection emits this event when it cancels a remote
   // JS dialog, popup window, remote permission request, or top-level redirect.
@@ -908,8 +923,8 @@ const VideoPlayerSection = () => {
   ]);
 
   // Trust player events only from the active iframe and its configured provider origin.
-  const observedEmbedProvider = (useFallback ? "megaplay" : episodeData?.provider || currentProviderName || "").toLowerCase();
-  const observedEmbedSource = useFallback ? { type: "embed", url: "" } : episodeData?.sources?.[playbackSourceIndex];
+  const observedEmbedProvider = (isFallbackActive ? "megaplay" : episodeData?.provider || currentProviderName || "").toLowerCase();
+  const observedEmbedSource = isFallbackActive ? { type: "embed", url: "" } : episodeData?.sources?.[playbackSourceIndex];
   useEffect(() => {
     if (!isLocalBackendEnabled() || (!useFallback && observedEmbedSource?.type !== "embed")) return;
 
@@ -980,7 +995,7 @@ const VideoPlayerSection = () => {
     const watchedProviders = ["megaplay", "anixo", "megavid", "megaflix"];
     if (
       !isLocalBackendEnabled() ||
-      (!useFallback && observedEmbedSource?.type !== "embed") ||
+      (!isFallbackActive && observedEmbedSource?.type !== "embed") ||
       !watchedProviders.includes(observedEmbedProvider)
     ) return;
 
@@ -999,7 +1014,7 @@ const VideoPlayerSection = () => {
   }, [
     activeEpisodeId, playbackSourceIndex, playerRetryKey,
     observedEmbedProvider, observedEmbedSource?.type, observedEmbedSource?.url,
-    useFallback, handlePlayerError,
+    isFallbackActive, handlePlayerError,
   ]);
 
   const playerAnimeInfo = useMemo(
