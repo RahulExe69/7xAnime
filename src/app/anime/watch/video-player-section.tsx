@@ -148,7 +148,7 @@ const VideoPlayerSection = () => {
   const [resolutionRetryTick, setResolutionRetryTick] = useState(0);
   const [providerPlaybackOutcomes, setProviderPlaybackOutcomes] = useState<Record<string, "playing" | "failed" | "retrying">>({});
   const attemptedSourceIdsRef = useRef<Set<string>>(new Set());
-  const blockedPlayerActionAtRef = useRef(0);
+  const blockedPlayerActionAtRef = useRef<{ retryKey: number; at: number }>({ retryKey: -1, at: 0 });
   const playbackRetriesRef = useRef<{ key: string; count: number }>({ key: "", count: 0 });
   const resolutionRetriesRef = useRef<Record<string, number>>({});
   const resolutionRetryInFlightRef = useRef<string | null>(null);
@@ -902,8 +902,13 @@ const VideoPlayerSection = () => {
     const handleBlockedPlayerAction = (event: Event) => {
       if (isHindiMode) return;
       const now = Date.now();
-      if (now - blockedPlayerActionAtRef.current < 900) return;
-      blockedPlayerActionAtRef.current = now;
+      // Debounce duplicate native events from a single frame, but permit an
+      // immediate retry to emit the same signal after playerRetryKey remounts it.
+      if (
+        blockedPlayerActionAtRef.current.retryKey === playerRetryKey &&
+        now - blockedPlayerActionAtRef.current.at < 900
+      ) return;
+      blockedPlayerActionAtRef.current = { retryKey: playerRetryKey, at: now };
 
       const detail = (event as CustomEvent<{ reason?: string; host?: string }>).detail || {};
       const reason = String(detail.reason || "blocked popup");
@@ -920,6 +925,7 @@ const VideoPlayerSection = () => {
     handlePlayerError,
     isHindiMode,
     isLocalBackendEnabled,
+    playerRetryKey,
   ]);
 
   // Trust player events only from the active iframe and its configured provider origin.
