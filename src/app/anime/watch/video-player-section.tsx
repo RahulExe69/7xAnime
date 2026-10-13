@@ -321,6 +321,18 @@ const VideoPlayerSection = () => {
   const advanceAfterSourceFailure = useCallback(() => {
     flushLatestEmbedProgress();
     if (activeEpisodeId) attemptedSourceIdsRef.current.add(activeEpisodeId);
+    // A provider has reached this path only after its retry budget was exhausted.
+    // Keep it out of the chooser while continuing through the internal candidate list.
+    if (hasManualProviderSelection && !isFallbackActive) {
+      const failedProvider = episodeData?.provider || activeEpisodeId.replace(/^\//, "").split("/")[1];
+      if (failedProvider && failedProvider !== "auto") {
+        setProviderPlaybackOutcomes((previous) =>
+          previous[failedProvider] === "failed"
+            ? previous
+            : { ...previous, [failedProvider]: "failed" },
+        );
+      }
+    }
     const currentCandidateIndex = automaticCandidates.findIndex((candidate) => candidate.id === activeEpisodeId);
     const orderedCandidates = currentCandidateIndex >= 0
       ? [
@@ -348,7 +360,7 @@ const VideoPlayerSection = () => {
     }
     setFallbackPlaybackFailed(true);
     setLastPlayerError("All configured servers failed to start playback for this episode.");
-  }, [activeEpisodeId, automaticCandidates, currentEpNumber, flushLatestEmbedProgress, isFallbackActive, setSelectedEpisode]);
+  }, [activeEpisodeId, automaticCandidates, currentEpNumber, flushLatestEmbedProgress, hasManualProviderSelection, episodeData?.provider, isFallbackActive, setSelectedEpisode]);
 
   useEffect(() => {
     if (!activeEpisodeId || isHindiMode || useFallback || isLoadingData || isFetchingEpisodeData) return;
@@ -712,14 +724,16 @@ const VideoPlayerSection = () => {
   const serverProviderNames = isLocalBackendEnabled()
     ? (localProviderStatus?.providers.filter((item) => item.moduleLoaded).map((item) => item.id) || availableProviderNames)
     : availableProviderNames;
-  // Keep every loaded server visible. SUB-only sources (AnimeParadise and
-  // NontonGo) remain discoverable while ENGLISH is selected and switch to SUB
-  // when tapped; a failure changes the status tint, never removes the button.
+  // Keep SUB-only servers discoverable while ENGLISH is selected, but hide a
+  // provider after its recovery attempts fail. Internal auto-failover still
+  // retains the complete provider order; this filter only affects the chooser.
   const selectableServerProviderNames = serverProviderNames;
   const failedServerProviderNames = selectableServerProviderNames.filter(
     (providerName) => providerPlaybackOutcomes[providerName] === "failed",
   );
-  const visibleServerProviderNames = selectableServerProviderNames;
+  const visibleServerProviderNames = selectableServerProviderNames.filter(
+    (providerName) => providerPlaybackOutcomes[providerName] !== "failed",
+  );
 
   useEffect(() => {
     if (!isLocalBackendEnabled() || !hasManualProviderSelection || isLoadingData) return;
