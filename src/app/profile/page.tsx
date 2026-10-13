@@ -105,13 +105,13 @@ function ProfilePageContent() {
   return (
     <>
       <Container className="min-h-[75vh] space-y-6 pb-16 pt-24 text-white sm:pt-28">
-        <header className="relative overflow-hidden rounded-[28px] border border-[#ff3b72]/25 bg-gradient-to-br from-[#4a0b20]/90 via-[#210811] to-[#100e18] p-5 shadow-[0_18px_50px_rgba(0,0,0,0.18)] sm:p-7">
+        <header className="relative overflow-hidden rounded-[28px] border border-[#ff3b72]/25 bg-gradient-to-br from-[#4a0b20]/70 via-[#24101d]/90 to-[#100e18] p-5 shadow-[0_18px_50px_rgba(0,0,0,0.18)] sm:p-6">
           <div className="pointer-events-none absolute -right-12 -top-20 h-56 w-56 rounded-full bg-[#ff3b72]/15 blur-3xl" />
           <div className="relative flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex min-w-0 items-center gap-4">
               <div className="group relative shrink-0">
                 <Avatar
-                  className="h-[62px] w-[62px] cursor-pointer border-2 border-[#ff9fbe]/35 shadow-lg shadow-black/20 sm:h-[76px] sm:w-[76px]"
+                  className="h-[58px] w-[58px] cursor-pointer border-2 border-[#ff9fbe]/35 shadow-lg shadow-black/20 sm:h-[64px] sm:w-[64px]"
                   username={targetUser.username}
                   url={targetUser.avatar}
                   collectionID={targetUser.collectionId}
@@ -133,7 +133,7 @@ function ProfilePageContent() {
                 )}
               </div>
               <div className="min-w-0">
-                <p className="mb-1 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.2em] text-[#ff9fbe]">
+                <p className="mb-1 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.16em] text-[#ff9fbe]">
                   <span className="h-1.5 w-1.5 rounded-full bg-[#ff3b72] shadow-[0_0_10px_rgba(255,59,114,0.8)]" />
                   7xAnime Profile
                 </p>
@@ -190,7 +190,7 @@ function ProfilePageContent() {
             </p>
           </div>
           <Tabs defaultValue="watching" className="w-full">
-            <TabsList className="grid h-auto w-full grid-cols-2 gap-1.5 rounded-2xl border border-white/[0.07] bg-[#16070d]/90 p-1.5 sm:grid-cols-5">
+            <TabsList className="grid h-auto w-full grid-cols-2 gap-1.5 rounded-[22px] border border-white/[0.07] bg-[#16070d]/90 p-1.5 sm:grid-cols-5">
               <TabsTrigger className="rounded-xl px-2 py-2.5 text-xs font-bold sm:text-sm" value="watching">Watching</TabsTrigger>
               <TabsTrigger className="rounded-xl px-2 py-2.5 text-xs font-bold sm:text-sm" value="plan-to-watch">Plan to watch</TabsTrigger>
               <TabsTrigger className="rounded-xl px-2 py-2.5 text-xs font-bold sm:text-sm" value="on-hold">On hold</TabsTrigger>
