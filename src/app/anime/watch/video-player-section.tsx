@@ -893,8 +893,6 @@ const VideoPlayerSection = () => {
       const detail = (event as CustomEvent<{ reason?: string; host?: string }>).detail || {};
       const reason = String(detail.reason || "blocked popup");
       const host = String(detail.host || "third-party player");
-      const providerKey = useFallback || isFallbackActive ? "megaplay" : currentProviderName;
-
       // Blocked popups, JS dialogs and top-level redirects are recovery signals,
       // not a reason to skip the retry sequence. Remount the current frame twice;
       // repeated interruption then advances to another configured server.
@@ -904,16 +902,9 @@ const VideoPlayerSection = () => {
     window.addEventListener("7xanime:blocked-player-action", handleBlockedPlayerAction);
     return () => window.removeEventListener("7xanime:blocked-player-action", handleBlockedPlayerAction);
   }, [
-    activeEpisodeId,
-    advanceAfterSourceFailure,
-    automaticCandidates,
-    currentEpNumber,
-    currentProviderName,
     handlePlayerError,
-    isFallbackActive,
     isHindiMode,
     isLocalBackendEnabled,
-    useFallback,
   ]);
 
   // Trust player events only from the active iframe and its configured provider origin.
