@@ -144,6 +144,7 @@ const VideoPlayerSection = () => {
   const [playerRetryKey, setPlayerRetryKey] = useState(0);
   const [retryingPlayback, setRetryingPlayback] = useState<{ episodeId: string; attempt: number } | null>(null);
   const [retryingResolution, setRetryingResolution] = useState<{ episodeId: string; attempt: number } | null>(null);
+  const [resolutionRetryTick, setResolutionRetryTick] = useState(0);
   const [providerPlaybackOutcomes, setProviderPlaybackOutcomes] = useState<Record<string, "playing" | "failed" | "retrying">>({});
   const attemptedSourceIdsRef = useRef<Set<string>>(new Set());
   const blockedPlayerActionAtRef = useRef(0);
@@ -363,6 +364,7 @@ const VideoPlayerSection = () => {
         setRetryingResolution((current) =>
           current?.episodeId === retryEpisode ? null : current,
         );
+        setResolutionRetryTick((tick) => tick + 1);
       };
       const timer = window.setTimeout(() => {
         void retryEpisodeData().finally(release);
@@ -403,6 +405,7 @@ const VideoPlayerSection = () => {
     allEpisodesData?.rawResponse?.source, automaticCandidates, episodeData,
     isEpisodeDataError, isEpisodesLoading, isHindiMode, isLoadingData, isFetchingEpisodeData,
     retryEpisodeData, streamRequestFailed, useFallback, hasManualProviderSelection,
+    resolutionRetryTick,
   ]);
   // A provider can hang without ever returning an HTTP/stream error. Treat the
   // 15-second timeout like a failure: retry the same route twice, then switch.
@@ -441,6 +444,7 @@ const VideoPlayerSection = () => {
       setRetryingResolution((current) =>
         current?.episodeId === retryEpisode ? null : current,
       );
+      setResolutionRetryTick((tick) => tick + 1);
     };
 
     void retryEpisodeData().finally(release);
