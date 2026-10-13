@@ -916,7 +916,14 @@ const VideoPlayerSection = () => {
       // Blocked popups, JS dialogs and top-level redirects are recovery signals,
       // not a reason to skip the retry sequence. Remount the current frame twice;
       // repeated interruption then advances to another configured server.
-      handlePlayerError(`Blocked ${reason} from ${host}; reconnecting to the current server.`);
+      const deceptiveInterstitial = reason.startsWith("javascript-")
+        || reason === "popup"
+        || reason === "top-level-redirect"
+        || reason === "permission-request";
+      const recoveryDetail = deceptiveInterstitial
+        ? `Blocked deceptive interstitial (${reason}) from ${host}; reconnecting to the current server.`
+        : `Blocked ${reason} from ${host}; reconnecting to the current server.`;
+      handlePlayerError(recoveryDetail);
     };
 
     window.addEventListener("7xanime:blocked-player-action", handleBlockedPlayerAction);
