@@ -290,20 +290,24 @@ splash_source.save(splash_output, format="PNG", optimize=True)
 # Capacitor's generated launch theme references @drawable/splash for both legacy
 # window background and Android 12+ launch icon. Point those references to our
 # squircle-masked copy, leaving the original source art and launcher icons unchanged.
-styles = resource_root / "values" / "styles.xml"
-if not styles.is_file():
-    print("ERROR: generated Android styles.xml is missing; cannot configure squircle splash.", file=sys.stderr)
-    raise SystemExit(1)
-styles_text = styles.read_text(encoding="utf-8")
-styles_text, splash_refs = re.subn(
-    r'(<item\s+name="(?:android:background|windowSplashScreenAnimatedIcon)">)\s*@drawable/splash\s*(</item>)',
-    r'\g<1>@drawable/splash_squircle\g<2>',
-    styles_text,
-)
+# Android 12+ uses values-v31/styles.xml (and future API levels may add
+# their own values-vXX overrides). Patch every generated styles resource, not just
+# the base theme, so no version-specific launch theme can keep the square source.
+style_files = sorted(resource_root.glob("values*/styles.xml"))
+splash_refs = 0
+for styles in style_files:
+    styles_text = styles.read_text(encoding="utf-8")
+    styles_text, updated_refs = re.subn(
+        r'(<item\s+name="(?:android:background|windowSplashScreenAnimatedIcon)">)\s*@drawable/splash\s*(</item>)',
+        r'\g<1>@drawable/splash_squircle\g<2>',
+        styles_text,
+    )
+    if updated_refs:
+        styles.write_text(styles_text, encoding="utf-8")
+        splash_refs += updated_refs
 if splash_refs < 1:
-    print("ERROR: could not find the generated @drawable/splash theme reference to replace.", file=sys.stderr)
+    print("ERROR: could not find a generated @drawable/splash theme reference in any values*/styles.xml.", file=sys.stderr)
     raise SystemExit(1)
-styles.write_text(styles_text, encoding="utf-8")
 
 print(f"Configured native squircle splash from {brand_icon} ({width}x{height}); original artwork and launcher assets remain unchanged.")
 
