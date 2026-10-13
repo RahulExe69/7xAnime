@@ -227,10 +227,14 @@ jobs:
           PREVIOUS_TAG="$(gh api "repos/${PUBLIC_RELEASE_REPO}/releases/latest" --jq '.tag_name // empty' 2>/dev/null || true)"
           if [[ -n "${PREVIOUS_TAG}" && "${PREVIOUS_TAG}" != "${TAG}" ]]; then
             PREVIOUS_VERSION="${PREVIOUS_TAG#v}"
-            PREVIOUS_CODE="$(bash .github/scripts/android-version.sh "${PREVIOUS_VERSION}" | awk -F= '$1 == "VERSION_CODE" {print $2}')"
-            if [[ -n "${PREVIOUS_CODE}" ]] && (( PREVIOUS_CODE > VERSION_CODE )); then
-              echo "::error::Refusing to publish ${TAG}; latest is ${PREVIOUS_TAG}."
-              exit 1
+            if [[ "${PREVIOUS_VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              PREVIOUS_CODE="$(bash .github/scripts/android-version.sh "${PREVIOUS_VERSION}" | awk -F= '$1 == "VERSION_CODE" {print $2}')"
+              if [[ -n "${PREVIOUS_CODE}" ]] && (( PREVIOUS_CODE > VERSION_CODE )); then
+                echo "::error::Refusing to publish ${TAG}; latest is ${PREVIOUS_TAG}."
+                exit 1
+              fi
+            else
+              echo "::warning::Latest release tag '${PREVIOUS_TAG}' is not a plain semantic version; skipping numeric comparison."
             fi
           fi
           NOTES="${CUSTOM_NOTES}"
