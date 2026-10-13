@@ -735,32 +735,6 @@ const VideoPlayerSection = () => {
     (providerName) => providerPlaybackOutcomes[providerName] !== "failed",
   );
 
-  useEffect(() => {
-    if (!isLocalBackendEnabled() || !hasManualProviderSelection || isLoadingData) return;
-    const failed = isEpisodeDataError || (!!episodeData && (
-      !hasPlayableSources ||
-      (!!episodeData.providerStatus && episodeData.providerStatus !== "ok")
-    ));
-    if (!failed || retryingResolution?.episodeId === activeEpisodeId) return;
-
-    const providerName = episodeData?.provider || currentProviderName;
-    if (!providerName || providerName === "auto") return;
-    setProviderPlaybackOutcomes((previous) =>
-      previous[providerName] === "failed"
-        ? previous
-        : { ...previous, [providerName]: "failed" },
-    );
-  }, [
-    currentProviderName,
-    episodeData,
-    hasManualProviderSelection,
-    hasPlayableSources,
-    isEpisodeDataError,
-    isLoadingData,
-    retryingResolution,
-    activeEpisodeId,
-  ]);
-
   // An automatic provider race reports the outcomes of sources it actually
   // attempted. Apply those failures to this screen's scoped hide/retry state;
   // never infer per-episode failure from the backend's global failure counters.
