@@ -20,6 +20,12 @@
 .DS_Store
 *.pem
 
+# Private Android signing material — never commit release keys
+*.jks
+*.keystore
+*.keystore.*
+*.p12
+
 # debug
 npm-debug.log*
 yarn-debug.log*
