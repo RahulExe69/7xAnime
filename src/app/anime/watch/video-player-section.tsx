@@ -141,20 +141,46 @@ const VideoPlayerSection = () => {
   const [lastPlayerError, setLastPlayerError] = useState<string | null>(null);
   const [streamResolutionTimedOut, setStreamResolutionTimedOut] = useState(false);
   const [streamRetryKey, setStreamRetryKey] = useState(0);
-  const [providerPlaybackOutcomes, setProviderPlaybackOutcomes] = useState<Record<string, "playing" | "failed">>({});
+  const [playerRetryKey, setPlayerRetryKey] = useState(0);
+  const [retryingPlayback, setRetryingPlayback] = useState<{ episodeId: string; attempt: number } | null>(null);
+  const [retryingResolution, setRetryingResolution] = useState<{ episodeId: string; attempt: number } | null>(null);
+  const [providerPlaybackOutcomes, setProviderPlaybackOutcomes] = useState<Record<string, "playing" | "failed" | "retrying">>({});
   const attemptedSourceIdsRef = useRef<Set<string>>(new Set());
   const blockedPlayerActionAtRef = useRef(0);
+  const playbackRetriesRef = useRef<{ key: string; count: number }>({ key: "", count: 0 });
+  const resolutionRetriesRef = useRef<Record<string, number>>({});
+  const resolutionRetryInFlightRef = useRef(false);
+  const lastEmbedProgressRef = useRef<{
+    animeId: string; episodeId: string; episodeNumber: number; animeTitle: string;
+    poster: string; current: number; duration: number;
+  } | null>(null);
   const externalEmbedFrameRef = useRef<HTMLIFrameElement | null>(null);
 
+  const flushLatestEmbedProgress = useCallback(() => {
+    const latest = lastEmbedProgressRef.current;
+    if (latest && isLocalBackendEnabled()) saveLocalWatchProgress(latest);
+  }, []);
+
   useEffect(() => {
+    const latest = lastEmbedProgressRef.current;
+    if (latest && latest.episodeId !== activeEpisodeId) {
+      flushLatestEmbedProgress();
+      lastEmbedProgressRef.current = null;
+    }
     setManualProviderPlaybackFailed(false);
     setPlaybackSourceIndex(0);
     setLastPlayerError(null);
-  }, [activeEpisodeId]);
+    playbackRetriesRef.current = { key: `${activeEpisodeId}|0`, count: 0 };
+    resolutionRetriesRef.current[activeEpisodeId] = 0;
+    resolutionRetryInFlightRef.current = false;
+    setRetryingPlayback(null);
+    setRetryingResolution(null);
+  }, [activeEpisodeId, flushLatestEmbedProgress]);
 
   const {
     data: episodeData,
     isLoading: isLoadingData,
+    isFetching: isFetchingEpisodeData,
     isError: isEpisodeDataError,
     refetch: retryEpisodeData,
   } = useGetEpisodeData(activeEpisodeId, !useFallback && !isHindiMode);
@@ -278,6 +304,7 @@ const VideoPlayerSection = () => {
   }, [activeEpisodeId]);
 
   const advanceAfterSourceFailure = useCallback(() => {
+    flushLatestEmbedProgress();
     if (activeEpisodeId) attemptedSourceIdsRef.current.add(activeEpisodeId);
     const currentCandidateIndex = automaticCandidates.findIndex((candidate) => candidate.id === activeEpisodeId);
     const orderedCandidates = currentCandidateIndex >= 0
@@ -297,27 +324,48 @@ const VideoPlayerSection = () => {
       return;
     }
     setUseFallback(true);
-  }, [activeEpisodeId, automaticCandidates, currentEpNumber, setSelectedEpisode]);
+  }, [activeEpisodeId, automaticCandidates, currentEpNumber, flushLatestEmbedProgress, setSelectedEpisode]);
 
   useEffect(() => {
-    if (!activeEpisodeId || isHindiMode || useFallback || isLoadingData) return;
+    if (!activeEpisodeId || isHindiMode || useFallback || isLoadingData || isFetchingEpisodeData) return;
     const requestFailed = streamRequestFailed;
-    if (!requestFailed) return;
+    if (!requestFailed) {
+      resolutionRetriesRef.current[activeEpisodeId] = 0;
+      return;
+    }
+    if (resolutionRetryInFlightRef.current) return;
 
-    // If a manually selected server returns no source, advance to the next
-    // allowlisted server rather than leaving the viewer on a dead-end error.
-    // The failed option remains visible so it can still be retried manually.
-    // The local "auto" route has already raced every bundled stream provider.
-    // If that race returned no source, trying the same providers sequentially
-    // can add another long wait per host; move to Server 1 instead.
+    // Retry the currently selected route twice before marking it unavailable
+    // or moving servers. Keep the route selected during each request attempt.
+    const attempts = resolutionRetriesRef.current[activeEpisodeId] || 0;
+    if (attempts < 2) {
+      const attempt = attempts + 1;
+      resolutionRetriesRef.current[activeEpisodeId] = attempt;
+      resolutionRetryInFlightRef.current = true;
+      setRetryingResolution({ episodeId: activeEpisodeId, attempt });
+      const timer = window.setTimeout(() => {
+        void retryEpisodeData().finally(() => {
+          resolutionRetryInFlightRef.current = false;
+          setRetryingResolution((current) =>
+            current?.episodeId === activeEpisodeId ? null : current,
+          );
+        });
+      }, 350);
+      return () => window.clearTimeout(timer);
+    }
+
+    resolutionRetriesRef.current[activeEpisodeId] = 0;
+    setRetryingResolution((current) =>
+      current?.episodeId === activeEpisodeId ? null : current,
+    );
+
+    // After two attempts, advance from Auto to MegaPlay or to the next
+    // configured provider for a manual selection.
     if (isLocalBackendEnabled() && activeEpisodeId.startsWith("watch/auto/")) {
       setUseFallback(true);
       return;
     }
 
-    // Let the initial local provider discovery yield at least a first batch
-    // before falling back. If every known candidate has already failed, keep
-    // waiting for the in-flight catalogue rather than giving up after two hosts.
     if (isLocalBackendEnabled() && isEpisodesLoading) return;
     const nativeCatalogue = allEpisodesData?.rawResponse?.source === "native";
     const catalogueComplete = allEpisodesData?.rawResponse?.complete === true;
@@ -333,8 +381,8 @@ const VideoPlayerSection = () => {
   }, [
     activeEpisodeId, advanceAfterSourceFailure, allEpisodesData?.rawResponse?.complete,
     allEpisodesData?.rawResponse?.source, automaticCandidates, episodeData,
-    isEpisodeDataError, isEpisodesLoading, isHindiMode, isLoadingData,
-    streamRequestFailed, useFallback, hasManualProviderSelection,
+    isEpisodeDataError, isEpisodesLoading, isHindiMode, isLoadingData, isFetchingEpisodeData,
+    retryEpisodeData, streamRequestFailed, useFallback, hasManualProviderSelection,
   ]);
   const animeTitleOptions = useMemo(
     () => [...new Set([
@@ -435,6 +483,8 @@ const VideoPlayerSection = () => {
     initBookmark();
 
     const handleIframeMessage = async (event: MessageEvent) => {
+      // Only accept progress emitted by the active embedded player frame.
+      if (event.source !== externalEmbedFrameRef.current?.contentWindow) return;
       let data = event.data;
       if (typeof data === "string") {
         try {
@@ -463,21 +513,25 @@ const VideoPlayerSection = () => {
       const isComplete = data.event === "complete";
 
       if (currentTime !== null && duration !== null && duration > 0) {
+        const progress = {
+          animeId: animeIdParam || anime?.anime?.info?.id || "0",
+          episodeId: activeEpisodeId,
+          episodeNumber: Number(currentEpNumber) || 1,
+          animeTitle: anime?.anime?.info?.name || "Anime",
+          poster: anime?.anime?.info?.poster || "",
+          current: currentTime,
+          duration,
+        };
+        // Keep the freshest position in memory even when persisted updates are
+        // throttled; flush it immediately before an automatic server switch.
+        lastEmbedProgressRef.current = progress;
         const now = Math.floor(currentTime);
         // Throttle updates every 10 seconds or on complete
         if (isComplete || Math.abs(now - lastSyncedTimeRef.current) >= 10) {
           lastSyncedTimeRef.current = now;
 
           if (isLocalBackendEnabled()) {
-            saveLocalWatchProgress({
-              animeId: animeIdParam || anime?.anime?.info?.id || "0",
-              episodeId: activeEpisodeId,
-              episodeNumber: Number(currentEpNumber) || 1,
-              animeTitle: anime?.anime?.info?.name || "Anime",
-              poster: anime?.anime?.info?.poster || "",
-              current: currentTime,
-              duration: duration,
-            });
+            saveLocalWatchProgress(progress);
           } else if (fallbackBookmarkIdRef.current) {
             const recordId = await syncWatchProgress(
               fallbackBookmarkIdRef.current,
@@ -499,6 +553,10 @@ const VideoPlayerSection = () => {
 
     window.addEventListener("message", handleIframeMessage);
     return () => {
+      const latest = lastEmbedProgressRef.current;
+      if (isLocalBackendEnabled() && latest?.episodeId === activeEpisodeId) {
+        saveLocalWatchProgress(latest);
+      }
       isMounted = false;
       window.removeEventListener("message", handleIframeMessage);
     };
