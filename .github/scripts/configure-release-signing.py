@@ -71,6 +71,7 @@ def main() -> None:
     signingConfigs {
         release {
             storeFile file(System.getenv("ANDROID_KEYSTORE_PATH"))
+            storeType "JKS"
             storePassword System.getenv("ANDROID_KEYSTORE_PASSWORD")
             keyAlias System.getenv("ANDROID_KEY_ALIAS")
             keyPassword System.getenv("ANDROID_KEY_PASSWORD")
@@ -99,7 +100,7 @@ def main() -> None:
 
     gradle.write_text(text, encoding="utf-8")
     check = gradle.read_text(encoding="utf-8")
-    if 'storeFile file(System.getenv("ANDROID_KEYSTORE_PATH"))' not in check or "signingConfig signingConfigs.release" not in check:
+    if 'storeFile file(System.getenv("ANDROID_KEYSTORE_PATH"))' not in check or 'storeType "JKS"' not in check or "signingConfig signingConfigs.release" not in check:
         fail("Could not verify persistent release signing configuration.")
     print("Configured permanent 7xAnime release signing without writing passwords into Gradle files.")
 
