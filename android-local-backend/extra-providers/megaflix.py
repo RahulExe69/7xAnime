@@ -74,7 +74,9 @@ async def watch(anilist_id: int, audio: str, ep: int, ctx: dict | None = None) -
     )
     sources = []
     for track in tracks:
-        url = f"{BASE}/stream/ani/{anime_id}/{episode}/{track}"
+        # MegaFlix documents these iframe options; match the app accent and request
+        # playback on load when the host/browser permits autoplay.
+        url = f"{BASE}/stream/ani/{anime_id}/{episode}/{track}?color=%23ff3b72&autoplay=true"
         sources.append({
             "url": url,
             "type": "embed",

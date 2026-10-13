@@ -137,24 +137,62 @@ const VideoPlayerSection = () => {
   const [isHindiMode, setIsHindiMode] = useState<boolean>(false);
   const [selectedHindiServer, setSelectedHindiServer] = useState<number>(0);
   const [manualProviderPlaybackFailed, setManualProviderPlaybackFailed] = useState(false);
+  const [fallbackPlaybackFailed, setFallbackPlaybackFailed] = useState(false);
   const [playbackSourceIndex, setPlaybackSourceIndex] = useState(0);
   const [lastPlayerError, setLastPlayerError] = useState<string | null>(null);
   const [streamResolutionTimedOut, setStreamResolutionTimedOut] = useState(false);
   const [streamRetryKey, setStreamRetryKey] = useState(0);
-  const [providerPlaybackOutcomes, setProviderPlaybackOutcomes] = useState<Record<string, "playing" | "failed">>({});
+  const [playerRetryKey, setPlayerRetryKey] = useState(0);
+  const [retryingPlayback, setRetryingPlayback] = useState<{ episodeId: string; attempt: number } | null>(null);
+  const [retryingResolution, setRetryingResolution] = useState<{ episodeId: string; attempt: number } | null>(null);
+  const [resolutionRetryTick, setResolutionRetryTick] = useState(0);
+  const [providerPlaybackOutcomes, setProviderPlaybackOutcomes] = useState<Record<string, "playing" | "failed" | "retrying">>({});
   const attemptedSourceIdsRef = useRef<Set<string>>(new Set());
-  const blockedPlayerActionAtRef = useRef(0);
+  const blockedPlayerActionAtRef = useRef<{ retryKey: number; at: number }>({ retryKey: -1, at: 0 });
+  const playbackRetriesRef = useRef<{ key: string; count: number }>({ key: "", count: 0 });
+  const resolutionRetriesRef = useRef<Record<string, number>>({});
+  const resolutionRetryInFlightRef = useRef<string | null>(null);
+  const resolutionRetryReleaseTimerRef = useRef<number | null>(null);
+  const lastEmbedProgressRef = useRef<{
+    animeId: string; episodeId: string; episodeNumber: number; animeTitle: string;
+    poster: string; current: number; duration: number;
+  } | null>(null);
+  const embedLoadStartedAtRef = useRef(0);
+  const lastEmbedSignalAtRef = useRef(0);
   const externalEmbedFrameRef = useRef<HTMLIFrameElement | null>(null);
 
+  const flushLatestEmbedProgress = useCallback(() => {
+    const latest = lastEmbedProgressRef.current;
+    if (latest && isLocalBackendEnabled()) saveLocalWatchProgress(latest);
+  }, []);
+
   useEffect(() => {
+    const latest = lastEmbedProgressRef.current;
+    if (latest && latest.episodeId !== activeEpisodeId) {
+      flushLatestEmbedProgress();
+      lastEmbedProgressRef.current = null;
+    }
     setManualProviderPlaybackFailed(false);
+    setFallbackPlaybackFailed(false);
     setPlaybackSourceIndex(0);
     setLastPlayerError(null);
-  }, [activeEpisodeId]);
+    playbackRetriesRef.current = { key: `${activeEpisodeId}|0`, count: 0 };
+    resolutionRetriesRef.current[activeEpisodeId] = 0;
+    resolutionRetryInFlightRef.current = null;
+    if (resolutionRetryReleaseTimerRef.current !== null) {
+      window.clearTimeout(resolutionRetryReleaseTimerRef.current);
+      resolutionRetryReleaseTimerRef.current = null;
+    }
+    embedLoadStartedAtRef.current = 0;
+    lastEmbedSignalAtRef.current = 0;
+    setRetryingPlayback(null);
+    setRetryingResolution(null);
+  }, [activeEpisodeId, flushLatestEmbedProgress]);
 
   const {
     data: episodeData,
     isLoading: isLoadingData,
+    isFetching: isFetchingEpisodeData,
     isError: isEpisodeDataError,
     refetch: retryEpisodeData,
   } = useGetEpisodeData(activeEpisodeId, !useFallback && !isHindiMode);
@@ -165,6 +203,9 @@ const VideoPlayerSection = () => {
     );
   const streamRequestFailed = isEpisodeDataError ||
     (!!episodeData && !hasPlayableSources);
+  const isFallbackActive = !isHindiMode && (
+    useFallback || (streamRequestFailed && !hasManualProviderSelection)
+  );
 
   // Never leave the video area in an endless loading state. Provider requests
   // may finish later, but the viewer gets a usable retry/fallback action quickly.
@@ -278,7 +319,20 @@ const VideoPlayerSection = () => {
   }, [activeEpisodeId]);
 
   const advanceAfterSourceFailure = useCallback(() => {
+    flushLatestEmbedProgress();
     if (activeEpisodeId) attemptedSourceIdsRef.current.add(activeEpisodeId);
+    // A provider has reached this path only after its retry budget was exhausted.
+    // Keep it out of the chooser while continuing through the internal candidate list.
+    if (hasManualProviderSelection && !isFallbackActive) {
+      const failedProvider = episodeData?.provider || activeEpisodeId.replace(/^\//, "").split("/")[1];
+      if (failedProvider && failedProvider !== "auto") {
+        setProviderPlaybackOutcomes((previous) =>
+          previous[failedProvider] === "failed"
+            ? previous
+            : { ...previous, [failedProvider]: "failed" },
+        );
+      }
+    }
     const currentCandidateIndex = automaticCandidates.findIndex((candidate) => candidate.id === activeEpisodeId);
     const orderedCandidates = currentCandidateIndex >= 0
       ? [
@@ -289,6 +343,7 @@ const VideoPlayerSection = () => {
     const next = orderedCandidates.find((candidate) => !attemptedSourceIdsRef.current.has(candidate.id));
     if (next) {
       attemptedSourceIdsRef.current.add(next.id);
+      setFallbackPlaybackFailed(false);
       setUseFallback(false);
       setIsHindiMode(false);
       setPreferredCategory(next.category);
@@ -296,28 +351,69 @@ const VideoPlayerSection = () => {
       updateEpisodeUrl(next.id, currentEpNumber);
       return;
     }
-    setUseFallback(true);
-  }, [activeEpisodeId, automaticCandidates, currentEpNumber, setSelectedEpisode]);
+    if (!isFallbackActive) {
+      playbackRetriesRef.current = { key: `${activeEpisodeId}|0`, count: 0 };
+      setPlaybackSourceIndex(0);
+      setFallbackPlaybackFailed(false);
+      setUseFallback(true);
+      return;
+    }
+    setFallbackPlaybackFailed(true);
+    setLastPlayerError("All configured servers failed to start playback for this episode.");
+  }, [activeEpisodeId, automaticCandidates, currentEpNumber, flushLatestEmbedProgress, hasManualProviderSelection, episodeData?.provider, isFallbackActive, setSelectedEpisode]);
 
   useEffect(() => {
-    if (!activeEpisodeId || isHindiMode || useFallback || isLoadingData) return;
+    if (!activeEpisodeId || isHindiMode || useFallback || isLoadingData || isFetchingEpisodeData) return;
     const requestFailed = streamRequestFailed;
-    if (!requestFailed) return;
+    if (!requestFailed) {
+      resolutionRetriesRef.current[activeEpisodeId] = 0;
+      return;
+    }
+    if (resolutionRetryInFlightRef.current === activeEpisodeId) return;
 
-    // If a manually selected server returns no source, advance to the next
-    // allowlisted server rather than leaving the viewer on a dead-end error.
-    // The failed option remains visible so it can still be retried manually.
-    // The local "auto" route has already raced every bundled stream provider.
-    // If that race returned no source, trying the same providers sequentially
-    // can add another long wait per host; move to Server 1 instead.
+    // Retry the currently selected route twice before marking it unavailable
+    // or moving servers. Keep the route selected during each request attempt.
+    const attempts = resolutionRetriesRef.current[activeEpisodeId] || 0;
+    if (attempts < 2) {
+      const attempt = attempts + 1;
+      resolutionRetriesRef.current[activeEpisodeId] = attempt;
+      resolutionRetryInFlightRef.current = activeEpisodeId;
+      setRetryingResolution({ episodeId: activeEpisodeId, attempt });
+      const retryEpisode = activeEpisodeId;
+      const release = () => {
+        if (resolutionRetryInFlightRef.current !== retryEpisode) return;
+        resolutionRetryInFlightRef.current = null;
+        if (resolutionRetryReleaseTimerRef.current !== null) {
+          window.clearTimeout(resolutionRetryReleaseTimerRef.current);
+          resolutionRetryReleaseTimerRef.current = null;
+        }
+        setRetryingResolution((current) =>
+          current?.episodeId === retryEpisode ? null : current,
+        );
+        setResolutionRetryTick((tick) => tick + 1);
+      };
+      const timer = window.setTimeout(() => {
+        void retryEpisodeData().finally(release);
+        // A stalled request must not lock recovery forever; allow the timeout
+        // watchdog to make the next decision even if the upstream never settles.
+        resolutionRetryReleaseTimerRef.current = window.setTimeout(release, 12000);
+      }, 350);
+      return () => window.clearTimeout(timer);
+    }
+
+    resolutionRetriesRef.current[activeEpisodeId] = 0;
+    resolutionRetryInFlightRef.current = null;
+    setRetryingResolution((current) =>
+      current?.episodeId === activeEpisodeId ? null : current,
+    );
+
+    // After two attempts, advance from Auto to MegaPlay or to the next
+    // configured provider for a manual selection.
     if (isLocalBackendEnabled() && activeEpisodeId.startsWith("watch/auto/")) {
       setUseFallback(true);
       return;
     }
 
-    // Let the initial local provider discovery yield at least a first batch
-    // before falling back. If every known candidate has already failed, keep
-    // waiting for the in-flight catalogue rather than giving up after two hosts.
     if (isLocalBackendEnabled() && isEpisodesLoading) return;
     const nativeCatalogue = allEpisodesData?.rawResponse?.source === "native";
     const catalogueComplete = allEpisodesData?.rawResponse?.complete === true;
@@ -333,9 +429,59 @@ const VideoPlayerSection = () => {
   }, [
     activeEpisodeId, advanceAfterSourceFailure, allEpisodesData?.rawResponse?.complete,
     allEpisodesData?.rawResponse?.source, automaticCandidates, episodeData,
-    isEpisodeDataError, isEpisodesLoading, isHindiMode, isLoadingData,
-    streamRequestFailed, useFallback, hasManualProviderSelection,
+    isEpisodeDataError, isEpisodesLoading, isHindiMode, isLoadingData, isFetchingEpisodeData,
+    retryEpisodeData, streamRequestFailed, useFallback, hasManualProviderSelection,
+    resolutionRetryTick,
   ]);
+  // A provider can hang without ever returning an HTTP/stream error. Treat the
+  // 15-second timeout like a failure: retry the same route twice, then switch.
+  useEffect(() => {
+    if (!streamResolutionTimedOut || !isLoadingData || isHindiMode || useFallback || !activeEpisodeId) return;
+    if (resolutionRetryInFlightRef.current === activeEpisodeId) return;
+
+    const attempts = resolutionRetriesRef.current[activeEpisodeId] || 0;
+    if (attempts >= 2) {
+      resolutionRetriesRef.current[activeEpisodeId] = 0;
+      resolutionRetryInFlightRef.current = null;
+      setRetryingResolution(null);
+      if (isLocalBackendEnabled() && activeEpisodeId.startsWith("watch/auto/")) {
+        setUseFallback(true);
+      } else {
+        advanceAfterSourceFailure();
+      }
+      return;
+    }
+
+    const attempt = attempts + 1;
+    const retryEpisode = activeEpisodeId;
+    resolutionRetriesRef.current[retryEpisode] = attempt;
+    resolutionRetryInFlightRef.current = retryEpisode;
+    setRetryingResolution({ episodeId: retryEpisode, attempt });
+    setStreamResolutionTimedOut(false);
+    setStreamRetryKey((previous) => previous + 1);
+
+    const release = () => {
+      if (resolutionRetryInFlightRef.current !== retryEpisode) return;
+      resolutionRetryInFlightRef.current = null;
+      if (resolutionRetryReleaseTimerRef.current !== null) {
+        window.clearTimeout(resolutionRetryReleaseTimerRef.current);
+        resolutionRetryReleaseTimerRef.current = null;
+      }
+      setRetryingResolution((current) =>
+        current?.episodeId === retryEpisode ? null : current,
+      );
+      setResolutionRetryTick((tick) => tick + 1);
+    };
+
+    void retryEpisodeData().finally(release);
+    resolutionRetryReleaseTimerRef.current = window.setTimeout(release, 12000);
+    // Intentionally no effect cleanup: turning off the timed-out UI immediately
+    // must not cancel the in-flight recovery attempt's release guard.
+  }, [
+    streamResolutionTimedOut, isLoadingData, isHindiMode, useFallback, activeEpisodeId,
+    advanceAfterSourceFailure, retryEpisodeData,
+  ]);
+
   const animeTitleOptions = useMemo(
     () => [...new Set([
       anime?.anime?.info?.name || "",
@@ -403,10 +549,6 @@ const VideoPlayerSection = () => {
     }
   };
 
-  const isFallbackActive = !isHindiMode && (
-    useFallback
-  );
-
   // Listen to postMessage events from Fallback Player iframe (megaplay.buzz / megacloud)
   useEffect(() => {
     fallbackWatchedRecordIdRef.current = null;
@@ -435,6 +577,8 @@ const VideoPlayerSection = () => {
     initBookmark();
 
     const handleIframeMessage = async (event: MessageEvent) => {
+      // Only accept progress emitted by the active embedded player frame.
+      if (event.source !== externalEmbedFrameRef.current?.contentWindow) return;
       let data = event.data;
       if (typeof data === "string") {
         try {
@@ -463,21 +607,26 @@ const VideoPlayerSection = () => {
       const isComplete = data.event === "complete";
 
       if (currentTime !== null && duration !== null && duration > 0) {
+        const progress = {
+          animeId: animeIdParam || anime?.anime?.info?.id || "0",
+          episodeId: activeEpisodeId,
+          episodeNumber: Number(currentEpNumber) || 1,
+          animeTitle: anime?.anime?.info?.name || "Anime",
+          poster: anime?.anime?.info?.poster || "",
+          current: currentTime,
+          duration,
+        };
+        // Keep the freshest position in memory even when persisted updates are
+        // throttled; flush it immediately before an automatic server switch.
+        lastEmbedProgressRef.current = progress;
+        lastEmbedSignalAtRef.current = Date.now();
         const now = Math.floor(currentTime);
         // Throttle updates every 10 seconds or on complete
         if (isComplete || Math.abs(now - lastSyncedTimeRef.current) >= 10) {
           lastSyncedTimeRef.current = now;
 
           if (isLocalBackendEnabled()) {
-            saveLocalWatchProgress({
-              animeId: animeIdParam || anime?.anime?.info?.id || "0",
-              episodeId: activeEpisodeId,
-              episodeNumber: Number(currentEpNumber) || 1,
-              animeTitle: anime?.anime?.info?.name || "Anime",
-              poster: anime?.anime?.info?.poster || "",
-              current: currentTime,
-              duration: duration,
-            });
+            saveLocalWatchProgress(progress);
           } else if (fallbackBookmarkIdRef.current) {
             const recordId = await syncWatchProgress(
               fallbackBookmarkIdRef.current,
@@ -499,6 +648,10 @@ const VideoPlayerSection = () => {
 
     window.addEventListener("message", handleIframeMessage);
     return () => {
+      const latest = lastEmbedProgressRef.current;
+      if (isLocalBackendEnabled() && latest?.episodeId === activeEpisodeId) {
+        saveLocalWatchProgress(latest);
+      }
       isMounted = false;
       window.removeEventListener("message", handleIframeMessage);
     };
@@ -532,6 +685,12 @@ const VideoPlayerSection = () => {
       : "");
     if (targetId) {
       const retryCurrentServer = activeEpisodeId === targetId;
+      flushLatestEmbedProgress();
+      setFallbackPlaybackFailed(false);
+      playbackRetriesRef.current = { key: `${targetId}|0`, count: 0 };
+      resolutionRetriesRef.current[targetId] = 0;
+      setRetryingPlayback(null);
+      setRetryingResolution(null);
       attemptedSourceIdsRef.current.delete(targetId);
       setProviderPlaybackOutcomes((previous) => {
         if (!(pName in previous)) return previous;
@@ -565,38 +724,16 @@ const VideoPlayerSection = () => {
   const serverProviderNames = isLocalBackendEnabled()
     ? (localProviderStatus?.providers.filter((item) => item.moduleLoaded).map((item) => item.id) || availableProviderNames)
     : availableProviderNames;
-  // Keep every loaded server visible. SUB-only sources (AnimeParadise and
-  // NontonGo) remain discoverable while ENGLISH is selected and switch to SUB
-  // when tapped; a failure changes the status tint, never removes the button.
+  // Keep SUB-only servers discoverable while ENGLISH is selected, but hide a
+  // provider after its recovery attempts fail. Internal auto-failover still
+  // retains the complete provider order; this filter only affects the chooser.
   const selectableServerProviderNames = serverProviderNames;
   const failedServerProviderNames = selectableServerProviderNames.filter(
     (providerName) => providerPlaybackOutcomes[providerName] === "failed",
   );
-  const visibleServerProviderNames = selectableServerProviderNames;
-
-  useEffect(() => {
-    if (!isLocalBackendEnabled() || !hasManualProviderSelection || isLoadingData) return;
-    const failed = isEpisodeDataError || (!!episodeData && (
-      !hasPlayableSources ||
-      (!!episodeData.providerStatus && episodeData.providerStatus !== "ok")
-    ));
-    if (!failed) return;
-
-    const providerName = episodeData?.provider || currentProviderName;
-    if (!providerName || providerName === "auto") return;
-    setProviderPlaybackOutcomes((previous) =>
-      previous[providerName] === "failed"
-        ? previous
-        : { ...previous, [providerName]: "failed" },
-    );
-  }, [
-    currentProviderName,
-    episodeData,
-    hasManualProviderSelection,
-    hasPlayableSources,
-    isEpisodeDataError,
-    isLoadingData,
-  ]);
+  const visibleServerProviderNames = selectableServerProviderNames.filter(
+    (providerName) => providerPlaybackOutcomes[providerName] !== "failed",
+  );
 
   // An automatic provider race reports the outcomes of sources it actually
   // attempted. Apply those failures to this screen's scoped hide/retry state;
@@ -607,7 +744,7 @@ const VideoPlayerSection = () => {
     const failedProviders = Object.entries(timings)
       .filter(([, outcome]) => outcome && outcome.ok === false)
       .map(([providerName]) => providerName);
-    if (!failedProviders.length) return;
+    if (!failedProviders.length || retryingResolution?.episodeId === activeEpisodeId) return;
     setProviderPlaybackOutcomes((previous) => {
       let changed = false;
       const next = { ...previous };
@@ -619,7 +756,7 @@ const VideoPlayerSection = () => {
       }
       return changed ? next : previous;
     });
-  }, [activeEpisodeId, episodeData?.timings]);
+  }, [activeEpisodeId, episodeData?.timings, retryingResolution]);
 
   const selectedProviderIndex = visibleServerProviderNames.indexOf(currentProviderName);
   const fallbackServerNumber = 1;
@@ -632,19 +769,23 @@ const VideoPlayerSection = () => {
     isLocalBackendEnabled() &&
     currentProviderName === "auto" &&
     !isHindiMode &&
-    !useFallback;
+    !isFallbackActive;
   const actualProviderName = episodeData?.provider || "";
   const activeServerLabel = isAutomaticServerActive
     ? actualProviderName && actualProviderName !== "auto"
       ? `Auto → ${getProviderDisplayName(actualProviderName)}`
       : "Auto"
-    : !useFallback && !isHindiMode && providerPlaybackOutcomes[currentProviderName] === "failed"
+    : !isFallbackActive && !isHindiMode && providerPlaybackOutcomes[currentProviderName] === "failed"
       ? `${getProviderDisplayName(currentProviderName)} unavailable`
       : activeServerNumber === 1
         ? "Server 1 — MegaPlay"
         : `Server ${activeServerNumber} — ${getProviderDisplayName(currentProviderName)}`;
 
   const selectFallbackServer = (category?: "sub" | "dub") => {
+    flushLatestEmbedProgress();
+    setFallbackPlaybackFailed(false);
+    playbackRetriesRef.current = { key: `${activeEpisodeId}|0`, count: 0 };
+    setRetryingPlayback(null);
     if (category) setPreferredCategory(category);
     setIsHindiMode(false);
     setStreamResolutionTimedOut(false);
@@ -659,25 +800,67 @@ const VideoPlayerSection = () => {
 
   const selectHindiMode = () => {
     if (!hindiStreams.length) return;
+    flushLatestEmbedProgress();
+    setRetryingPlayback(null);
     setUseFallback(false);
     setSelectedHindiServer(0);
     setIsHindiMode(true);
   };
 
   const selectAutomaticServer = () => {
+    flushLatestEmbedProgress();
+    setFallbackPlaybackFailed(false);
+    playbackRetriesRef.current = { key: `${activeEpisodeId}|0`, count: 0 };
+    setRetryingPlayback(null);
+    setRetryingResolution(null);
+    setManualProviderPlaybackFailed(false);
+    setPlaybackSourceIndex(0);
+    resolutionRetriesRef.current = {};
+    resolutionRetryInFlightRef.current = null;
+    if (resolutionRetryReleaseTimerRef.current !== null) {
+      window.clearTimeout(resolutionRetryReleaseTimerRef.current);
+      resolutionRetryReleaseTimerRef.current = null;
+    }
+    // An explicit "Try Auto again" is a fresh attempt: clear the provider
+    // quarantine set so previously failed servers can be tested again.
+    attemptedSourceIdsRef.current.clear();
+    setProviderPlaybackOutcomes({});
     setIsHindiMode(false);
     setUseFallback(false);
     const targetId = `watch/auto/${animeIdParam}/${activeCategory}/episode-${currentEpNumber}`;
-    attemptedSourceIdsRef.current.delete(targetId);
     setSelectedEpisode(targetId);
     updateEpisodeUrl(targetId, currentEpNumber);
   };
 
   const handlePlayerError = useCallback((detail?: string) => {
-    // One provider may expose multiple distinct stream servers. Exhaust those
-    // before declaring the provider broken or moving away from an Auto winner.
+    const retryKey = `${activeEpisodeId}|${playbackSourceIndex}`;
+    if (playbackRetriesRef.current.key !== retryKey) {
+      playbackRetriesRef.current = { key: retryKey, count: 0 };
+    }
+    const providerKey = isFallbackActive ? "megaplay" : episodeData?.provider || currentProviderName;
+
+    // Persist the last known point before restarting the current player.
+    flushLatestEmbedProgress();
+    if (playbackRetriesRef.current.count < 2) {
+      const attempt = playbackRetriesRef.current.count + 1;
+      playbackRetriesRef.current.count = attempt;
+      setRetryingPlayback({ episodeId: activeEpisodeId, attempt });
+      if (providerKey && providerKey !== "auto") {
+        setProviderPlaybackOutcomes((previous) => ({ ...previous, [providerKey]: "retrying" }));
+      }
+      setLastPlayerError(detail || null);
+      setPlayerRetryKey((previous) => previous + 1);
+      // Refresh short-lived direct media URLs while remounting the player frame.
+      void retryEpisodeData();
+      return;
+    }
+
+    setRetryingPlayback(null);
+    // If this provider supplied alternate URLs, try those next. The current URL
+    // itself has already received two recovery attempts.
     const nextSourceIndex = playbackSourceIndex + 1;
-    if (episodeData?.sources?.[nextSourceIndex]?.url) {
+    if (!isFallbackActive && episodeData?.sources?.[nextSourceIndex]?.url) {
+      playbackRetriesRef.current = { key: `${activeEpisodeId}|${nextSourceIndex}`, count: 0 };
       setLastPlayerError(detail || null);
       setPlaybackSourceIndex(nextSourceIndex);
       setManualProviderPlaybackFailed(false);
@@ -685,24 +868,29 @@ const VideoPlayerSection = () => {
     }
 
     setLastPlayerError(detail || null);
-    const providerKey = episodeData?.provider || currentProviderName;
     if (providerKey && providerKey !== "auto") {
       setProviderPlaybackOutcomes((previous) => ({ ...previous, [providerKey]: "failed" }));
     }
     if (hasManualProviderSelection) {
       setManualProviderPlaybackFailed(true);
     }
-    // Try the next server on detected playback failure. If no candidates remain,
-    // advanceAfterSourceFailure opens Server 1 (MegaPlay) as the final fallback.
+    // Two retries failed: switch to the next configured server, keeping the same
+    // anime/episode/audio selection and the latest saved position.
     advanceAfterSourceFailure();
-  }, [advanceAfterSourceFailure, currentProviderName, episodeData?.provider, episodeData?.sources, hasManualProviderSelection, playbackSourceIndex]);
+  }, [
+    activeEpisodeId, advanceAfterSourceFailure, currentProviderName,
+    episodeData?.provider, episodeData?.sources, flushLatestEmbedProgress,
+    hasManualProviderSelection, playbackSourceIndex, retryEpisodeData, isFallbackActive,
+  ]);
 
   const handlePlayerPlaybackReady = useCallback(() => {
-    const providerKey = episodeData?.provider || currentProviderName;
+    playbackRetriesRef.current = { key: `${activeEpisodeId}|${playbackSourceIndex}`, count: 0 };
+    setRetryingPlayback(null);
+    const providerKey = isFallbackActive ? "megaplay" : episodeData?.provider || currentProviderName;
     if (providerKey && providerKey !== "auto") {
       setProviderPlaybackOutcomes((previous) => ({ ...previous, [providerKey]: "playing" }));
     }
-  }, [currentProviderName, episodeData?.provider]);
+  }, [activeEpisodeId, currentProviderName, episodeData?.provider, playbackSourceIndex, isFallbackActive]);
 
   // Native WebView ad protection emits this event when it cancels a remote
   // JS dialog, popup window, remote permission request, or top-level redirect.
@@ -714,64 +902,49 @@ const VideoPlayerSection = () => {
     const handleBlockedPlayerAction = (event: Event) => {
       if (isHindiMode) return;
       const now = Date.now();
-      if (now - blockedPlayerActionAtRef.current < 900) return;
-      blockedPlayerActionAtRef.current = now;
+      // Debounce duplicate native events from a single frame, but permit an
+      // immediate retry to emit the same signal after playerRetryKey remounts it.
+      if (
+        blockedPlayerActionAtRef.current.retryKey === playerRetryKey &&
+        now - blockedPlayerActionAtRef.current.at < 900
+      ) return;
+      blockedPlayerActionAtRef.current = { retryKey: playerRetryKey, at: now };
 
       const detail = (event as CustomEvent<{ reason?: string; host?: string }>).detail || {};
       const reason = String(detail.reason || "blocked popup");
       const host = String(detail.host || "third-party player");
-      const providerKey = useFallback || isFallbackActive ? "megaplay" : currentProviderName;
-
-      if (providerKey && providerKey !== "auto") {
-        setProviderPlaybackOutcomes((previous) => ({ ...previous, [providerKey]: "failed" }));
-      }
-
-      // A native JS dialog is a stronger signal than a missing stream: it means
-      // the embed tried to interrupt the viewer with a robot-check/Allow prompt.
-      // Advance immediately for dialogs and blocked redirects/popups; do not leave
-      // the user stuck on the same third-party frame with only an error message.
+      // Blocked popups, JS dialogs and top-level redirects are recovery signals,
+      // not a reason to skip the retry sequence. Remount the current frame twice;
+      // repeated interruption then advances to another configured server.
       const deceptiveInterstitial = reason.startsWith("javascript-")
         || reason === "popup"
-        || reason === "top-level-redirect";
-      if (deceptiveInterstitial) {
-        advanceAfterSourceFailure();
-        return;
-      }
-
-      if (useFallback || isFallbackActive) {
-        advanceAfterSourceFailure();
-        return;
-      }
-
-      handlePlayerError(`Blocked ${reason} from ${host}; trying the next server.`);
+        || reason === "top-level-redirect"
+        || reason === "permission-request";
+      const recoveryDetail = deceptiveInterstitial
+        ? `Blocked deceptive interstitial (${reason}) from ${host}; reconnecting to the current server.`
+        : `Blocked ${reason} from ${host}; reconnecting to the current server.`;
+      handlePlayerError(recoveryDetail);
     };
 
     window.addEventListener("7xanime:blocked-player-action", handleBlockedPlayerAction);
     return () => window.removeEventListener("7xanime:blocked-player-action", handleBlockedPlayerAction);
   }, [
-    activeEpisodeId,
-    advanceAfterSourceFailure,
-    automaticCandidates,
-    currentEpNumber,
-    currentProviderName,
     handlePlayerError,
-    isFallbackActive,
     isHindiMode,
     isLocalBackendEnabled,
-    useFallback,
+    playerRetryKey,
   ]);
 
   // Trust player events only from the active iframe and its configured provider origin.
-  // Cosmic exposes time/server/complete/error messages for its embedded player.
-  const observedEmbedProvider = (episodeData?.provider || currentProviderName || "").toLowerCase();
-  const observedEmbedSource = episodeData?.sources?.[playbackSourceIndex];
+  const observedEmbedProvider = (isFallbackActive ? "megaplay" : episodeData?.provider || currentProviderName || "").toLowerCase();
+  const observedEmbedSource = isFallbackActive ? { type: "embed", url: "" } : episodeData?.sources?.[playbackSourceIndex];
   useEffect(() => {
-    if (!isLocalBackendEnabled() || observedEmbedSource?.type !== "embed") return;
+    if (!isLocalBackendEnabled() || (!isFallbackActive && observedEmbedSource?.type !== "embed")) return;
 
     const expectedHosts: Record<string, string> = {
+      megaplay: "megaplay.buzz",
       anixo: "anixo.buzz",
       megavid: "megavid.buzz",
-      cosmic: "cosmic-api-azure.vercel.app",
       megaflix: "megaflix.buzz",
       tryembed: "tryembed.us.cc",
       cinexstream: "cinextream.cc",
@@ -793,11 +966,6 @@ const VideoPlayerSection = () => {
       if (hostname !== expectedHost && !hostname.endsWith(`.${expectedHost}`)) return;
 
       const payload = raw as Record<string, unknown>;
-      // Cosmic's documented player protocol explicitly namespaces its messages.
-      if (
-        observedEmbedProvider === "cosmic" &&
-        String(payload.channel || "").toLowerCase() !== "cosmic"
-      ) return;
       const eventType = String(payload.event || payload.type || payload.action || "").toLowerCase();
       const status = String(payload.status || "").toLowerCase();
       const failed = eventType.includes("error") || status === "error";
@@ -808,8 +976,12 @@ const VideoPlayerSection = () => {
 
       const playbackObserved =
         ["aniembed:play", "aniembed:ended"].includes(String(payload.type || "").toLowerCase()) ||
-        ["play", "playing", "time", "progress", "timeupdate", "watching-log", "complete"].includes(eventType);
+        ["play", "playing", "pause", "paused", "ready", "seek", "buffer", "buffering", "loadedmetadata", "time", "progress", "timeupdate", "watching-log", "complete"].includes(eventType) ||
+        ["playing", "paused", "buffering", "ready"].includes(status);
       if (playbackObserved) {
+        lastEmbedSignalAtRef.current = Date.now();
+        playbackRetriesRef.current = { key: `${activeEpisodeId}|${playbackSourceIndex}`, count: 0 };
+        setRetryingPlayback(null);
         setProviderPlaybackOutcomes((previous) =>
           previous[observedEmbedProvider] === "playing"
             ? previous
@@ -825,6 +997,41 @@ const VideoPlayerSection = () => {
     observedEmbedSource?.type,
     observedEmbedSource?.url,
     handlePlayerError,
+    isFallbackActive,
+  ]);
+
+  // Known event-reporting iframe players (MegaPlay, AniXo, Megavid, MegaFlix)
+  // should emit playback/progress signals. If their page remains stuck on an
+  // upstream error or interstitial and never reports progress, retry the same
+  // iframe twice before switching providers. MegaFlix gets a shorter timeout
+  // because its upstream currently returns an endpoint error page; other embeds
+  // get more startup time. We cannot inspect/click inside a cross-origin iframe,
+  // so this watchdog relies on documented player events.
+  useEffect(() => {
+    const watchedProviders = ["megaplay", "anixo", "megavid", "megaflix"];
+    if (
+      !isLocalBackendEnabled() ||
+      (!isFallbackActive && observedEmbedSource?.type !== "embed") ||
+      !watchedProviders.includes(observedEmbedProvider)
+    ) return;
+
+    embedLoadStartedAtRef.current = Date.now();
+    lastEmbedSignalAtRef.current = 0;
+    const interval = window.setInterval(() => {
+      const lastSignal = Math.max(embedLoadStartedAtRef.current, lastEmbedSignalAtRef.current);
+      const stallTimeoutMs = observedEmbedProvider === "megaflix" ? 10000 : 18000;
+      if (Date.now() - lastSignal < stallTimeoutMs) return;
+      // Reset the baseline before calling into React so rapid repeated timer
+      // ticks cannot consume both retries for the same stalled frame.
+      embedLoadStartedAtRef.current = Date.now();
+      handlePlayerError(`${getProviderDisplayName(observedEmbedProvider)} stopped reporting playback; retrying this player.`);
+    }, 2500);
+
+    return () => window.clearInterval(interval);
+  }, [
+    activeEpisodeId, playbackSourceIndex, playerRetryKey,
+    observedEmbedProvider, observedEmbedSource?.type, observedEmbedSource?.url,
+    isFallbackActive, handlePlayerError,
   ]);
 
   const playerAnimeInfo = useMemo(
@@ -885,14 +1092,25 @@ const VideoPlayerSection = () => {
                     <span>{index + 2}</span>
                     <span className="text-[8px] font-semibold opacity-80">{serverName}</span>
                     {!supportsAudio && <span className="text-[7px] font-bold text-amber-300">SUB only</span>}
-                    {failed && <span className="text-[7px] font-bold text-rose-300">Retry</span>}
+                    {providerPlaybackOutcomes[providerName] === "retrying" && <span className="text-[7px] font-bold text-amber-200">Retrying</span>}
+                    {failed && <span className="text-[7px] font-bold text-rose-300">Failed</span>}
                   </span>
                 </Button>
               );
             })}
+            {retryingPlayback?.episodeId === activeEpisodeId && (
+              <span className="self-center px-1 text-[10px] text-amber-200" role="status" aria-live="polite">
+                Reconnecting to current server · attempt {retryingPlayback.attempt}/2…
+              </span>
+            )}
+            {retryingResolution?.episodeId === activeEpisodeId && (
+              <span className="self-center px-1 text-[10px] text-amber-200" role="status" aria-live="polite">
+                Retrying server response · attempt {retryingResolution.attempt}/2…
+              </span>
+            )}
             {failedServerProviderNames.length > 0 && (
               <span className="self-center px-1 text-[10px] text-zinc-500" role="status">
-                Auto-switch tried {failedServerProviderNames.length}; failed servers remain available to retry.
+                Automatically skipped {failedServerProviderNames.length} failed server{failedServerProviderNames.length === 1 ? "" : "s"}. Use Auto to try the server pool again.
               </span>
             )}
             {isLocalBackendEnabled() && !nativeCatalogueComplete && availableProviderNames.length === 0 && (
@@ -907,7 +1125,7 @@ const VideoPlayerSection = () => {
             Provider diagnostics {localProviderStatus ? `· ${localProviderStatus.loadedCount}/${localProviderStatus.providerCount} modules loaded` : isLoadingProviderStatus ? "· checking…" : ""}
           </summary>
           <p className="mt-2 leading-5 text-zinc-500">
-            Loaded means the provider module is present, not that every anime has a playable stream. “URL returned” is not playback proof; AniXo, Megavid, and Cosmic need a trusted player event, while AnimeParadise needs successful HLS playback.
+            Loaded means the provider module is present, not that every anime has a playable stream. “URL returned” is not playback proof; AniXo and Megavid need trusted player events, while AnimeParadise needs successful HLS playback.
           </p>
           <div className="mt-2 max-h-52 space-y-1.5 overflow-y-auto pr-1">
             {(localProviderStatus?.providers || []).map((item) => (
@@ -1047,7 +1265,9 @@ const VideoPlayerSection = () => {
           className="flex aspect-video w-full flex-col items-center justify-center gap-3 rounded-2xl border border-white/[0.06] bg-white/[0.035] text-sm text-zinc-400"
         >
           <span className="h-7 w-7 animate-spin rounded-full border-2 border-rose-400/25 border-t-rose-300" />
-          <span>{activeEpisodeId ? "Finding a playable stream…" : "Preparing episode…"}</span>
+          <span>{retryingResolution?.episodeId === activeEpisodeId
+            ? `Retrying server response · attempt ${retryingResolution.attempt}/2…`
+            : activeEpisodeId ? "Finding a playable stream…" : "Preparing episode…"}</span>
         </div>
         {playerControls}
       </div>
@@ -1077,6 +1297,20 @@ const VideoPlayerSection = () => {
   // Never mount ArtPlayer with an undefined or empty stream response. That
   // transient render happens before useEffect can switch to the fallback player
   // and can crash the entire Next route on slower Android devices.
+  if (retryingResolution?.episodeId === activeEpisodeId) {
+    return (
+      <div className="space-y-3">
+        {playerHeader}
+        <div className="flex aspect-video w-full flex-col items-center justify-center gap-3 rounded-2xl border border-white/[0.06] bg-white/[0.035] text-sm text-zinc-300" role="status" aria-live="polite">
+          <span className="h-7 w-7 animate-spin rounded-full border-2 border-rose-400/25 border-t-rose-300" />
+          <span>Reconnecting to {getProviderDisplayName(currentProviderName)} · attempt {retryingResolution.attempt}/2…</span>
+          <span className="text-xs text-zinc-500">Keeping the same episode and server while we retry.</span>
+        </div>
+        {playerControls}
+      </div>
+    );
+  }
+
   if (hasManualProviderSelection && !useFallback && (streamRequestFailed || manualProviderPlaybackFailed)) {
     const failedProvider = episodeData?.provider || currentProviderName;
     return (
@@ -1101,6 +1335,26 @@ const VideoPlayerSection = () => {
     );
   }
 
+  if (isFallbackActive && fallbackPlaybackFailed) {
+    return (
+      <div className="space-y-3">
+        {playerHeader}
+        <Alert className="rounded-2xl border-rose-300/15 bg-rose-300/[0.04] text-zinc-200">
+          <AlertCircle className="h-4 w-4 text-rose-300" />
+          <AlertTitle className="font-bold">Playback could not recover</AlertTitle>
+          <AlertDescription className="mt-1 flex flex-col gap-3 text-sm text-zinc-400">
+            MegaPlay and the available servers could not start this episode after automatic retries. Your latest saved timestamp is kept where a player reported it.
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" onClick={selectAutomaticServer}>Try Auto again</Button>
+            </div>
+            <span className="text-xs text-zinc-500">You can also choose another server below. Embedded providers may not expose a seek command, so exact resume is not guaranteed on every iframe.</span>
+          </AlertDescription>
+        </Alert>
+        {playerControls}
+      </div>
+    );
+  }
+
   if (isFallbackActive || (streamRequestFailed && !hasManualProviderSelection)) {
     const fallbackAnimeId = animeIdParam || anime?.anime?.info?.id || "1";
     const fallbackEpId = currentEpNumber || "1";
@@ -1110,7 +1364,8 @@ const VideoPlayerSection = () => {
         {playerHeader}
         <PlayerViewport title="MegaPlay video player">
           <iframe
-            key={`${fallbackAnimeId}-${fallbackEpId}-${activeCategory}`}
+            ref={externalEmbedFrameRef}
+            key={`${fallbackAnimeId}-${fallbackEpId}-${activeCategory}:${playerRetryKey}`}
             src={fallbackSrc}
             title={`${anime?.anime?.info?.name || "Anime"} episode ${currentEpNumber} via MegaPlay`}
             width="100%"
@@ -1137,7 +1392,7 @@ const VideoPlayerSection = () => {
         <PlayerViewport title={`${getProviderDisplayName(embedProvider)} video player`}>
           <iframe
             ref={externalEmbedFrameRef}
-            key={firstResolvedSource.url}
+            key={`${firstResolvedSource.url}:${playerRetryKey}`}
             src={firstResolvedSource.url}
             title={`${anime?.anime?.info?.name || "Anime"} episode ${currentEpNumber} via ${getProviderDisplayName(embedProvider)}`}
             width="100%"
@@ -1151,9 +1406,7 @@ const VideoPlayerSection = () => {
           />
         </PlayerViewport>
         <p className="text-xs text-zinc-500">
-          {embedProvider === "cosmic"
-            ? "Cosmic Player wraps MegaPlay-backed streams. Use this server to compare the player interface; it is not an independent upstream source."
-            : `Embedded source: ${getProviderDisplayName(embedProvider)}. External top-level navigation is blocked by Android.`}
+          {`Embedded source: ${getProviderDisplayName(embedProvider)}. External top-level navigation is blocked by Android.`}
         </p>
         {playerControls}
       </div>
@@ -1199,7 +1452,7 @@ const VideoPlayerSection = () => {
       {playerHeader}
       <PlayerViewport title="7xAnime video player">
         <VideoPlayer
-          key={selectedPlaybackSource.url}
+          key={`${selectedPlaybackSource.url}:${playerRetryKey}`}
           className="!h-full !min-h-0 !max-h-none !aspect-auto"
           episodeInfo={{ ...episodeData, sources: [selectedPlaybackSource] }}
           serversData={{

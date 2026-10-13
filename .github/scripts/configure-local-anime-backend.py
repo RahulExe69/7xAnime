@@ -247,6 +247,12 @@ def patch_manifest() -> None:
             text,
             count=1,
         )
+    if "android.permission.REQUEST_INSTALL_PACKAGES" not in text:
+        text = text.replace(
+            "<application",
+            '    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />\n\n    <application',
+            1,
+        )
     if "android:usesCleartextTraffic=" not in text:
         text = re.sub(
             r"<application\b",
@@ -258,8 +264,36 @@ def patch_manifest() -> None:
         fail("Could not add Android INTERNET permission.")
     if "android:usesCleartextTraffic=" not in text:
         fail("Could not enable loopback HTTP for the local API.")
-    path.write_text(text, encoding="utf-8")
 
+    provider_authority = '"${applicationId}.fileprovider"'
+    if provider_authority not in text:
+        provider = """
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+"""
+        if "</application>" not in text:
+            fail("Could not locate AndroidManifest application terminator for FileProvider.")
+        text = text.replace("</application>", provider + "    </application>", 1)
+
+    path_source = ROOT / "android-local-backend/file_paths.xml"
+    if not path_source.is_file():
+        fail("The native updater FileProvider path configuration is missing.")
+    path_target = ANDROID / "app/src/main/res/xml/file_paths.xml"
+    path_target.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(path_source, path_target)
+
+    if "android.permission.REQUEST_INSTALL_PACKAGES" not in text:
+        fail("Could not add Android REQUEST_INSTALL_PACKAGES permission.")
+    if provider_authority not in text or "@xml/file_paths" not in text:
+        fail("Could not configure Android FileProvider for update installation.")
+    path.write_text(text, encoding="utf-8")
 
 def add_import(text: str, import_statement: str) -> str:
     if import_statement in text:
@@ -459,7 +493,6 @@ def copy_python_source() -> None:
         "anixo": "android-local-backend/extra-providers/anixo.py",
         "megavid": "android-local-backend/extra-providers/megavid.py",
         "animeparadise": "android-local-backend/extra-providers/animeparadise.py",
-        "cosmic": "android-local-backend/extra-providers/cosmic.py",
         "megaflix": "android-local-backend/extra-providers/megaflix.py",
         "tryembed": "android-local-backend/extra-providers/tryembed.py",
         "cinexstream": "android-local-backend/extra-providers/cinexstream.py",
@@ -522,7 +555,7 @@ def copy_python_source() -> None:
 
     # These added adapters are selectable manually during verification; local_api.py
     # excludes them from Auto so route construction cannot masquerade as playback.
-    for provider_name in ("anixo", "megavid", "animeparadise", "cosmic", "megaflix", "tryembed", "cinexstream", "nontongo"):
+    for provider_name in ("anixo", "megavid", "animeparadise", "megaflix", "tryembed", "cinexstream", "nontongo"):
         if f'"{provider_name}"' not in ranking_block:
             ranking_block = ranking_block.rstrip().rstrip(",") + f', "{provider_name}"'
     race_text = race_text[:ranking_match.start(1)] + ranking_block + race_text[ranking_match.end(1):]
@@ -562,6 +595,54 @@ def copy_python_source() -> None:
         py_compile.compile(str(provider_file), doraise=True)
 
 
+
+def install_update_bridge(main_activity: Path) -> None:
+    """Expose a narrowly scoped native bridge for official APK update installation."""
+    text = main_activity.read_text(encoding="utf-8")
+    text = add_import(text, "import com.sevenx.anime.UpdateBridge;")
+
+    class_match = re.search(r"class\s+MainActivity\s+extends\s+BridgeActivity\s*\{", text)
+    if not class_match:
+        fail("Could not locate MainActivity for native update bridge setup.")
+    field = "private UpdateBridge updateBridge;"
+    if field not in text:
+        text = text[:class_match.end()] + "\n    " + field + "\n" + text[class_match.end():]
+
+    if 'addJavascriptInterface(updateBridge, "Android")' not in text:
+        super_call = re.search(r"super\.onCreate\s*\(\s*savedInstanceState\s*\)\s*;", text)
+        if not super_call:
+            fail("Could not locate MainActivity.onCreate super call for update bridge setup.")
+        statement = (
+            "\n        updateBridge = new UpdateBridge(this);"
+            "\n        if (getBridge() != null && getBridge().getWebView() != null) {"
+            '\n            getBridge().getWebView().addJavascriptInterface(updateBridge, "Android");'
+            '\n            getBridge().getWebView().addJavascriptInterface(updateBridge, "AndroidBridge");'
+            "\n        }"
+        )
+        position = super_call.end()
+        text = text[:position] + statement + text[position:]
+
+    on_resume = re.search(r"void\s+onResume\s*\([^)]*\)\s*\{", text)
+    if not on_resume:
+        close = text.rfind("}")
+        method = (
+            "\n    @Override\n"
+            "    protected void onResume() {\n"
+            "        super.onResume();\n"
+            "        if (updateBridge != null) updateBridge.resumePendingInstall();\n"
+            "    }\n"
+        )
+        text = text[:close] + method + text[close:]
+    elif "updateBridge.resumePendingInstall()" not in text:
+        open_index = text.find("{", on_resume.start())
+        close_index = matching_brace(text, open_index)
+        body = text[open_index + 1:close_index]
+        super_resume = re.search(r"super\.onResume\s*\(\s*\)\s*;", body)
+        insert_at = open_index + 1 + super_resume.end() if super_resume else open_index + 1
+        text = text[:insert_at] + "\n        if (updateBridge != null) updateBridge.resumePendingInstall();\n" + text[insert_at:]
+
+    main_activity.write_text(text, encoding="utf-8")
+
 def main() -> None:
     if not ANDROID.is_dir():
         fail("The generated android/ directory is missing; generate Android with Capacitor first.")
@@ -579,6 +660,7 @@ def main() -> None:
         "AdblockFilterEngine.java": ROOT / "android-local-backend/AdblockFilterEngine.java",
         "StreamingWebChromeClient.java": ROOT / "android-local-backend/StreamingWebChromeClient.java",
         "PlayerFullscreenPlugin.java": ROOT / "android-local-backend/PlayerFullscreenPlugin.java",
+        "UpdateBridge.java": ROOT / "android-local-backend/UpdateBridge.java",
     }
     for filename, source in native_sources.items():
         if not source.is_file():
@@ -597,6 +679,7 @@ def main() -> None:
     install_service_worker_filter(candidates[0])
     install_streaming_chrome_client(candidates[0])
     install_adblock_filter_engine(candidates[0])
+    install_update_bridge(candidates[0])
 
     print("Configured 7xAnime with maintained filter-list blocking, domain fallback, popup protection, and fullscreen support.")
 

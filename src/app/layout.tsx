@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import localFont from "next/font/local";
 
 import NavBar from "@/components/navbar";
+import ForceUpdateGate from "@/components/force-update-gate";
 import Footer from "@/components/footer";
 import NativeBackHandler from "@/components/native-back-handler";
 import Script from "next/script";
@@ -81,7 +82,7 @@ export default function RootLayout({
         <link rel="icon" href="/brand/7xanime-icon.png" type="image/png" />
       </head>
       <body
-        className={`${geistSans.className} antialiased max-w-[100vw] overflow-x-clip bg-background text-foreground`}
+        className={`${geistSans.className} antialiased max-w-[100vw] overflow-x-clip bg-background text-foreground pb-[calc(4.5rem+env(safe-area-inset-bottom))] lg:pb-0`}
       >
         <ThemeProvider
           attribute="class"
@@ -91,6 +92,7 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <QueryProvider>
+            <ForceUpdateGate />
             <Suspense fallback={null}>
               <NativeBackHandler />
             </Suspense>

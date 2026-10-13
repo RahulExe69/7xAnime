@@ -36,7 +36,7 @@ jobs:
 
       - name: Validate backend bootstrap scripts
         run: |
-          python3 -m py_compile pocketbase/init-collections.py .github/scripts/configure-capacitor-android.py .github/scripts/configure-local-anime-backend.py android-local-backend/local_api.py
+          python3 -m py_compile pocketbase/init-collections.py .github/scripts/configure-capacitor-android.py .github/scripts/configure-local-anime-backend.py .github/scripts/configure-release-signing.py android-local-backend/local_api.py
           sh -n pocketbase/entrypoint.sh
           bash -n .github/scripts/fetch-kuhi-backend.sh
 
