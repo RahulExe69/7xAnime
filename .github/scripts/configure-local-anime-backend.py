@@ -459,7 +459,6 @@ def copy_python_source() -> None:
         "anixo": "android-local-backend/extra-providers/anixo.py",
         "megavid": "android-local-backend/extra-providers/megavid.py",
         "animeparadise": "android-local-backend/extra-providers/animeparadise.py",
-        "cosmic": "android-local-backend/extra-providers/cosmic.py",
         "megaflix": "android-local-backend/extra-providers/megaflix.py",
         "tryembed": "android-local-backend/extra-providers/tryembed.py",
         "cinexstream": "android-local-backend/extra-providers/cinexstream.py",
@@ -522,7 +521,7 @@ def copy_python_source() -> None:
 
     # These added adapters are selectable manually during verification; local_api.py
     # excludes them from Auto so route construction cannot masquerade as playback.
-    for provider_name in ("anixo", "megavid", "animeparadise", "cosmic", "megaflix", "tryembed", "cinexstream", "nontongo"):
+    for provider_name in ("anixo", "megavid", "animeparadise", "megaflix", "tryembed", "cinexstream", "nontongo"):
         if f'"{provider_name}"' not in ranking_block:
             ranking_block = ranking_block.rstrip().rstrip(",") + f', "{provider_name}"'
     race_text = race_text[:ranking_match.start(1)] + ranking_block + race_text[ranking_match.end(1):]
