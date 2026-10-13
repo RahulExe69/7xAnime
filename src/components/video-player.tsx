@@ -809,6 +809,12 @@ function VideoPlayer({
         detail = event.message || [event.type, event.details, event.code ? `code ${event.code}` : ""]
           .filter(Boolean).join(": ") || detail;
       }
+      // Save the latest native-player position synchronously before the parent
+      // remounts this source or switches providers. Local progress lookup falls
+      // back to anime + episode number, so a new provider can restore this point.
+      if (art.duration > 0 && Number.isFinite(art.currentTime)) {
+        void persistWatchProgress(art.currentTime, art.duration);
+      }
       onError?.(detail);
     });
 
