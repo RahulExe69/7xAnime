@@ -880,13 +880,13 @@ const VideoPlayerSection = () => {
   }, [
     activeEpisodeId, advanceAfterSourceFailure, currentProviderName,
     episodeData?.provider, episodeData?.sources, flushLatestEmbedProgress,
-    hasManualProviderSelection, playbackSourceIndex, retryEpisodeData, useFallback,
+    hasManualProviderSelection, playbackSourceIndex, retryEpisodeData, isFallbackActive,
   ]);
 
   const handlePlayerPlaybackReady = useCallback(() => {
     playbackRetriesRef.current = { key: `${activeEpisodeId}|${playbackSourceIndex}`, count: 0 };
     setRetryingPlayback(null);
-    const providerKey = useFallback ? "megaplay" : episodeData?.provider || currentProviderName;
+    const providerKey = isFallbackActive ? "megaplay" : episodeData?.provider || currentProviderName;
     if (providerKey && providerKey !== "auto") {
       setProviderPlaybackOutcomes((previous) => ({ ...previous, [providerKey]: "playing" }));
     }
