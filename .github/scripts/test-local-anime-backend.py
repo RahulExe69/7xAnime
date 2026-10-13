@@ -10,7 +10,7 @@ from unittest.mock import AsyncMock, patch
 from fastapi.testclient import TestClient
 
 import local_api
-from src.providers import animenosub, anixo, animeparadise, cinexstream, cosmic, megaflix, megavid, nontongo, tryembed
+from src.providers import animenosub, anixo, animeparadise, cinexstream, megaflix, megavid, nontongo, tryembed
 
 
 class LocalAnimeApiTests(unittest.TestCase):
@@ -237,7 +237,7 @@ class LocalAnimeApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200, response.text)
         payload = response.json()
         self.assertEqual(payload["loadedCount"], 1)
-        self.assertEqual(payload["providerCount"], 8)
+        self.assertEqual(payload["providerCount"], 7)
         self.assertEqual(payload["providers"][0]["status"], "recent_attempt_succeeded")
         self.assertEqual(payload["providers"][1]["status"], "module_unavailable")
         self.assertIn("not a live guarantee", payload["note"])
@@ -530,26 +530,6 @@ class LocalAnimeApiTests(unittest.TestCase):
 
         asyncio.run(exercise())
 
-    def test_cosmic_returns_its_player_embed_without_network(self) -> None:
-        context = {
-            "media": {"id": 21, "episodes": 12, "title": {"english": "Test Series"}},
-            "anizip": None,
-        }
-
-        async def exercise() -> None:
-            sources = await cosmic.watch(21, "dub", 7, context)
-            self.assertEqual(sources[0]["type"], "embed")
-            self.assertEqual(sources[0]["url"], "https://cosmic-api-azure.vercel.app/embeds/21/7")
-            self.assertEqual(sources[0]["server"], "Cosmic Player")
-            self.assertEqual(sources[0]["upstream"], "cosmic")
-
-            episodes = await cosmic.get_episodes(21, context)
-            self.assertEqual(len(episodes["episodes"]["sub"]), 12)
-            self.assertEqual(len(episodes["episodes"]["dub"]), 12)
-            self.assertEqual(episodes["episodes"]["dub"][6]["id"], "watch/cosmic/21/dub/cosmic-7")
-
-        asyncio.run(exercise())
-
     def test_yomi_server_adapters_construct_documented_embed_routes_without_network(self) -> None:
         context = {
             "media": {"id": 21, "episodes": 12, "title": {"english": "Test Series"}},
@@ -558,7 +538,7 @@ class LocalAnimeApiTests(unittest.TestCase):
 
         async def exercise() -> None:
             cases = [
-                (megaflix, "dub", 2, "https://www.megaflix.buzz/stream/ani/21/2/dub", "MegaFlix"),
+                (megaflix, "dub", 2, "https://www.megaflix.buzz/stream/ani/21/2/dub?color=%23ff3b72&autoplay=true", "MegaFlix"),
                 (tryembed, "sub", 3, "https://tryembed.us.cc/embed/anime/21/3/sub", "TryEmbed"),
                 (cinexstream, "dub", 4, "https://cinextream.cc/api/embed/anime/dub/21/4?color=7c6ee0", "CinexStream"),
                 (nontongo, "sub", 5, "https://nontongo.win/anime/21/5/play", "NontonGo"),
@@ -600,7 +580,7 @@ class LocalAnimeApiTests(unittest.TestCase):
             self.assertEqual(response.status_code, 200, response.text)
             payload = response.json()
             self.assertEqual(payload["providerStatus"], "ok")
-            self.assertEqual(payload["streams"][0]["url"], "https://www.megaflix.buzz/stream/ani/21/43/dub")
+            self.assertEqual(payload["streams"][0]["url"], "https://www.megaflix.buzz/stream/ani/21/43/dub?color=%23ff3b72&autoplay=true")
             context_lookup.assert_not_awaited()
 
         asyncio.run(exercise())
@@ -616,7 +596,7 @@ class LocalAnimeApiTests(unittest.TestCase):
             with (
                 patch.object(local_api.provider_race, "providers", return_value=[
                     ("anineko", object()), ("anixo", anixo), ("megavid", megavid),
-                    ("animeparadise", animeparadise), ("cosmic", cosmic),
+                    ("animeparadise", animeparadise),
                     ("megaflix", megaflix), ("tryembed", tryembed),
                     ("cinexstream", cinexstream), ("nontongo", nontongo),
                 ]),
