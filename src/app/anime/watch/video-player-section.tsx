@@ -812,10 +812,22 @@ const VideoPlayerSection = () => {
     setFallbackPlaybackFailed(false);
     playbackRetriesRef.current = { key: `${activeEpisodeId}|0`, count: 0 };
     setRetryingPlayback(null);
+    setRetryingResolution(null);
+    setManualProviderPlaybackFailed(false);
+    setPlaybackSourceIndex(0);
+    resolutionRetriesRef.current = {};
+    resolutionRetryInFlightRef.current = null;
+    if (resolutionRetryReleaseTimerRef.current !== null) {
+      window.clearTimeout(resolutionRetryReleaseTimerRef.current);
+      resolutionRetryReleaseTimerRef.current = null;
+    }
+    // An explicit "Try Auto again" is a fresh attempt: clear the provider
+    // quarantine set so previously failed servers can be tested again.
+    attemptedSourceIdsRef.current.clear();
+    setProviderPlaybackOutcomes({});
     setIsHindiMode(false);
     setUseFallback(false);
     const targetId = `watch/auto/${animeIdParam}/${activeCategory}/episode-${currentEpNumber}`;
-    attemptedSourceIdsRef.current.delete(targetId);
     setSelectedEpisode(targetId);
     updateEpisodeUrl(targetId, currentEpNumber);
   };
