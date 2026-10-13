@@ -847,7 +847,7 @@ const VideoPlayerSection = () => {
     // If this provider supplied alternate URLs, try those next. The current URL
     // itself has already received two recovery attempts.
     const nextSourceIndex = playbackSourceIndex + 1;
-    if (episodeData?.sources?.[nextSourceIndex]?.url) {
+    if (!isFallbackActive && episodeData?.sources?.[nextSourceIndex]?.url) {
       playbackRetriesRef.current = { key: `${activeEpisodeId}|${nextSourceIndex}`, count: 0 };
       setLastPlayerError(detail || null);
       setPlaybackSourceIndex(nextSourceIndex);
@@ -1087,7 +1087,7 @@ const VideoPlayerSection = () => {
             )}
             {failedServerProviderNames.length > 0 && (
               <span className="self-center px-1 text-[10px] text-zinc-500" role="status">
-                Automatically skipped {failedServerProviderNames.length} failed server{failedServerProviderNames.length === 1 ? "" : "s"}; tap a server to test it again.
+                Automatically skipped {failedServerProviderNames.length} failed server{failedServerProviderNames.length === 1 ? "" : "s"}. Use Auto to try the server pool again.
               </span>
             )}
             {isLocalBackendEnabled() && !nativeCatalogueComplete && availableProviderNames.length === 0 && (
