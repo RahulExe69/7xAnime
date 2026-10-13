@@ -969,7 +969,8 @@ const VideoPlayerSection = () => {
 
       const playbackObserved =
         ["aniembed:play", "aniembed:ended"].includes(String(payload.type || "").toLowerCase()) ||
-        ["play", "playing", "time", "progress", "timeupdate", "watching-log", "complete"].includes(eventType);
+        ["play", "playing", "pause", "paused", "ready", "seek", "buffer", "buffering", "loadedmetadata", "time", "progress", "timeupdate", "watching-log", "complete"].includes(eventType) ||
+        ["playing", "paused", "buffering", "ready"].includes(status);
       if (playbackObserved) {
         lastEmbedSignalAtRef.current = Date.now();
         playbackRetriesRef.current = { key: `${activeEpisodeId}|${playbackSourceIndex}`, count: 0 };
@@ -995,8 +996,10 @@ const VideoPlayerSection = () => {
   // Known event-reporting iframe players (MegaPlay, AniXo, Megavid, MegaFlix)
   // should emit playback/progress signals. If their page remains stuck on an
   // upstream error or interstitial and never reports progress, retry the same
-  // iframe twice before switching providers. We cannot inspect/click inside a
-  // cross-origin iframe, so this watchdog relies on its documented event API.
+  // iframe twice before switching providers. MegaFlix gets a shorter timeout
+  // because its upstream currently returns an endpoint error page; other embeds
+  // get more startup time. We cannot inspect/click inside a cross-origin iframe,
+  // so this watchdog relies on documented player events.
   useEffect(() => {
     const watchedProviders = ["megaplay", "anixo", "megavid", "megaflix"];
     if (
@@ -1009,7 +1012,8 @@ const VideoPlayerSection = () => {
     lastEmbedSignalAtRef.current = 0;
     const interval = window.setInterval(() => {
       const lastSignal = Math.max(embedLoadStartedAtRef.current, lastEmbedSignalAtRef.current);
-      if (Date.now() - lastSignal < 18000) return;
+      const stallTimeoutMs = observedEmbedProvider === "megaflix" ? 10000 : 18000;
+      if (Date.now() - lastSignal < stallTimeoutMs) return;
       // Reset the baseline before calling into React so rapid repeated timer
       // ticks cannot consume both retries for the same stalled frame.
       embedLoadStartedAtRef.current = Date.now();
