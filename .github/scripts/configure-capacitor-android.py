@@ -407,6 +407,16 @@ foreground_output.write_bytes(foreground_bytes)
 if foreground_output.read_bytes() != foreground_bytes:
     splash_fail("Splash foreground PNG differs from the approved 7x product source.")
 
+# Pre-Android 12 uses a layer-list rather than the OS splash icon slot. Create a
+# modestly sized transparent copy for that legacy composition, while the Android 12+
+# windowSplashScreenAnimatedIcon continues to use the original 1080px source PNG.
+legacy_foreground_output = portrait_dir / "splash_foreground_legacy.png"
+with Image.open(splash_foreground) as approved_foreground:
+    legacy_foreground = approved_foreground.convert("RGBA")
+    resampling = getattr(Image, "Resampling", Image).LANCZOS
+    legacy_foreground = legacy_foreground.resize((512, 512), resampling)
+    legacy_foreground.save(legacy_foreground_output, format="PNG", optimize=True)
+
 composed_splash = portrait_dir / "splash_composed.xml"
 composed_splash.write_text(
     '''<?xml version="1.0" encoding="utf-8"?>
@@ -414,7 +424,7 @@ composed_splash.write_text(
     <item android:drawable="@drawable/splash_background" />
     <item>
         <bitmap
-            android:src="@drawable/splash_foreground"
+            android:src="@drawable/splash_foreground_legacy"
             android:gravity="center"
             android:filter="true" />
     </item>
