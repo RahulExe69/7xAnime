@@ -331,5 +331,6 @@ export default function ForceUpdateGate() {
           </footer>
         )}
       </section>
-    </div  );
+    </div>
+  );
 }
