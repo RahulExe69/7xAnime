@@ -469,6 +469,57 @@ for styles in style_files:
     animated_icon_refs += icon_count
     background_color_refs += color_count
 
+# Capacitor 8's generated launch theme inherits Theme.SplashScreen but only
+# includes android:background. The AndroidX SplashScreen attributes are not
+# present in the template, so replacement-only logic silently has nothing to
+# replace. Explicitly create/update them in the launch theme and restore the
+# regular app theme after the system splash is dismissed.
+launch_style_pattern = re.compile(
+    r'(?P<opening><style\\b(?=[^>]*\\bname=["\\']AppTheme\\.NoActionBarLaunch["\\'])[^>]*>)'
+    r'(?P<body>.*?)'
+    r'(?P<closing></style>)',
+    re.DOTALL,
+)
+required_launch_items = (
+    ("windowSplashScreenAnimatedIcon", "@drawable/splash_foreground"),
+    ("windowSplashScreenBackground", "#1E0D1B"),
+    ("postSplashScreenTheme", "@style/AppTheme.NoActionBar"),
+)
+
+def configure_launch_style(match: re.Match[str]) -> str:
+    body = match.group("body")
+    for item_name, item_value in required_launch_items:
+        item_pattern = re.compile(
+            r'(<item\\b(?=[^>]*\\bname=["\\'](?:android:)?'
+            + re.escape(item_name)
+            + r'["\\'])[^>]*>).*?(</item>)',
+            re.DOTALL,
+        )
+        body, replaced = item_pattern.subn(
+            lambda item: item.group(1) + item_value + item.group(2),
+            body,
+            count=1,
+        )
+        if replaced == 0:
+            body = body.rstrip() + (
+                f'\\n        <item name="{item_name}">{item_value}</item>\\n    '
+            )
+    return match.group("opening") + body + match.group("closing")
+
+launch_styles_configured = 0
+for styles in style_files:
+    styles_text = styles.read_text(encoding="utf-8")
+    styles_text, configured_count = launch_style_pattern.subn(
+        configure_launch_style,
+        styles_text,
+    )
+    if configured_count:
+        styles.write_text(styles_text, encoding="utf-8")
+        launch_styles_configured += configured_count
+
+if launch_styles_configured == 0:
+    splash_fail("Could not find AppTheme.NoActionBarLaunch to configure AndroidX splash attributes.")
+
 if legacy_refs < 1 and not any(
     "@drawable/splash_composed" in styles.read_text(encoding="utf-8") for styles in style_files
 ):
@@ -476,10 +527,6 @@ if legacy_refs < 1 and not any(
 if animated_icon_refs < 1 and not any(
     "@drawable/splash_foreground" in styles.read_text(encoding="utf-8") for styles in style_files
 ):
-    print("DEBUG: generated Android style/theme files inspected for splash icon:", file=sys.stderr)
-    for styles in style_files:
-        print(f"--- {styles} ---", file=sys.stderr)
-        print(styles.read_text(encoding="utf-8"), file=sys.stderr)
     splash_fail("Could not find or configure the Android splash foreground icon.")
 if background_color_refs < 1 and not any(
     re.search(r'<item\s+name="windowSplashScreenBackground">\s*#1E0D1B\s*</item>', styles.read_text(encoding="utf-8"))
