@@ -41,7 +41,7 @@ const SORT_PRESETS = [
   { value: "trending", label: "Trending Now", mode: "collection", icon: TrendingUp },
   { value: "score", label: "Highest Rated", mode: "sort", icon: Sparkles },
   { value: "recently-added", label: "Newest First", mode: "sort", icon: CalendarDays },
-  { value: "most-watched", label: "Most Watched", mode: "sort", icon: BarChart3 },
+  { value: "most-episodes", label: "Most Episodes", mode: "sort", icon: BarChart3 },
 ];
 
 function AnimeResultCard({ anime }: { anime: IAnime }) {
