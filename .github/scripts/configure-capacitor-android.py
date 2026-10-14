@@ -111,7 +111,7 @@ def env_bool(name: str, default: bool) -> bool:
 
 release_minify = env_bool("ANDROID_RELEASE_MINIFY", True)
 release_shrink = env_bool("ANDROID_RELEASE_SHRINK_RESOURCES", True)
-minify_pattern = r"(?m)^(\\s*)minifyEnabled\\s+(?:true|false)\\s*$"
+minify_pattern = r"(?m)^(\s*)minifyEnabled\s+(?:true|false)\s*$"
 text, minify_count = re.subn(
     minify_pattern,
     lambda match: match.group(1) + "minifyEnabled " + str(release_minify).lower(),
@@ -122,7 +122,7 @@ if minify_count != 1:
     print("ERROR: could not configure the generated release minifyEnabled setting.", file=sys.stderr)
     raise SystemExit(1)
 
-shrink_pattern = r"(?m)^(\\s*)shrinkResources\\s+(?:true|false)\\s*$"
+shrink_pattern = r"(?m)^(\s*)shrinkResources\s+(?:true|false)\s*$"
 if re.search(shrink_pattern, text):
     text, shrink_count = re.subn(
         shrink_pattern,
@@ -133,7 +133,7 @@ if re.search(shrink_pattern, text):
 else:
     text, shrink_count = re.subn(
         minify_pattern,
-        lambda match: match.group(0) + "\\n" + match.group(1) + "shrinkResources " + str(release_shrink).lower(),
+        lambda match: match.group(0) + "\n" + match.group(1) + "shrinkResources " + str(release_shrink).lower(),
         text,
         count=1,
     )
@@ -145,13 +145,13 @@ if shrink_count != 1:
 # across optimization. The rules file is copied into the generated app by the
 # local-backend configurator.
 proguard_rules = "proguard-7xanime-rules.pro"
-proguard_lines = re.findall(r"(?m)^\\s*proguardFiles\\s+[^\\n]+", text)
+proguard_lines = re.findall(r"(?m)^\s*proguardFiles\s+[^\n]+", text)
 if not proguard_lines:
     print("ERROR: could not locate release proguardFiles declaration.", file=sys.stderr)
     raise SystemExit(1)
 if proguard_rules not in proguard_lines[0]:
     text, rules_count = re.subn(
-        r"(?m)^(\\s*proguardFiles\\s+[^\\n]+)$",
+        r"(?m)^(\s*proguardFiles\s+[^\n]+)$",
         lambda match: match.group(1) + ", '" + proguard_rules + "'",
         text,
         count=1,
