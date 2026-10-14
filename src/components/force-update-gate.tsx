@@ -10,6 +10,7 @@ type ReleaseAsset = { name?: string; size?: number; browser_download_url?: strin
 type LatestRelease = { tag_name?: string; body?: string; published_at?: string; assets?: ReleaseAsset[] };
 type NativeUpdateBridge = {
   getAppVersionName?: () => string;
+  getSupportedAbis?: () => string;
   downloadAndInstallUpdate?: (url: string, version: string) => void;
   installDownloadedUpdate?: () => void;
   openInstallPermissionSettings?: () => void;
@@ -105,9 +106,21 @@ export default function ForceUpdateGate() {
         if (!response.ok) throw new Error("Release API returned HTTP " + response.status + ".");
         const release = (await response.json()) as LatestRelease;
         const tag = typeof release.tag_name === "string" ? release.tag_name : "";
-        const apk = Array.isArray(release.assets)
-          ? release.assets.find((asset) => asset.name?.toLowerCase().endsWith(".apk") && !!asset.browser_download_url)
-          : undefined;
+        const apkAssets = Array.isArray(release.assets)
+          ? release.assets.filter((asset) => asset.name?.toLowerCase().endsWith(".apk") && !!asset.browser_download_url)
+          : [];
+        const supportedAbis = (getBridge()?.getSupportedAbis?.() || "")
+          .split(",")
+          .map((abi) => abi.trim().toLowerCase())
+          .filter(Boolean);
+        const architectureApk = supportedAbis
+          .map((abi) => apkAssets.find((asset) => asset.name?.toLowerCase().endsWith(`-${abi}.apk`)))
+          .find((asset) => !!asset);
+        // Keep the unsuffixed universal APK as a fallback for older releases,
+        // older native bridges, and devices without a matching architecture asset.
+        const universalApk = apkAssets.find((asset) =>
+          !/-(?:arm64-v8a|x86_64|armeabi-v7a|x86)\.apk$/i.test(asset.name || ""));
+        const apk = architectureApk || universalApk;
         if (!/^v?\d+\.\d+\.\d+(?:[-+][0-9a-z.-]+)?$/i.test(tag) || !apk?.browser_download_url) {
           throw new Error("The latest published release does not contain a valid versioned APK.");
         }

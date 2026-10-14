@@ -40,6 +40,17 @@ A source tag such as v1.0.4 also triggers a release build. Do not publish a lowe
 
 The existing debug workflow still emits a debug APK with package ID com.sevenx.anime.debug, so it can be installed beside the production app. Official APKs use com.sevenx.anime and the persistent release key. Debug APKs are not published to the public release repository.
 
+## Release architecture and size optimization
+
+Each official release publishes two signed APKs using the same package ID, version code, and permanent signing key:
+
+- `7xAnime-vX.Y.Z.apk` is the universal build containing `arm64-v8a` and `x86_64`. It is uploaded first to preserve compatibility with older updater code that selects the first APK asset.
+- `7xAnime-vX.Y.Z-arm64-v8a.apk` contains only the ARM64 native runtime and libraries and is preferred by current Android builds when the device reports `arm64-v8a`.
+
+The current updater asks the native bridge for Android's supported ABI order and picks a matching architecture asset. If no matching asset exists, it falls back to the unsuffixed universal APK. Releases also enable R8 minification and Android resource shrinking with narrow keep rules for the JavaScript bridge and Capacitor plugins.
+
+Pull-request CI runs a size comparison using the same source tree: an unoptimized universal release build, an R8/resource-shrunk universal build, and an R8/resource-shrunk ARM64 build. The comparison artifacts are unsigned and are only for measurement; they must never be published as official releases. The report separates the savings from code/resource shrinking from the savings from excluding x86-64 runtime files.
+
 ## Troubleshooting
 
 - If the release workflow fails immediately, verify all five secrets exist and that the PAT has write access to 7xAnime-Releases.

@@ -56,6 +56,18 @@ public final class UpdateBridge {
         } catch (Exception e) { return 0; }
     }
 
+    /** Return the device ABI preference order for architecture-specific release assets. */
+    @JavascriptInterface
+    public String getSupportedAbis() {
+        StringBuilder result = new StringBuilder();
+        for (String abi : Build.SUPPORTED_ABIS) {
+            if (abi == null || abi.isEmpty()) continue;
+            if (result.length() > 0) result.append(',');
+            result.append(abi);
+        }
+        return result.toString();
+    }
+
     @JavascriptInterface
     public synchronized void downloadAndInstallUpdate(final String rawUrl, final String version) {
         if (downloading) {

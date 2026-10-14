@@ -162,6 +162,10 @@ jobs:
               raise SystemExit("Maintained adblock-rust Android dependency is missing")
           if "getDefaultProguardFile('proguard-android-optimize.txt')" not in app_gradle and 'getDefaultProguardFile("proguard-android-optimize.txt")' not in app_gradle:
               raise SystemExit("AGP 9 ProGuard default compatibility patch is missing")
+          if "minifyEnabled true" not in app_gradle or "shrinkResources true" not in app_gradle:
+              raise SystemExit("Release builds must enable R8 minification and Android resource shrinking")
+          if "proguard-7xanime-rules.pro" not in app_gradle or not Path("android/app/proguard-7xanime-rules.pro").is_file():
+              raise SystemExit("7xAnime R8 keep rules were not attached to the generated app")
           capacitor_app_gradle = Path("node_modules/@capacitor/app/android/build.gradle").read_text(encoding="utf-8")
           if "getDefaultProguardFile('proguard-android.txt')" in capacitor_app_gradle or 'getDefaultProguardFile("proguard-android.txt")' in capacitor_app_gradle:
               raise SystemExit("AGP 9 legacy ProGuard default remains in @capacitor/app")
@@ -239,22 +243,22 @@ jobs:
           if '/brand/7xanime-icon.png' not in manifest:
               raise SystemExit("The PWA manifest does not use the approved app icon")
           launcher_dir = Path("android/app/src/main/res/mipmap-nodpi")
-          launcher_names = (
-              "ic_launcher.png",
-              "ic_launcher_round.png",
-              "ic_launcher_static.png",
-              "ic_launcher_static_round.png",
-          )
-          missing_or_changed = [
-              name for name in launcher_names
-              if not (launcher_dir / name).is_file()
-              or (launcher_dir / name).read_bytes() != brand_icon.read_bytes()
+          launcher_icon = launcher_dir / "ic_launcher.png"
+          alias_file = Path("android/app/src/main/res/values/7xanime-launcher-aliases.xml")
+          if not launcher_icon.is_file() or launcher_icon.read_bytes() != brand_icon.read_bytes():
+              raise SystemExit("The single no-crop launcher bitmap must exactly match the approved PNG")
+          if not alias_file.is_file():
+              raise SystemExit("Launcher resource aliases are missing")
+          alias_text = alias_file.read_text(encoding="utf-8")
+          for alias_name in ("ic_launcher_round", "ic_launcher_static", "ic_launcher_static_round"):
+              if f'name="{alias_name}"' not in alias_text or "@mipmap/ic_launcher" not in alias_text:
+                  raise SystemExit(f"Launcher resource alias missing or invalid: {alias_name}")
+          duplicate_launcher_files = [
+              name for name in ("ic_launcher_round.png", "ic_launcher_static.png", "ic_launcher_static_round.png")
+              if (launcher_dir / name).exists()
           ]
-          if missing_or_changed:
-              raise SystemExit(
-                  "No-crop launcher bitmaps must be exact copies of the approved PNG: "
-                  + ", ".join(missing_or_changed)
-              )
+          if duplicate_launcher_files:
+              raise SystemExit("Duplicate launcher PNGs inflate the APK: " + ", ".join(duplicate_launcher_files))
           adaptive_icons = list(Path("android/app/src/main/res").rglob("ic_launcher*.xml"))
           if adaptive_icons:
               raise SystemExit(
@@ -426,6 +430,92 @@ jobs:
         with:
           name: 7xAnime-v${{ env.VERSION_NAME }}-debug-checksum
           path: artifacts/7xAnime-v${{ env.VERSION_NAME }}-debug.apk.sha256
+          if-no-files-found: error
+          retention-days: 30
+
+      # Build unoptimized universal, optimized universal, and optimized ARM64
+      # variants from the same sources to measure each size reduction.
+      - name: Compare release APK size variants
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/size-audit
+
+          build_variant() {
+            local label="$1"
+            local abis="$2"
+            local minify="$3"
+            local shrink="$4"
+            echo "::group::Build ${label} (ABIs=${abis}, R8=${minify}, resource shrink=${shrink})"
+            export ANDROID_ABI_FILTERS="${abis}"
+            export ANDROID_RELEASE_MINIFY="${minify}"
+            export ANDROID_RELEASE_SHRINK_RESOURCES="${shrink}"
+            python3 .github/scripts/configure-capacitor-android.py
+            python3 .github/scripts/configure-local-anime-backend.py
+            (
+              cd android
+              chmod +x gradlew
+              ./gradlew clean assembleRelease --no-daemon --parallel --build-cache --stacktrace
+            )
+            local apk="android/app/build/outputs/apk/release/app-release.apk"
+            if [[ ! -s "${apk}" ]]; then
+              apk="android/app/build/outputs/apk/release/app-release-unsigned.apk"
+            fi
+            test -s "${apk}"
+            cp "${apk}" "artifacts/size-audit/${label}.apk"
+            echo "Built ${label}: $(stat -c%s "artifacts/size-audit/${label}.apk") bytes"
+            echo "::endgroup::"
+          }
+
+          build_variant "universal-unoptimized" "arm64-v8a,x86_64" "false" "false"
+          build_variant "universal-optimized" "arm64-v8a,x86_64" "true" "true"
+          build_variant "arm64-optimized" "arm64-v8a" "true" "true"
+
+          python3 - <<'PY'
+          from pathlib import Path
+
+          root = Path("artifacts/size-audit")
+          variants = [
+              ("Universal, no R8/resource shrink", "universal-unoptimized.apk"),
+              ("Universal, R8 + resource shrink", "universal-optimized.apk"),
+              ("ARM64, R8 + resource shrink", "arm64-optimized.apk"),
+          ]
+          sizes = [(label, name, (root / name).stat().st_size) for label, name in variants]
+          baseline = sizes[0][2]
+          universal_optimized = sizes[1][2]
+          arm64_optimized = sizes[2][2]
+          def mib(value: int) -> str:
+              return f"{value / 1048576:.2f} MiB"
+          def reduction(before: int, after: int) -> str:
+              return f"{(before - after) / 1048576:.2f} MiB ({(before - after) * 100 / before:.1f}%)"
+          report = [
+              "# 7xAnime APK size comparison",
+              "",
+              "| Variant | Size | Change versus baseline |",
+              "|---|---:|---:|",
+              f"| {sizes[0][0]} | {mib(baseline)} | Baseline |",
+              f"| {sizes[1][0]} | {mib(universal_optimized)} | {reduction(baseline, universal_optimized)} |",
+              f"| {sizes[2][0]} | {mib(arm64_optimized)} | {reduction(baseline, arm64_optimized)} |",
+              "",
+              f"- R8/resource-shrink effect (universal): {reduction(baseline, universal_optimized)}",
+              f"- Architecture split effect (optimized universal → ARM64): {reduction(universal_optimized, arm64_optimized)}",
+              "- These are unsigned release-build size comparisons, not publishable APKs.",
+              "",
+          ]
+          text = "\n".join(report)
+          (root / "REPORT.md").write_text(text, encoding="utf-8")
+          summary = Path(__import__("os").environ["GITHUB_STEP_SUMMARY"])
+          summary.write_text(summary.read_text(encoding="utf-8") + text, encoding="utf-8")
+          print(text)
+          PY
+
+      - name: Upload APK size comparison
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: 7xAnime-v${{ env.VERSION_NAME }}-apk-size-audit
+          path: artifacts/size-audit/
           if-no-files-found: error
           retention-days: 30
 
