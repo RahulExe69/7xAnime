@@ -164,7 +164,7 @@ const SearchResults = () => {
   };
 
   return (
-    <main className="mx-auto flex min-h-[75vh] w-full max-w-[1600px] flex-col gap-4 px-4 pb-20 pt-20 text-white sm:gap-5 sm:px-6 sm:pb-16 sm:pt-28 lg:px-8">
+    <main className="mx-auto flex min-h-[75vh] w-full max-w-[1600px] flex-col gap-4 px-4 pb-20 pt-14 text-white sm:gap-5 sm:px-6 sm:pb-16 sm:pt-28 lg:px-8">
       <header className="flex items-center justify-between gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
@@ -191,7 +191,7 @@ const SearchResults = () => {
         </div>
       </header>
 
-      <nav aria-label="Sort anime" className="anime-shelf-scroll -mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
+      <nav aria-label="Sort anime" className="flex flex-wrap gap-2 px-0 pb-1">
         {SORT_PRESETS.map((preset) => {
           const Icon = preset.icon;
           const active = activePreset === preset.value;
