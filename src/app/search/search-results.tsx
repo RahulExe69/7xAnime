@@ -2,10 +2,10 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import SearchBar from "@/components/search-bar";
 import { BarChart3, Bookmark, CalendarDays, Flame, Search, SearchX, SlidersHorizontal, Sparkles, TrendingUp, X } from "lucide-react";
 import { ROUTES } from "@/constants/routes";
-import AnimeCard from "@/components/anime-card";
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useGetSearchAnimeResults } from "@/query/get-search-results";
@@ -21,7 +21,7 @@ import {
   sort,
   genres,
 } from "@/constants/search-filters";
-import { SearchAnimeParams } from "@/types/anime";
+import { IAnime, SearchAnimeParams } from "@/types/anime";
 import Button from "@/components/common/custom-button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { cn } from "@/lib/utils";
@@ -43,6 +43,33 @@ const SORT_PRESETS = [
   { value: "recently-added", label: "Newest First", mode: "sort", icon: CalendarDays },
   { value: "most-watched", label: "Most Watched", mode: "sort", icon: BarChart3 },
 ];
+
+function AnimeResultCard({ anime }: { anime: IAnime }) {
+  const score = typeof anime.score === "number" && anime.score > 0
+    ? (anime.score > 10 ? anime.score / 10 : anime.score).toFixed(1)
+    : null;
+  const episodes = anime.episodes?.sub || anime.episodes?.dub || 0;
+
+  return (
+    <article className="group min-w-0 overflow-hidden rounded-2xl border border-white/[0.09] bg-[#19070d] shadow-[0_8px_22px_rgba(0,0,0,0.16)] transition hover:border-[#ff3b72]/45 hover:shadow-[0_10px_24px_rgba(255,59,114,0.10)]">
+      <Link href={ROUTES.animeDetails(anime.id)} className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#ff3b72]" aria-label={`View ${anime.name} details`}>
+        <div className="relative aspect-[2/3] w-full overflow-hidden bg-[#210b14]">
+          <Image src={anime.poster || "/brand/7xanime-mark.svg"} alt={anime.name} fill sizes="(max-width: 640px) 46vw, (max-width: 1024px) 28vw, 220px" className="object-cover transition-transform duration-200 group-hover:scale-[1.025]" />
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-[#100309]/65 to-transparent" />
+          {score && <span className="absolute right-2 top-2 inline-flex items-center gap-1 rounded-lg border border-white/10 bg-[#0a0306]/90 px-2 py-1 text-xs font-extrabold text-white shadow backdrop-blur"><span className="text-amber-300">★</span>{score}</span>}
+        </div>
+        <div className="min-h-[82px] p-3">
+          <h2 className="line-clamp-2 text-sm font-extrabold leading-5 tracking-[-0.01em] text-[#fff3f7]">{anime.name}</h2>
+          <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-medium text-[#a99baa]">
+            {score && <span className="inline-flex items-center gap-1 font-bold text-amber-300"><span>★</span>{score}</span>}
+            {anime.type && <span>{anime.type}</span>}
+            {episodes > 0 && <span>· {episodes} ep</span>}
+          </div>
+        </div>
+      </Link>
+    </article>
+  );
+}
 
 const SearchResults = () => {
   const params = useAnimeSearchParams();
@@ -115,7 +142,8 @@ const SearchResults = () => {
       if (key === "page") return;
       if (typeof value === "string" && value.trim() !== "") next.set(key, value);
     });
-    router.push(next.size ? `/search?${next.toString()}` : "/search?collection=popular");
+    const query = next.toString();
+    router.push(query ? `/search?${query}` : "/search?collection=popular");
     setFiltersOpen(false);
   };
 
@@ -239,11 +267,7 @@ const SearchResults = () => {
         </div>
       )}
       <div className="grid w-full grid-cols-2 content-start gap-x-3 gap-y-4 sm:grid-cols-3 sm:gap-4 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7">
-        {searchResults?.animes.map((anime) => (
-          <AnimeCard key={anime.id} title={anime.name} format={anime.type} poster={anime.poster}
-            href={ROUTES.animeDetails(anime.id)} quickWatchHref={ROUTES.watchAnime(anime.id)}
-            episodes={anime.episodes?.sub} score={anime.score} className="w-full min-w-0" showGenre={false} />
-        ))}
+        {searchResults?.animes.map((anime) => <AnimeResultCard key={anime.id} anime={anime} />)}
       </div>
       {searchResults && searchResults.totalPages && (
         <Pagination totalPages={searchResults.totalPages} currentPage={params.page} handleNextPage={handleNextPage}
