@@ -1,9 +1,9 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import SearchBar from "@/components/search-bar";
-import { Bookmark, CalendarDays, CheckCircle2, Flame, Search, SearchX, Sparkles, TrendingUp } from "lucide-react";
+import { Bookmark, CalendarDays, Flame, Search, SearchX, SlidersHorizontal, Sparkles, TrendingUp, X, ChartNoAxesColumnIncreasing } from "lucide-react";
 import { ROUTES } from "@/constants/routes";
 import AnimeCard from "@/components/anime-card";
 
@@ -36,13 +36,12 @@ const COLLECTION_TITLES: Record<string, string> = {
   completed: "Top Completed Series",
 };
 
-const EXPLORE_COLLECTIONS = [
-  { value: "trending", title: "Trending", description: "Popular this week", icon: Flame },
-  { value: "currently-airing", title: "Airing now", description: "Series releasing now", icon: CalendarDays },
-  { value: "popular", title: "Fan favourites", description: "All-time popular picks", icon: TrendingUp },
-  { value: "upcoming", title: "Coming soon", description: "Next season watchlist", icon: Sparkles },
-  { value: "new", title: "New today", description: "Recently updated anime", icon: CheckCircle2 },
-  { value: "completed", title: "Completed", description: "Finished stories to binge", icon: Bookmark },
+const SORT_PRESETS = [
+  { value: "popular", label: "Most Popular", mode: "collection", icon: Flame },
+  { value: "trending", label: "Trending Now", mode: "collection", icon: TrendingUp },
+  { value: "score", label: "Highest Rated", mode: "sort", icon: Sparkles },
+  { value: "recently-added", label: "Newest First", mode: "sort", icon: CalendarDays },
+  { value: "most-watched", label: "Most Watched", mode: "sort", icon: ChartNoAxesColumnIncreasing },
 ];
 
 const SearchResults = () => {
@@ -50,9 +49,18 @@ const SearchResults = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
   const displayPhrase = params.q.replace(/^"+|"+$/g, "").trim();
-  const collectionTitle = params.collection ? COLLECTION_TITLES[params.collection] : undefined;
+  const hasManualFilters = Boolean(params.q || params.type || params.status || params.rated || params.season || params.language || params.genres || params.sort);
+  const requestParams = useMemo(
+    () => (!params.collection && !hasManualFilters ? { ...params, collection: "popular" } : params),
+    [params, hasManualFilters],
+  );
+  const collectionTitle = requestParams.collection ? COLLECTION_TITLES[requestParams.collection] : undefined;
+  const activePreset = requestParams.collection === "popular" || requestParams.collection === "trending"
+    ? requestParams.collection
+    : requestParams.sort || (requestParams.collection === "top-airing" ? "score" : undefined);
 
-  const { data: searchResults, isLoading } = useGetSearchAnimeResults(params);
+  const { data: searchResults, isLoading } = useGetSearchAnimeResults(requestParams);
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   const [filters, setFilters] = React.useState<SearchAnimeParams>({
     q: params.q,
@@ -85,26 +93,30 @@ const SearchResults = () => {
     router.push(`/search?${_params.toString()}`);
   };
 
+  useEffect(() => {
+    setFilters({
+      q: params.q, page: params.page, type: params.type, status: params.status, rated: params.rated,
+      season: params.season, language: params.language, sort: params.sort, genres: params.genres,
+    });
+  }, [params]);
+
   const onChange = (key: keyof typeof filters, value: string) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
   };
 
+  const choosePreset = (preset: (typeof SORT_PRESETS)[number]) => {
+    if (preset.mode === "collection") router.push(`/search?collection=${preset.value}`);
+    else router.push(`/search?sort=${preset.value}`);
+  };
+
   const applyFilters = () => {
-    const searchParams = new URLSearchParams();
-
-    onChange("q", params.q);
-
+    const next = new URLSearchParams();
     Object.entries(filters).forEach(([key, value]) => {
-      if (typeof value === "string" && value.trim() !== "") {
-        searchParams.set(key, value);
-      } else if (typeof value === "number" && !isNaN(value)) {
-        searchParams.set(key, value.toString());
-      }
+      if (key === "page") return;
+      if (typeof value === "string" && value.trim() !== "") next.set(key, value);
     });
-
-    searchParams.delete("page");
-
-    router.push(`/search?${searchParams.toString()}`);
+    router.push(next.size ? `/search?${next.toString()}` : "/search?collection=popular");
+    setFiltersOpen(false);
   };
 
   const resetFilters = () => {
@@ -119,175 +131,126 @@ const SearchResults = () => {
       sort: "",
       genres: "",
     });
-    router.push('/search?q=""');
+    router.push("/search?collection=popular");
+    setFiltersOpen(false);
   };
 
   return (
-    <div className="mx-auto flex min-h-[75vh] w-full max-w-[1600px] flex-col gap-6 px-4 pb-16 pt-28 text-[#211e38] sm:gap-8 md:px-6 lg:pt-32 lg:px-8 dark:text-white">
-      <section className="flex flex-col justify-between gap-4 rounded-3xl border border-[#4b1727] bg-gradient-to-br from-[#f7f4ff] via-white to-[#fff3fa] p-5 shadow-[0_8px_28px_rgba(37,25,81,0.05)] dark:border-[#302c40] dark:from-[#3a0819] dark:via-[#1b0710] dark:to-[#21121e] sm:flex-row sm:items-end sm:p-7">
-        <div className="max-w-2xl">
-          <p className="mb-2 text-[11px] font-extrabold uppercase tracking-[0.2em] text-[#b62b80] dark:text-[#ff9fbe]">Discover something new</p>
-          <h1 className="text-3xl font-black tracking-tight sm:text-4xl">Explore Anime</h1>
-          <p className="mt-2 max-w-xl text-sm leading-6 text-[#d49aaf] dark:text-[#b8afcb]">Browse what is trending, find currently airing shows, or build your next binge from completed series.</p>
+    <main className="mx-auto flex min-h-[75vh] w-full max-w-[1600px] flex-col gap-4 px-4 pb-20 pt-20 text-white sm:gap-5 sm:px-6 sm:pb-16 sm:pt-28 lg:px-8">
+      <header className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-[#ff3b72]/12 text-[#ff9fbe]">
+              <Search className="h-[18px] w-[18px]" />
+            </span>
+            <h1 className="truncate text-[1.55rem] font-black tracking-tight sm:text-3xl">
+              {displayPhrase ? "Search results" : "Browse Anime"}
+            </h1>
+          </div>
+          <p className="mt-1 pl-10 text-xs font-medium text-[#b8afcb] sm:text-sm">
+            {isLoading ? "Finding your next favourite…" : searchResults ? `${searchResults.animes.length}${searchResults.hasNextPage ? "+" : ""} results` : "Discover your next favourite"}
+          </p>
         </div>
-        <Link href="/library" className="inline-flex h-10 shrink-0 items-center justify-center gap-2 self-start rounded-xl border border-[#4b1727] bg-white px-4 text-sm font-bold text-[#433a61] transition hover:border-[#ff3b72]/40 hover:text-[#b62b80] dark:border-white/10 dark:bg-white/[0.04] dark:text-[#e5deef] dark:hover:border-[#ff3b72]/40 dark:hover:text-[#ffbad0] sm:self-auto">
-          <Bookmark className="h-4 w-4" /> My List
-        </Link>
-      </section>
+        <div className="flex shrink-0 items-center gap-2">
+          <Link href="/library" aria-label="My List" title="My List" className="hidden h-10 items-center justify-center gap-2 rounded-xl border border-white/[0.10] bg-white/[0.035] px-3 text-sm font-semibold text-[#d9cbdc] transition hover:border-[#ff3b72]/40 hover:text-[#ffbad0] sm:inline-flex">
+            <Bookmark className="h-4 w-4" /> My List
+          </Link>
+          <button type="button" onClick={() => setFiltersOpen((open) => !open)} aria-expanded={filtersOpen} aria-controls="explore-filters"
+            className={`inline-flex h-10 items-center justify-center gap-2 rounded-xl border px-3 text-sm font-semibold transition ${filtersOpen ? "border-[#ff3b72]/50 bg-[#ff3b72]/12 text-[#ffbad0]" : "border-white/[0.12] bg-white/[0.035] text-[#d9cbdc] hover:border-[#ff3b72]/40 hover:text-[#ffbad0]"}`}>
+            {filtersOpen ? <X className="h-4 w-4" /> : <SlidersHorizontal className="h-4 w-4" />}
+            <span>{filtersOpen ? "Close" : "Filters"}</span>
+          </button>
+        </div>
+      </header>
 
-      <section aria-label="Explore anime collections" className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-        {EXPLORE_COLLECTIONS.map((collection) => {
-          const Icon = collection.icon;
-          const active = params.collection === collection.value;
+      <nav aria-label="Sort anime" className="anime-shelf-scroll -mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
+        {SORT_PRESETS.map((preset) => {
+          const Icon = preset.icon;
+          const active = activePreset === preset.value;
           return (
-            <Link key={collection.value} href={`/search?collection=${collection.value}`} aria-current={active ? "page" : undefined}
-              className={`group rounded-2xl border p-3.5 transition sm:p-4 ${active ? "border-[#ff3b72]/45 bg-[#ff3b72]/10" : "border-[#4b1727] bg-white hover:border-[#ff3b72]/35 hover:bg-[#fff8fc] dark:border-[#302c40] dark:bg-[#19070d] dark:hover:border-[#ff3b72]/35 dark:hover:bg-[#211a2b]"}`}>
-              <span className={`mb-3 grid h-9 w-9 place-items-center rounded-xl ${active ? "bg-[#ff3b72]/15 text-[#c62b82] dark:text-[#ffbad0]" : "bg-[#f0ebff] text-[#ff3b72] dark:bg-[#ff3b72]/15 dark:text-[#b6a8ff]"}`}><Icon className="h-4 w-4" /></span>
-              <span className="block text-sm font-extrabold">{collection.title}</span>
-              <span className="mt-1 block text-[11px] leading-4 text-[#d49aaf] dark:text-[#a39db9]">{collection.description}</span>
-            </Link>
+            <button key={preset.value} type="button" onClick={() => choosePreset(preset)} aria-pressed={active}
+              className={`inline-flex h-10 shrink-0 items-center gap-2 rounded-full border px-4 text-xs font-bold transition sm:text-sm ${active ? "border-[#ff3b72]/55 bg-[#ff3b72]/12 text-[#ffbad0]" : "border-white/[0.10] bg-[#19070d] text-[#c8bfd7] hover:border-[#ff3b72]/35 hover:text-white"}`}>
+              <Icon className={`h-4 w-4 ${active ? "text-[#ff9fbe]" : "text-[#a9a0bf]"}`} />
+              {preset.label}
+            </button>
           );
         })}
-      </section>
+      </nav>
 
-      <div className="flex flex-col gap-5 rounded-2xl border border-[#4b1727] bg-white p-4 shadow-[0_5px_20px_rgba(37,25,81,0.035)] sm:p-6 dark:border-[#302c40] dark:bg-[#19070d]">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div className="flex items-center gap-2"><Search className="h-5 w-5 text-[#ff3b72] dark:text-[#b6a8ff]" /><p className="text-lg font-semibold">{collectionTitle ? `Browse ${collectionTitle}` : "Search & filters"}</p></div><span className="text-xs text-[#d49aaf] dark:text-[#a39db9]">{collectionTitle ? `Curated list: ${collectionTitle}` : "Search by title or narrow results by type, language, season, and genre."}</span></div><SearchBar className="max-w-2xl" showFilterButton={false} /><p className="text-sm font-semibold text-[#5f5a73] dark:text-zinc-300">Refine results</p>
-        <div className="flex flex-wrap gap-3">
-          <Select
-            options={types}
-            placeholder="Type"
-            value={filters.type}
-            onChange={(val) => onChange("type", val)}
-          />
-          <Select
-            options={statuses}
-            placeholder="Status"
-            value={filters.status}
-            onChange={(val) => onChange("status", val)}
-          />
-          <Select
-            options={ratings}
-            placeholder="Rated"
-            value={filters.rated}
-            onChange={(val) => onChange("rated", val)}
-          />
-          <Select
-            options={seasons}
-            placeholder="Season"
-            value={filters.season}
-            onChange={(val) => onChange("season", val)}
-          />
-          <Select
-            options={languages}
-            placeholder="Language"
-            value={filters.language}
-            onChange={(val) => onChange("language", val)}
-          />
-          <Select
-            options={sort}
-            placeholder="Sort"
-            value={filters.sort}
-            onChange={(val) => onChange("sort", val)}
-          />
+      {filtersOpen && (
+        <section id="explore-filters" aria-label="Anime filters" className="flex flex-col gap-4 rounded-2xl border border-white/[0.09] bg-[#16070d]/95 p-4 shadow-lg shadow-black/10 sm:p-5">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h2 className="text-base font-bold">Find your kind of anime</h2>
+              <p className="mt-1 text-xs text-[#a39ab6]">Search a title or narrow the list with filters.</p>
+            </div>
+            <button type="button" onClick={resetFilters} className="shrink-0 rounded-lg px-2 py-1.5 text-xs font-semibold text-[#ff9fbe] hover:bg-[#ff3b72]/10">Reset all</button>
+          </div>
+          <SearchBar className="w-full" showFilterButton={false} />
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+            <Select options={types} placeholder="Type" value={filters.type} onChange={(val) => onChange("type", val)} className="w-full" />
+            <Select options={statuses} placeholder="Status" value={filters.status} onChange={(val) => onChange("status", val)} className="w-full" />
+            <Select options={ratings} placeholder="Rated" value={filters.rated} onChange={(val) => onChange("rated", val)} className="w-full" />
+            <Select options={seasons} placeholder="Season" value={filters.season} onChange={(val) => onChange("season", val)} className="w-full" />
+            <Select options={languages} placeholder="Language" value={filters.language} onChange={(val) => onChange("language", val)} className="w-full" />
+            <Select options={sort} placeholder="Sort" value={filters.sort} onChange={(val) => onChange("sort", val)} className="w-full" />
+          </div>
+          <div>
+            <p className="mb-2 text-sm font-semibold">Genres</p>
+            <ToggleGroup type="multiple" className="flex flex-wrap justify-start gap-2" value={filters.genres?.split(",") || []}
+              onValueChange={(value) => onChange("genres", value.filter(Boolean).join(","))}>
+              {genres.map((genre) => (
+                <ToggleGroupItem value={genre.value} key={genre.value} size="sm"
+                  className={cn(
+                    "rounded-full border border-white/[0.10] bg-white/[0.035] text-[#c7c1dc] hover:border-[#ff3b72]/40 hover:bg-[#ff3b72]/10 hover:text-[#ffbad0]",
+                    "data-[state=on]:border-[#ff3b72]/50 data-[state=on]:bg-[#ff3b72]/15 data-[state=on]:text-[#ffbad0]",
+                  )}>
+                  {genre.label}
+                </ToggleGroupItem>
+              ))}
+            </ToggleGroup>
+          </div>
+          <div className="flex gap-2">
+            <Button size="sm" className="h-10 flex-1 rounded-xl bg-[#ff3b72] text-white hover:bg-[#ed245c]" onClick={applyFilters}>Apply filters</Button>
+            <Button size="sm" className="h-10 rounded-xl border border-white/10 px-5 text-[#d8ccdf]" onClick={resetFilters} variant="link">Reset</Button>
+          </div>
+        </section>
+      )}
+
+      {displayPhrase && (
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="min-w-0 truncate text-sm font-semibold text-[#e7dce9]">Results for “{displayPhrase}”</h2>
+          <Link href="/search?collection=popular" className="shrink-0 text-xs font-semibold text-[#ff9fbe] hover:text-white">Clear search</Link>
         </div>
-        <div>
-          <p className="text-lg font-semibold mt-4">Genres</p>
-          <ToggleGroup
-            type="multiple"
-            className="flex flex-wrap justify-start gap-2 mt-4"
-            value={filters.genres?.split(",") || []}
-            onValueChange={(value) => {
-              onChange("genres", value.filter(Boolean).join(","));
-            }}
-          >
-            {genres.map((genre) => (
-              <ToggleGroupItem
-                value={genre.value}
-                key={genre.value}
-                size="sm"
-                className={cn(
-                  "rounded-full border border-[#4b1727] bg-[#f8f7fd] text-[#d1a3b3] hover:border-[#8b79e3] hover:text-[#ff3b72] hover:bg-[#eeeafb] dark:border-[#393449] dark:bg-[#201d2a] dark:text-[#c7c1dc] dark:hover:bg-[#302b42]",
-                  "data-[state=on]:border-[#8b79e3] data-[state=on]:text-[#4935bd] data-[state=on]:bg-[#e5e0fb] dark:data-[state=on]:border-[#8b79e3] dark:data-[state=on]:text-white dark:data-[state=on]:bg-rose-500/30",
-                  filters.genres?.split(",").includes(genre.value)
-                    ? "bg-[#e5e0fb] text-[#4935bd] dark:bg-rose-500/30 dark:text-white"
-                    : "text-[#d1a3b3] dark:text-slate-300",
-                )}
-              >
-                {genre.label}
-              </ToggleGroupItem>
-            ))}
-          </ToggleGroup>
-        </div>
-        <div className="flex items-center gap-2 mt-4">
-          <Button
-            size="sm"
-            className="w-[6.25rem] rounded-xl bg-[#ff3b72] text-white hover:bg-[#5140c4]"
-            onClick={applyFilters}
-          >
-            Filter
-          </Button>
-          <Button
-            size="sm"
-            className="w-[6.25rem]"
-            onClick={resetFilters}
-            variant="link"
-          >
-            Reset
-          </Button>
-        </div>
-      </div>
-      <div className="text-xl font-semibold tracking-tight sm:text-2xl">
-        {collectionTitle || (displayPhrase === "" ? "Filter Results" : (
-          <>
-            Search Results for{" "}
-            <span className="font-[800]">&quot;{params.q}&quot;</span>
-          </>
-        ))}
-      </div>
+      )}
+      {collectionTitle && <p className="text-xs font-medium text-[#a39ab6]">{collectionTitle} · curated for you</p>}
+
       {isLoading && (
-        <div className="grid w-full grid-cols-2 content-start gap-x-3 gap-y-5 sm:grid-cols-3 sm:gap-4 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7">
-          {[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1].map((_, idx) => {
-            return (
-              <div
-                key={idx}
-                className="aspect-[2/3] w-full rounded-2xl animate-pulse bg-[#e9e7f2] dark:bg-white/[0.06]"
-              ></div>
-            );
-          })}
+        <div className="grid w-full grid-cols-2 content-start gap-x-3 gap-y-4 sm:grid-cols-3 sm:gap-4 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7">
+          {Array.from({ length: 10 }, (_, idx) => <div key={idx} className="aspect-[2/3] w-full animate-pulse rounded-2xl bg-white/[0.06]" />)}
         </div>
       )}
       {!isLoading && searchResults?.animes?.length === 0 && (
-        <div className="flex flex-col items-center justify-center rounded-2xl border border-[#4b1727] bg-white px-5 py-12 text-center dark:border-[#302c40] dark:bg-[#19070d]">
-          <SearchX className="mb-3 h-8 w-8 text-rose-300" />
-          <h3 className="text-base font-semibold text-[#211e38] dark:text-white">No anime found</h3>
-          <p className="mt-1 max-w-sm text-sm text-[#d49aaf] dark:text-zinc-400">Try a different title or loosen a few filters.</p>
+        <div className="flex flex-col items-center justify-center rounded-2xl border border-white/[0.10] bg-[#16070d] px-5 py-12 text-center">
+          <SearchX className="mb-3 h-8 w-8 text-[#ff9fbe]" />
+          <h3 className="text-base font-semibold text-white">No anime found</h3>
+          <p className="mt-1 max-w-sm text-sm text-[#a39ab6]">Try a different title or loosen a few filters.</p>
+          <button type="button" onClick={resetFilters} className="mt-4 rounded-xl bg-[#ff3b72]/12 px-4 py-2 text-sm font-semibold text-[#ffbad0]">Reset filters</button>
         </div>
       )}
-      <div className="grid w-full grid-cols-2 content-start gap-x-3 gap-y-5 sm:grid-cols-3 sm:gap-4 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7">
+      <div className="grid w-full grid-cols-2 content-start gap-x-3 gap-y-4 sm:grid-cols-3 sm:gap-4 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7">
         {searchResults?.animes.map((anime) => (
-          <AnimeCard
-            key={anime.id}
-            title={anime.name}
-            format={anime.type}
-            poster={anime.poster}
-            href={ROUTES.animeDetails(anime.id)}
-            quickWatchHref={ROUTES.watchAnime(anime.id)}
-            className="w-full min-w-0"
-            showGenre={false}
-          />
+          <AnimeCard key={anime.id} title={anime.name} format={anime.type} poster={anime.poster}
+            href={ROUTES.animeDetails(anime.id)} quickWatchHref={ROUTES.watchAnime(anime.id)}
+            episodes={anime.episodes?.sub} score={anime.score} className="w-full min-w-0" showGenre={false} />
         ))}
       </div>
       {searchResults && searchResults.totalPages && (
-        <Pagination
-          totalPages={searchResults?.totalPages}
-          currentPage={params.page}
-          handleNextPage={handleNextPage}
-          handlePageChange={handlePageChange}
-          handlePreviousPage={handlePreviousPage}
-        />
+        <Pagination totalPages={searchResults.totalPages} currentPage={params.page} handleNextPage={handleNextPage}
+          handlePageChange={handlePageChange} handlePreviousPage={handlePreviousPage} />
       )}
-    </div>
-  );
+    </main>
+  );;
 };
 
 export default SearchResults;
