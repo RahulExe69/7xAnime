@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import SearchBar from "@/components/search-bar";
-import { Bookmark, CalendarDays, Flame, Search, SearchX, SlidersHorizontal, Sparkles, TrendingUp, X, ChartNoAxesColumnIncreasing } from "lucide-react";
+import { BarChart3, Bookmark, CalendarDays, Flame, Search, SearchX, SlidersHorizontal, Sparkles, TrendingUp, X } from "lucide-react";
 import { ROUTES } from "@/constants/routes";
 import AnimeCard from "@/components/anime-card";
 
@@ -41,7 +41,7 @@ const SORT_PRESETS = [
   { value: "trending", label: "Trending Now", mode: "collection", icon: TrendingUp },
   { value: "score", label: "Highest Rated", mode: "sort", icon: Sparkles },
   { value: "recently-added", label: "Newest First", mode: "sort", icon: CalendarDays },
-  { value: "most-watched", label: "Most Watched", mode: "sort", icon: ChartNoAxesColumnIncreasing },
+  { value: "most-watched", label: "Most Watched", mode: "sort", icon: BarChart3 },
 ];
 
 const SearchResults = () => {
@@ -54,7 +54,7 @@ const SearchResults = () => {
     () => (!params.collection && !hasManualFilters ? { ...params, collection: "popular" } : params),
     [params, hasManualFilters],
   );
-  const collectionTitle = requestParams.collection ? COLLECTION_TITLES[requestParams.collection] : undefined;
+  const collectionTitle = params.collection ? COLLECTION_TITLES[params.collection] : undefined;
   const activePreset = requestParams.collection === "popular" || requestParams.collection === "trending"
     ? requestParams.collection
     : requestParams.sort || (requestParams.collection === "top-airing" ? "score" : undefined);
