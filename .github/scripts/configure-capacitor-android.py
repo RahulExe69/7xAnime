@@ -151,7 +151,7 @@ if not proguard_lines:
     raise SystemExit(1)
 if proguard_rules not in proguard_lines[0]:
     text, rules_count = re.subn(
-        r"(?m)^(\s*proguardFiles\s+[^\n]+)$",
+        r"(?m)^(\s*proguardFiles\s+[^\n]+)$,
         lambda match: match.group(1) + ", '" + proguard_rules + "'",
         text,
         count=1,
