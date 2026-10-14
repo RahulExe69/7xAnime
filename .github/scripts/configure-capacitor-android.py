@@ -336,6 +336,11 @@ for alias_name in ("ic_launcher_round", "ic_launcher_static", "ic_launcher_stati
 # The 7x product keeps SVG as the source of truth for its scalable gradient background.
 # Rasterize it at full phone-screen resolutions for Android's native launch window, using
 # a centered SVG viewBox crop (cover, not stretch) to preserve the original gradient geometry.
+def splash_fail(message: str) -> None:
+    print(f"ERROR: {message}", file=sys.stderr)
+    raise SystemExit(1)
+
+
 try:
     import cairosvg
     from PIL import Image
@@ -368,7 +373,7 @@ def background_svg_for_canvas(width: int, height: int) -> str:
     root, height_count = re.subn(r'\sheight="[^"]+"', f' height="{height}"', root, count=1)
     root, viewbox_count = re.subn(r'\sviewBox="[^"]+"', f' viewBox="{view_box}"', root, count=1)
     if (width_count, height_count, viewbox_count) != (1, 1, 1):
-        fail("Could not configure the SVG splash background viewport.")
+        splash_fail("Could not configure the SVG splash background viewport.")
     return svg_source[:svg_root.start()] + root + svg_source[svg_root.end():]
 
 # Portrait and landscape variants let Android select the closest full-bleed composition.
@@ -389,8 +394,9 @@ for output, width, height in background_outputs:
     )
     with Image.open(output) as raster:
         if raster.size != (width, height):
-            fail(f"Splash background has unexpected dimensions: {output} is {raster.size}.")
-        raster.convert("RGB").save(output, format="PNG", optimize=True)
+            splash_fail(f"Splash background has unexpected dimensions: {output} is {raster.size}.")
+        optimized_background = raster.convert("RGB")
+    optimized_background.save(output, format="PNG", optimize=True)
 
 # Use the exact transparent foreground PNG for the Android 12+ splash icon; don't mask,
 # crop, or re-render it. A separate composed drawable layers it over the SVG background
@@ -399,7 +405,7 @@ foreground_bytes = splash_foreground.read_bytes()
 foreground_output = portrait_dir / "splash_foreground.png"
 foreground_output.write_bytes(foreground_bytes)
 if foreground_output.read_bytes() != foreground_bytes:
-    fail("Splash foreground PNG differs from the approved 7x product source.")
+    splash_fail("Splash foreground PNG differs from the approved 7x product source.")
 
 composed_splash = portrait_dir / "splash_composed.xml"
 composed_splash.write_text(
@@ -456,16 +462,16 @@ for styles in style_files:
 if legacy_refs < 1 and not any(
     "@drawable/splash_composed" in styles.read_text(encoding="utf-8") for styles in style_files
 ):
-    fail("Could not find or configure the native launch window background.")
+    splash_fail("Could not find or configure the native launch window background.")
 if animated_icon_refs < 1 and not any(
     "@drawable/splash_foreground" in styles.read_text(encoding="utf-8") for styles in style_files
 ):
-    fail("Could not find or configure the Android splash foreground icon.")
+    splash_fail("Could not find or configure the Android splash foreground icon.")
 if background_color_refs < 1 and not any(
     re.search(r'<item\s+name="windowSplashScreenBackground">\s*#1E0D1B\s*</item>', styles.read_text(encoding="utf-8"))
     for styles in style_files
 ):
-    fail("Could not configure Android 12+ splash base colour.")
+    splash_fail("Could not configure Android 12+ splash base colour.")
 
 print(
     "Configured native splash from the 7x product SVG and byte-identical foreground PNG; "
