@@ -476,6 +476,10 @@ if legacy_refs < 1 and not any(
 if animated_icon_refs < 1 and not any(
     "@drawable/splash_foreground" in styles.read_text(encoding="utf-8") for styles in style_files
 ):
+    print("DEBUG: generated Android style/theme files inspected for splash icon:", file=sys.stderr)
+    for styles in style_files:
+        print(f"--- {styles} ---", file=sys.stderr)
+        print(styles.read_text(encoding="utf-8"), file=sys.stderr)
     splash_fail("Could not find or configure the Android splash foreground icon.")
 if background_color_refs < 1 and not any(
     re.search(r'<item\s+name="windowSplashScreenBackground">\s*#1E0D1B\s*</item>', styles.read_text(encoding="utf-8"))
