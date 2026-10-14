@@ -157,27 +157,27 @@ export default function ForceUpdateGate() {
 
   const notes = useMemo(() => {
     const cleaned = releaseNotes
-      .replace(/<!--[\\s\\S]*?-->/g, "")
-      .split(/\\r?\\n/)
+      .replace(/<!--[\s\S]*?-->/g, "")
+      .split(/\r?\n/)
       .map((line) => line.trim())
       .filter((line) => {
-        if (!line || /^#+\\s/.test(line) || /^[-*_]{3,}$/.test(line)) return false;
-        if (/^(full changelog|compare view|view changes|release notes|what's new|changelog)\\b/i.test(line)) return false;
-        if (/^\\*\\*?(file|package|size|sha-256|android version code|optimizations|architectures|signing|apk)\\*\\*?:/i.test(line)) return false;
-        if (/^https?:\\/\\//i.test(line)) return false;
+        if (!line || /^#+\s/.test(line) || /^[-*_]{3,}$/.test(line)) return false;
+        if (/^(full changelog|compare view|view changes|release notes|what's new|changelog)\b/i.test(line)) return false;
+        if (/^\*\*?(file|package|size|sha-256|android version code|optimizations|architectures|signing|apk)\*\*?:/i.test(line)) return false;
+        if (/^https?:\/\//i.test(line)) return false;
         return true;
       })
       .map((line) => line
-        .replace(/^[-*•]\\s+/, "")
-        .replace(/^\\d+[.)]\\s+/, "")
-        .replace(/\\[([^\\]]+)\\]\\([^)]+\\)/g, "$1")
-        .replace(/`([^`]+)`/g, "$1")
-        .replace(/\\*\\*(.*?)\\*\\*/g, "$1")
-        .replace(/\\s+/g, " ")
+        .replace(/^[-*•]\s+/, "")
+        .replace(/^\d+[.)]\s+/, "")
+        .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+        .replace(/\*\*(.*?)\*\*/g, "$1")
+        .replace(/[\u0060]/g, "")
+        .replace(/\s+/g, " ")
         .trim())
-      .filter((line) => line && !/^(full changelog|see all changes|download|assets)\\b/i.test(line));
+      .filter((line) => line && !/^(full changelog|see all changes|download|assets)\b/i.test(line));
     const unique = Array.from(new Set(cleaned));
-    return unique.slice(0, 5).map((line) => line.length > 135 ? line.slice(0, 132).replace(/\\s+\\S*$/, "") + "…" : line);
+    return unique.slice(0, 5).map((line) => line.length > 135 ? line.slice(0, 132).replace(/\s+\S*$/, "") + "…" : line);
   }, [releaseNotes]);
 
   const startDownload = () => {
@@ -331,5 +331,5 @@ export default function ForceUpdateGate() {
           </footer>
         )}
       </section>
-    </div>
+    </div  );
 }
