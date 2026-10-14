@@ -475,7 +475,7 @@ for styles in style_files:
 # replace. Explicitly create/update them in the launch theme and restore the
 # regular app theme after the system splash is dismissed.
 launch_style_pattern = re.compile(
-    r'(?P<opening><style\\b(?=[^>]*\\bname=["\\']AppTheme\\.NoActionBarLaunch["\\'])[^>]*>)'
+    r'(?P<opening><style\b(?=[^>]*\bname=["\']AppTheme\.NoActionBarLaunch["\'])[^>]*>)'
     r'(?P<body>.*?)'
     r'(?P<closing></style>)',
     re.DOTALL,
@@ -490,9 +490,9 @@ def configure_launch_style(match: re.Match[str]) -> str:
     body = match.group("body")
     for item_name, item_value in required_launch_items:
         item_pattern = re.compile(
-            r'(<item\\b(?=[^>]*\\bname=["\\'](?:android:)?'
+            r'(<item\b(?=[^>]*\bname=["\'](?:android:)?'
             + re.escape(item_name)
-            + r'["\\'])[^>]*>).*?(</item>)',
+            + r'["\'])[^>]*>).*?(</item>)',
             re.DOTALL,
         )
         body, replaced = item_pattern.subn(
@@ -502,7 +502,7 @@ def configure_launch_style(match: re.Match[str]) -> str:
         )
         if replaced == 0:
             body = body.rstrip() + (
-                f'\\n        <item name="{item_name}">{item_value}</item>\\n    '
+                f'\n        <item name="{item_name}">{item_value}</item>\n    '
             )
     return match.group("opening") + body + match.group("closing")
 
