@@ -235,7 +235,9 @@ jobs:
           chmod +x android/gradlew
           (
             cd android
-            ./gradlew clean assembleRelease --no-daemon --parallel --build-cache --stacktrace
+            # Do not clean between ABI variants: Chaquopy's generated R8 rules live under build/python,
+            # and its cached generation task may not recreate that file after clean removes it.
+            ./gradlew assembleRelease --no-daemon --parallel --build-cache --stacktrace
           )
 
       - name: Verify signature and package ARM64-only release APK
