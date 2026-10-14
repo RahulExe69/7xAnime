@@ -199,10 +199,34 @@ def patch_app_gradle() -> None:
     default_open = text.find("{", default_match.start())
     default_close = matching_brace(text, default_open)
     default_config = text[default_open:default_close]
-    if "abiFilters" not in default_config:
+
+    requested_abis = [
+        item.strip()
+        for item in os.environ.get("ANDROID_ABI_FILTERS", "arm64-v8a,x86_64").split(",")
+        if item.strip()
+    ]
+    allowed_abis = {"arm64-v8a", "x86_64"}
+    if not requested_abis or len(set(requested_abis)) != len(requested_abis):
+        fail("ANDROID_ABI_FILTERS must list one or more unique supported ABIs.")
+    unsupported_abis = sorted(set(requested_abis) - allowed_abis)
+    if unsupported_abis:
+        fail("Unsupported Android ABI filter(s): " + ", ".join(unsupported_abis))
+    abi_filters = "abiFilters " + ", ".join(f'"{abi}"' for abi in requested_abis)
+
+    if "abiFilters" in default_config:
+        default_config, abi_count = re.subn(
+            r"(?m)^(\\s*)abiFilters\\s+[^\\n]+$",
+            lambda match: match.group(1) + abi_filters,
+            default_config,
+            count=1,
+        )
+        if abi_count != 1:
+            fail("Could not update the generated Android ABI filters.")
+        text = text[:default_open] + default_config + text[default_close:]
+    else:
         text = (
             text[:default_close]
-            + '\n        ndk {\n            abiFilters "arm64-v8a", "x86_64"\n        }\n    '
+            + "\\n        ndk {\\n            " + abi_filters + "\\n        }\\n    "
             + text[default_close:]
         )
 
@@ -652,6 +676,11 @@ def main() -> None:
     patch_root_gradle()
     patch_app_gradle()
     patch_manifest()
+
+    proguard_source = ROOT / "android-local-backend/proguard-7xanime-rules.pro"
+    if not proguard_source.is_file():
+        fail("The 7xAnime-specific ProGuard rules file is missing.")
+    shutil.copy2(proguard_source, ANDROID / "app/proguard-7xanime-rules.pro")
 
     native_sources = {
         "LocalAnimeBackendPlugin.java": ROOT / "android-local-backend/LocalAnimeBackendPlugin.java",
