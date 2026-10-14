@@ -21,6 +21,7 @@ const SORT_API_VALUES: Record<string, string> = {
   "released-date": "START_DATE_DESC",
   "recently-updated": "UPDATED_AT_DESC",
   "most-watched": "POPULARITY_DESC",
+  "most-episodes": "EPISODES_DESC",
   "name-a-z": "TITLE_ROMAJI",
 };
 
