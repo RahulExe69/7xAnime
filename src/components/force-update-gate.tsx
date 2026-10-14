@@ -155,14 +155,30 @@ export default function ForceUpdateGate() {
     return () => window.removeEventListener("7xanime:back", preventDismiss);
   }, [status]);
 
-  const notes = useMemo(() => releaseNotes
-    .replace(/<!--[\s\S]*?-->/g, "")
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter((line) => line && !/^#+\s/.test(line) && !/^[-*_]{3,}$/.test(line) &&
-      !/^\*\*?(File|Package|Size|SHA-256|Android version code|Optimizations)\*\*?:/i.test(line))
-    .map((line) => line.replace(/^[-*]\s+/, "").replace(/\*\*/g, ""))
-    .slice(0, 7), [releaseNotes]);
+  const notes = useMemo(() => {
+    const cleaned = releaseNotes
+      .replace(/<!--[\s\S]*?-->/g, "")
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter((line) => {
+        if (!line || /^#+\s/.test(line) || /^[-*_]{3,}$/.test(line)) return false;
+        if (/^(full changelog|compare view|view changes|release notes|what's new|changelog)\b/i.test(line)) return false;
+        if (/^\*\*?(file|package|size|sha-256|android version code|optimizations|architectures|signing|apk)\*\*?:/i.test(line)) return false;
+        if (/^https?:\/\//i.test(line)) return false;
+        return true;
+      })
+      .map((line) => line
+        .replace(/^[-*•]\s+/, "")
+        .replace(/^\d+[.)]\s+/, "")
+        .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+        .replace(/\*\*(.*?)\*\*/g, "$1")
+        .replace(/[\u0060]/g, "")
+        .replace(/\s+/g, " ")
+        .trim())
+      .filter((line) => line && !/^(full changelog|see all changes|download|assets)\b/i.test(line));
+    const unique = Array.from(new Set(cleaned));
+    return unique.slice(0, 5).map((line) => line.length > 135 ? line.slice(0, 132).replace(/\s+\S*$/, "") + "…" : line);
+  }, [releaseNotes]);
 
   const startDownload = () => {
     setErrorMessage("");
@@ -195,64 +211,81 @@ export default function ForceUpdateGate() {
     ? new Date(publishedAt).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })
     : "Latest release";
   return (
-    <div className="fixed inset-0 z-[99999] flex min-h-[100dvh] items-center justify-center overflow-y-auto bg-[#07040b] px-4 py-6 text-white">
-      <div aria-hidden="true" className="pointer-events-none fixed inset-0 overflow-hidden">
-        <div className="absolute -left-24 -top-24 h-72 w-72 rounded-full bg-fuchsia-600/20 blur-[100px]" />
-        <div className="absolute -bottom-24 -right-16 h-80 w-80 rounded-full bg-violet-600/20 blur-[110px]" />
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(236,72,153,0.10),transparent_55%)]" />
+    <div className="fixed inset-0 z-[99999] h-[100dvh] w-full overflow-hidden bg-[#080308] text-white">
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="absolute -left-24 -top-24 h-72 w-72 rounded-full bg-fuchsia-600/15 blur-[100px]" />
+        <div className="absolute -bottom-24 -right-16 h-80 w-80 rounded-full bg-violet-600/15 blur-[110px]" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(236,72,153,0.08),transparent_55%)]" />
       </div>
+
       <section aria-live="polite" aria-modal="true" role="dialog" aria-labelledby="7xanime-update-title"
-        className="relative z-10 w-full max-w-md overflow-hidden rounded-[28px] border border-white/10 bg-[#100b17]/95 p-6 shadow-[0_25px_100px_rgba(0,0,0,0.65)] backdrop-blur-2xl sm:p-8">
-        <div className="mb-6 flex items-center gap-4">
-          <div className="flex h-[68px] w-[68px] shrink-0 items-center justify-center rounded-[22px] border border-white/10 bg-black/50 p-2">
-            <img src="/brand/7xanime-icon.png" alt="" className="h-full w-full object-contain" />
+        className="relative z-10 flex h-full min-h-0 w-full flex-col overflow-hidden bg-[#10070e]/95">
+        <header className="shrink-0 border-b border-white/[0.08] px-4 pb-4 pt-[calc(env(safe-area-inset-top)+0.85rem)] sm:px-6">
+          <div className="flex items-center gap-3">
+            <div className="grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-2xl border border-white/[0.08] bg-black/35 p-1.5">
+              <img src="/brand/7xanime-icon.png" alt="" className="h-full w-full object-contain" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.18em] text-[#ff9fbe]">7xAnime · Official release</p>
+              <h1 id="7xanime-update-title" className="text-xl font-black tracking-tight sm:text-2xl">Update available</h1>
+              <p className="mt-0.5 text-xs text-white/55 sm:text-sm">
+                {status === "checking" ? "Checking for the latest version…" : "A newer version is ready to install."}
+              </p>
+            </div>
           </div>
-          <div className="min-w-0">
-            <p className="mb-1 text-xs font-semibold uppercase tracking-[0.24em] text-fuchsia-300">7xAnime • Official Release</p>
-            <h1 id="7xanime-update-title" className="text-2xl font-black tracking-tight">A new world awaits.</h1>
-            <p className="mt-1 text-sm text-white/55">Your app needs an update to continue.</p>
-          </div>
-        </div>
+          {status !== "checking" && (
+            <div className="mt-4 flex items-center justify-between gap-3 rounded-xl border border-white/[0.08] bg-white/[0.035] px-3 py-2.5">
+              <div className="min-w-0">
+                <p className="truncate text-sm font-bold text-white">7xAnime v{latestVersion}</p>
+                <p className="mt-0.5 text-[11px] text-white/45">Released {displayDate}</p>
+              </div>
+              <div className="shrink-0 text-right">
+                <p className="text-xs font-semibold text-[#ffbad0]">{formatBytes(apkSize)}</p>
+                <p className="mt-0.5 text-[10px] text-white/40">APK update</p>
+              </div>
+            </div>
+          )}
+        </header>
+
         {status === "checking" ? (
-          <div className="flex flex-col items-center gap-4 py-8 text-center">
-            <LoaderCircle className="h-9 w-9 animate-spin text-fuchsia-300" />
+          <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4 px-6 text-center">
+            <LoaderCircle className="h-9 w-9 animate-spin text-[#ff9fbe]" />
             <p className="font-semibold">Checking the latest release…</p>
             <p className="text-sm text-white/45">This usually takes only a moment.</p>
           </div>
         ) : (
-          <>
-            <div className="mb-5 rounded-2xl border border-fuchsia-400/15 bg-fuchsia-400/[0.06] p-4">
-              <div className="flex items-center justify-between gap-4">
-                <span className="text-sm text-white/55">Installed version</span>
-                <span className="font-mono text-sm text-white/80">{currentVersion}</span>
-              </div>
-              <div className="my-3 h-px bg-white/10" />
-              <div className="flex items-center justify-between gap-4">
-                <span className="text-sm text-white/55">Required update</span>
-                <span className="font-mono font-bold text-fuchsia-200">v{latestVersion}</span>
-              </div>
-              <div className="mt-3 flex items-center justify-between text-xs text-white/35">
-                <span>{displayDate}</span><span>{formatBytes(apkSize)}</span>
-              </div>
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:px-6">
+            <div className="mb-4 flex items-center justify-between gap-3 text-xs">
+              <span className="text-white/45">Installed version</span>
+              <span className="rounded-lg bg-white/[0.05] px-2.5 py-1 font-mono text-white/80">v{currentVersion}</span>
             </div>
-            <div className="mb-5">
-              <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-white/80">
-                <Sparkles className="h-4 w-4 text-fuchsia-300" /> What’s new
+
+            <section className="rounded-2xl border border-white/[0.08] bg-[#160a12] p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h2 className="text-base font-extrabold tracking-tight">What’s new</h2>
+                  <p className="mt-1 text-xs text-white/45">The latest improvements in this version</p>
+                </div>
+                <Sparkles className="mt-0.5 h-5 w-5 shrink-0 text-[#ff9fbe]" />
               </div>
               {notes.length ? (
-                <ul className="space-y-2 text-sm leading-5 text-white/60">
+                <ul className="mt-4 space-y-3">
                   {notes.map((note, index) => (
-                    <li key={String(index) + "-" + note} className="flex gap-2">
-                      <span className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-fuchsia-300" /><span>{note}</span>
+                    <li key={String(index) + "-" + note} className="flex items-start gap-2.5">
+                      <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[#ff9fbe]/85" />
+                      <p className="line-clamp-2 min-w-0 text-sm leading-5 text-white/75">{note}</p>
                     </li>
                   ))}
                 </ul>
-              ) : <p className="text-sm leading-5 text-white/60">Stability improvements and fixes are ready for you.</p>}
-            </div>
+              ) : (
+                <p className="mt-3 text-sm leading-5 text-white/65">Stability improvements and fixes are ready for you.</p>
+              )}
+            </section>
+
             {(status === "downloading" || status === "installing") && (
-              <div className="mb-5 rounded-2xl bg-white/[0.04] p-4">
-                <div className="mb-2 flex items-center justify-between text-xs text-white/60">
-                  <span>{status === "downloading" ? "Downloading secure APK" : "Opening Android installer"}</span>
+              <div className="mt-4 rounded-2xl border border-white/[0.08] bg-white/[0.035] p-4">
+                <div className="mb-2 flex items-center justify-between gap-3 text-xs text-white/65">
+                  <span>{status === "downloading" ? "Downloading update" : "Opening Android installer"}</span>
                   <span>{status === "downloading" ? progress + "%" : "Please wait"}</span>
                 </div>
                 <div className="h-2 overflow-hidden rounded-full bg-white/10">
@@ -260,14 +293,28 @@ export default function ForceUpdateGate() {
                     style={status === "downloading" ? { width: progress + "%" } : undefined} />
                 </div>
                 {totalBytes > 0 && status === "downloading" && (
-                  <p className="mt-2 text-right text-[11px] text-white/35">{formatBytes(downloadedBytes)} of {formatBytes(totalBytes)}</p>
+                  <p className="mt-2 text-right text-[11px] text-white/40">{formatBytes(downloadedBytes)} of {formatBytes(totalBytes)}</p>
                 )}
               </div>
             )}
-            {status === "permission" && <div className="mb-4 flex gap-3 rounded-2xl border border-amber-300/20 bg-amber-300/[0.07] p-3 text-sm text-amber-100/85"><ShieldAlert className="mt-0.5 h-5 w-5 shrink-0" /><span>{errorMessage || "Allow 7xAnime to install apps, then return here."}</span></div>}
-            {status === "error" && <div className="mb-4 flex gap-3 rounded-2xl border border-rose-300/20 bg-rose-300/[0.07] p-3 text-sm text-rose-100/85"><TriangleAlert className="mt-0.5 h-5 w-5 shrink-0" /><span>{errorMessage}</span></div>}
+
+            {status === "permission" && (
+              <div className="mt-4 flex gap-3 rounded-xl border border-amber-300/20 bg-amber-300/[0.07] p-3 text-sm text-amber-100/85">
+                <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0" /><span>{errorMessage || "Allow 7xAnime to install apps, then return here."}</span>
+              </div>
+            )}
+            {status === "error" && (
+              <div className="mt-4 flex gap-3 rounded-xl border border-rose-300/20 bg-rose-300/[0.07] p-3 text-sm text-rose-100/85">
+                <TriangleAlert className="mt-0.5 h-5 w-5 shrink-0" /><span>{errorMessage}</span>
+              </div>
+            )}
+          </div>
+        )}
+
+        {status !== "checking" && (
+          <footer className="shrink-0 border-t border-white/[0.08] bg-[#10070e]/98 px-4 pt-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] sm:px-6">
             <button type="button" onClick={retry} disabled={status === "downloading"}
-              className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-fuchsia-500 to-violet-500 px-4 py-3 font-bold text-white disabled:cursor-wait disabled:opacity-60">
+              className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-fuchsia-500 to-violet-500 px-4 py-3 text-sm font-extrabold text-white shadow-lg shadow-fuchsia-950/25 disabled:cursor-wait disabled:opacity-60">
               {status === "downloading" ? <><LoaderCircle className="h-5 w-5 animate-spin" /> Downloading update</> :
                status === "installing" ? <><CheckCircle2 className="h-5 w-5" /> Continue to Android installer</> :
                status === "permission" ? <><ShieldAlert className="h-5 w-5" /> Allow installation</> :
@@ -276,12 +323,12 @@ export default function ForceUpdateGate() {
             </button>
             {status === "error" && downloadUrl && (
               <button type="button" onClick={() => window.open(downloadUrl, "_blank", "noopener,noreferrer")}
-                className="mt-3 flex min-h-11 w-full items-center justify-center gap-2 rounded-2xl border border-white/10 px-4 py-2 text-sm font-semibold text-white/70">
+                className="mt-2 flex min-h-10 w-full items-center justify-center gap-2 rounded-xl border border-white/10 px-4 py-2 text-xs font-semibold text-white/70 hover:bg-white/[0.04]">
                 <ExternalLink className="h-4 w-4" /> Open APK download instead
               </button>
             )}
-            <p className="mt-4 text-center text-[11px] leading-4 text-white/30">Update source: RahulExe69/7xAnime-Releases · Official signed APK</p>
-          </>
+            <p className="mt-2 text-center text-[10px] leading-4 text-white/30">Official signed APK · 7xAnime Releases</p>
+          </footer>
         )}
       </section>
     </div>

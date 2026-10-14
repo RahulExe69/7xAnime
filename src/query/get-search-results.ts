@@ -14,7 +14,19 @@ const COLLECTION_REQUESTS: Record<string, { endpoint: string; params?: Record<st
   completed: { endpoint: "/filter", params: { status: "FINISHED", sort: "SCORE_DESC" } },
 };
 
+const SORT_API_VALUES: Record<string, string> = {
+  default: "POPULARITY_DESC",
+  score: "SCORE_DESC",
+  "recently-added": "START_DATE_DESC",
+  "released-date": "START_DATE_DESC",
+  "recently-updated": "UPDATED_AT_DESC",
+  "most-watched": "POPULARITY_DESC",
+  "most-episodes": "EPISODES_DESC",
+  "name-a-z": "TITLE_ROMAJI",
+};
+
 const searchAnime = async (params: SearchAnimeParams): Promise<IAnimeSearch> => {
+  const sortValue = params.sort ? SORT_API_VALUES[params.sort] || params.sort.toUpperCase() : undefined;
   const requestParams: Record<string, any> = {
     page: params.page || 1,
     per_page: 20,
@@ -22,7 +34,7 @@ const searchAnime = async (params: SearchAnimeParams): Promise<IAnimeSearch> => 
     season: params.season ? params.season.toUpperCase() : undefined,
     format: params.type ? params.type.toUpperCase() : undefined,
     status: params.status ? params.status.toUpperCase() : undefined,
-    sort: params.sort ? params.sort.toUpperCase() : undefined,
+    sort: sortValue,
   };
 
   const cleanQuery = params.q ? params.q.replace(/^"+|"+$/g, "").trim() : "";
@@ -60,6 +72,7 @@ const searchAnime = async (params: SearchAnimeParams): Promise<IAnimeSearch> => 
         dub: 0,
       },
       type: m.format as any,
+      score: m.averageScore,
     })),
     totalPages: totalPages > 0 ? totalPages : 1,
     hasNextPage: data.hasNextPage,

@@ -195,6 +195,10 @@ if not root_gradle.is_file():
 agp_pattern = r"com\.android\.tools\.build:gradle:[0-9.]+"
 agp_files = []
 for gradle_file in Path("android").rglob("*.gradle"):
+    # Gradle creates an android/.gradle cache directory whose name also matches
+    # "*.gradle". Only patch actual build script files, never cache directories.
+    if not gradle_file.is_file():
+        continue
     gradle_text = gradle_file.read_text(encoding="utf-8")
     gradle_text, agp_count = re.subn(
         agp_pattern,
@@ -273,14 +277,16 @@ debug_strings.write_text(
 )
 
 
-# Match 7xTune's proven no-crop launcher strategy: do not use Android adaptive-icon
+# Match 7xTune's proven no-crop launcher strategy: do not use Android adaptive icon
 # XML for this artwork. That XML treats the complete icon image as a foreground layer and
 # applies an OEM-dependent mask/scale to it, which clips the outer 7x mark on some launchers.
 # Copy the approved PNG byte-for-byte into mipmap-nodpi and point @mipmap launcher refs at it.
 brand_dir = Path("public/brand")
 brand_icon = brand_dir / "7xanime-icon.png"
 brand_wordmark = brand_dir / "7xanime-wordmark.png"
-for source in (brand_icon, brand_wordmark):
+splash_background_svg = brand_dir / "7xanime-splash-background.svg"
+splash_foreground = brand_dir / "7xanime-splash-foreground.png"
+for source in (brand_icon, brand_wordmark, splash_background_svg, splash_foreground):
     if not source.is_file():
         print(f"ERROR: missing 7x Brand Studio asset: {source}", file=sys.stderr)
         raise SystemExit(1)
@@ -289,13 +295,10 @@ resource_root = Path("android/app/src/main/res")
 launcher_dir = resource_root / "mipmap-nodpi"
 launcher_dir.mkdir(parents=True, exist_ok=True)
 
-# Remove all template-generated adaptive icon definitions so Android cannot prefer them
-# over the exact source bitmap on Android 8+.
+# Keep the approved launcher artwork byte-for-byte and avoid adaptive launcher masks.
 for existing_xml in resource_root.rglob("ic_launcher*.xml"):
     existing_xml.unlink()
 
-# Remove generated density-specific launcher PNGs. Leaving them in place can cause Android
-# to pick an old, resized template icon instead of the no-density source below.
 for mipmap_dir in resource_root.glob("mipmap-*"):
     if not mipmap_dir.is_dir() or mipmap_dir == launcher_dir:
         continue
@@ -303,9 +306,6 @@ for mipmap_dir in resource_root.glob("mipmap-*"):
         generated_icon.unlink()
 
 approved_icon_bytes = brand_icon.read_bytes()
-# Keep one physical launcher bitmap rather than storing four byte-identical
-# PNG files in the APK. Values-resource aliases preserve the existing resource
-# names while resolving to the single approved source bitmap.
 launcher_output = launcher_dir / "ic_launcher.png"
 launcher_output.write_bytes(approved_icon_bytes)
 if launcher_output.read_bytes() != approved_icon_bytes:
@@ -333,89 +333,210 @@ for alias_name in ("ic_launcher_round", "ic_launcher_static", "ic_launcher_stati
         print(f"ERROR: launcher alias {alias_name} was not generated.", file=sys.stderr)
         raise SystemExit(1)
 
-# Render the native launch artwork as a true transparent squircle. Keep the approved
-# source image and launcher icons untouched; only the splash-specific copy receives
-# an antialiased alpha mask, so the splash no longer shows a hard square edge.
+# The 7x product keeps SVG as the source of truth for its scalable gradient background.
+# Rasterize it at full phone-screen resolutions for Android's native launch window, using
+# a centered SVG viewBox crop (cover, not stretch) to preserve the original gradient geometry.
+def splash_fail(message: str) -> None:
+    print(f"ERROR: {message}", file=sys.stderr)
+    raise SystemExit(1)
+
+
 try:
+    import cairosvg
     from PIL import Image
-except ImportError:
-    print("ERROR: Pillow is required to generate the antialiased squircle splash asset.", file=sys.stderr)
+except ImportError as error:
+    print(
+        "ERROR: CairoSVG and Pillow are required to create the 7xAnime splash assets: " + str(error),
+        file=sys.stderr,
+    )
     raise SystemExit(1)
 
-from PIL import ImageDraw
-
-splash_source = Image.open(brand_icon).convert("RGBA")
-width, height = splash_source.size
-if width != height:
-    print("ERROR: the approved splash artwork must be square to form a squircle.", file=sys.stderr)
+svg_source = splash_background_svg.read_text(encoding="utf-8")
+svg_root = re.search(r"<svg\b[^>]*>", svg_source)
+if not svg_root or 'viewBox="0 0 1080 1080"' not in svg_root.group(0):
+    print("ERROR: the 7xAnime static splash SVG has an unexpected root viewBox.", file=sys.stderr)
     raise SystemExit(1)
 
-scale = 4
-mask_large = Image.new("L", (width * scale, height * scale), 0)
-draw = ImageDraw.Draw(mask_large)
-# A 22% corner radius gives the soft, squircle-like silhouette seen across 7x apps.
-inset = int(round(min(width, height) * 0.012 * scale))
-radius = int(round(min(width, height) * 0.22 * scale))
-draw.rounded_rectangle(
-    (inset, inset, width * scale - inset - 1, height * scale - inset - 1),
-    radius=radius,
-    fill=255,
+def background_svg_for_canvas(width: int, height: int) -> str:
+    aspect = width / height
+    if aspect < 1:
+        view_width = 1080 * aspect
+        view_x = (1080 - view_width) / 2
+        view_box = f"{view_x:.4f} 0 {view_width:.4f} 1080"
+    else:
+        view_height = 1080 / aspect
+        view_y = (1080 - view_height) / 2
+        view_box = f"0 {view_y:.4f} 1080 {view_height:.4f}"
+
+    root = svg_root.group(0)
+    root, width_count = re.subn(r'\swidth="[^"]+"', f' width="{width}"', root, count=1)
+    root, height_count = re.subn(r'\sheight="[^"]+"', f' height="{height}"', root, count=1)
+    root, viewbox_count = re.subn(r'\sviewBox="[^"]+"', f' viewBox="{view_box}"', root, count=1)
+    if (width_count, height_count, viewbox_count) != (1, 1, 1):
+        splash_fail("Could not configure the SVG splash background viewport.")
+    return svg_source[:svg_root.start()] + root + svg_source[svg_root.end():]
+
+# Portrait and landscape variants let Android select the closest full-bleed composition.
+portrait_dir = resource_root / "drawable-nodpi"
+landscape_dir = resource_root / "drawable-land-nodpi"
+portrait_dir.mkdir(parents=True, exist_ok=True)
+landscape_dir.mkdir(parents=True, exist_ok=True)
+background_outputs = [
+    (portrait_dir / "splash_background.png", 1080, 1920),
+    (landscape_dir / "splash_background.png", 1920, 1080),
+]
+for output, width, height in background_outputs:
+    cairosvg.svg2png(
+        bytestring=background_svg_for_canvas(width, height).encode("utf-8"),
+        write_to=str(output),
+        output_width=width,
+        output_height=height,
+    )
+    with Image.open(output) as raster:
+        if raster.size != (width, height):
+            splash_fail(f"Splash background has unexpected dimensions: {output} is {raster.size}.")
+        optimized_background = raster.convert("RGB")
+    optimized_background.save(output, format="PNG", optimize=True)
+
+# Use the exact transparent foreground PNG for the Android 12+ splash icon; don't mask,
+# crop, or re-render it. A separate composed drawable layers it over the SVG background
+# for the legacy launch window.
+foreground_bytes = splash_foreground.read_bytes()
+foreground_output = portrait_dir / "splash_foreground.png"
+foreground_output.write_bytes(foreground_bytes)
+if foreground_output.read_bytes() != foreground_bytes:
+    splash_fail("Splash foreground PNG differs from the approved 7x product source.")
+
+# Pre-Android 12 uses a layer-list rather than the OS splash icon slot. Create a
+# modestly sized transparent copy for that legacy composition, while the Android 12+
+# windowSplashScreenAnimatedIcon continues to use the original 1080px source PNG.
+legacy_foreground_output = portrait_dir / "splash_foreground_legacy.png"
+with Image.open(splash_foreground) as approved_foreground:
+    legacy_foreground = approved_foreground.convert("RGBA")
+    resampling = getattr(Image, "Resampling", Image).LANCZOS
+    legacy_foreground = legacy_foreground.resize((512, 512), resampling)
+    legacy_foreground.save(legacy_foreground_output, format="PNG", optimize=True)
+
+composed_splash = portrait_dir / "splash_composed.xml"
+composed_splash.write_text(
+    '''<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@drawable/splash_background" />
+    <item>
+        <bitmap
+            android:src="@drawable/splash_foreground_legacy"
+            android:gravity="center"
+            android:filter="true" />
+    </item>
+</layer-list>
+''',
+    encoding="utf-8",
 )
-mask = mask_large.resize((width, height), getattr(Image.Resampling, "LANCZOS"))
-splash_source.putalpha(Image.composite(splash_source.getchannel("A"), Image.new("L", (width, height), 0), mask))
 
-splash_dir = resource_root / "drawable-nodpi"
-splash_dir.mkdir(parents=True, exist_ok=True)
-# The splash image is not a launcher icon. Compare lossless WebP and optimized
-# PNG, then retain whichever is smaller. Both encodings preserve the generated
-# transparent pixels; WebP is supported by the app's minSdk 26.
-splash_png = splash_dir / "splash_squircle.png"
-splash_webp = splash_dir / "splash_squircle.webp"
-for previous_output in (splash_png, splash_webp):
+# Remove obsolete generated squircle artwork, so the old launcher icon can't be reused
+# accidentally as the splash foreground and the APK doesn't carry dead splash images.
+for previous_output in (portrait_dir / "splash_squircle.png", portrait_dir / "splash_squircle.webp"):
     if previous_output.exists():
         previous_output.unlink()
-splash_source.save(splash_png, format="PNG", optimize=True)
-try:
-    splash_source.save(splash_webp, format="WEBP", lossless=True, method=6)
-except (OSError, ValueError):
-    if splash_webp.exists():
-        splash_webp.unlink()
 
-if splash_webp.is_file() and splash_webp.stat().st_size < splash_png.stat().st_size:
-    splash_png.unlink()
-    splash_output = splash_webp
-else:
-    if splash_webp.exists():
-        splash_webp.unlink()
-    splash_output = splash_png
-
-# Capacitor's generated launch theme references @drawable/splash for both legacy
-# window background and Android 12+ launch icon. Point those references to our
-# squircle-masked copy, leaving the original source art and launcher icons unchanged.
-# Android 12+ uses values-v31/styles.xml (and future API levels may add
-# their own values-vXX overrides). Patch every generated styles resource, not just
-# the base theme, so no version-specific launch theme can keep the square source.
-style_files = sorted(resource_root.glob("values*/styles.xml"))
-splash_refs = 0
+# Legacy Android uses the composed full-screen drawable. Android 12+ requires a solid
+# windowSplashScreenBackground colour and a separate centered splash icon; use the SVG's
+# own base colour there, and keep the generated window background on the same composition.
+style_files = sorted({*resource_root.glob("values*/styles.xml"), *resource_root.glob("values*/themes.xml")})
+legacy_refs = 0
+animated_icon_refs = 0
+background_color_refs = 0
 for styles in style_files:
     styles_text = styles.read_text(encoding="utf-8")
-    styles_text, updated_refs = re.subn(
-        r'(<item\s+name="(?:android:background|windowSplashScreenAnimatedIcon)">)\s*@drawable/splash\s*(</item>)',
-        r'\g<1>@drawable/splash_squircle\g<2>',
+    styles_text, legacy_count = re.subn(
+        r'(<item\s+name="android:background">)\s*[^<]*\s*(</item>)',
+        r'\g<1>@drawable/splash_composed\g<2>',
         styles_text,
     )
-    if updated_refs:
-        styles.write_text(styles_text, encoding="utf-8")
-        splash_refs += updated_refs
-if splash_refs < 1:
-    already_configured = any(
-        "@drawable/splash_squircle" in styles.read_text(encoding="utf-8")
-        for styles in style_files
+    styles_text, icon_count = re.subn(
+        r'(<item\s+name="(?:android:)?windowSplashScreenAnimatedIcon">)\s*[^<]*\s*(</item>)',
+        r'\g<1>@drawable/splash_foreground\g<2>',
+        styles_text,
     )
-    if not already_configured:
-        print("ERROR: could not find a generated @drawable/splash theme reference in any values*/styles.xml.", file=sys.stderr)
-        raise SystemExit(1)
+    styles_text, color_count = re.subn(
+        r'(<item\s+name="(?:android:)?windowSplashScreenBackground">)\s*[^<]*\s*(</item>)',
+        r'\g<1>#1E0D1B\g<2>',
+        styles_text,
+    )
+    if legacy_count or icon_count or color_count:
+        styles.write_text(styles_text, encoding="utf-8")
+    legacy_refs += legacy_count
+    animated_icon_refs += icon_count
+    background_color_refs += color_count
 
-print(f"Configured native squircle splash from {brand_icon} ({width}x{height}); original artwork and launcher assets remain unchanged.")
+# Capacitor 8's generated launch theme inherits Theme.SplashScreen but only
+# includes android:background. The AndroidX SplashScreen attributes are not
+# present in the template, so replacement-only logic silently has nothing to
+# replace. Explicitly create/update them in the launch theme and restore the
+# regular app theme after the system splash is dismissed.
+launch_style_pattern = re.compile(
+    r'(?P<opening><style\b(?=[^>]*\bname=["\']AppTheme\.NoActionBarLaunch["\'])[^>]*>)'
+    r'(?P<body>.*?)'
+    r'(?P<closing></style>)',
+    re.DOTALL,
+)
+required_launch_items = (
+    ("windowSplashScreenAnimatedIcon", "@drawable/splash_foreground"),
+    ("windowSplashScreenBackground", "#1E0D1B"),
+    ("postSplashScreenTheme", "@style/AppTheme.NoActionBar"),
+)
 
+def configure_launch_style(match: re.Match[str]) -> str:
+    body = match.group("body")
+    for item_name, item_value in required_launch_items:
+        item_pattern = re.compile(
+            r'(<item\b(?=[^>]*\bname=["\'](?:android:)?'
+            + re.escape(item_name)
+            + r'["\'])[^>]*>).*?(</item>)',
+            re.DOTALL,
+        )
+        body, replaced = item_pattern.subn(
+            lambda item: item.group(1) + item_value + item.group(2),
+            body,
+            count=1,
+        )
+        if replaced == 0:
+            body = body.rstrip() + (
+                f'\n        <item name="{item_name}">{item_value}</item>\n    '
+            )
+    return match.group("opening") + body + match.group("closing")
+
+launch_styles_configured = 0
+for styles in style_files:
+    styles_text = styles.read_text(encoding="utf-8")
+    styles_text, configured_count = launch_style_pattern.subn(
+        configure_launch_style,
+        styles_text,
+    )
+    if configured_count:
+        styles.write_text(styles_text, encoding="utf-8")
+        launch_styles_configured += configured_count
+
+if launch_styles_configured == 0:
+    splash_fail("Could not find AppTheme.NoActionBarLaunch to configure AndroidX splash attributes.")
+
+if legacy_refs < 1 and not any(
+    "@drawable/splash_composed" in styles.read_text(encoding="utf-8") for styles in style_files
+):
+    splash_fail("Could not find or configure the native launch window background.")
+if animated_icon_refs < 1 and not any(
+    "@drawable/splash_foreground" in styles.read_text(encoding="utf-8") for styles in style_files
+):
+    splash_fail("Could not find or configure the Android splash foreground icon.")
+if background_color_refs < 1 and not any(
+    re.search(r'<item\s+name="windowSplashScreenBackground">\s*#1E0D1B\s*</item>', styles.read_text(encoding="utf-8"))
+    for styles in style_files
+):
+    splash_fail("Could not configure Android 12+ splash base colour.")
+
+print(
+    "Configured native splash from the 7x product SVG and byte-identical foreground PNG; "
+    f"portrait={background_outputs[0][1]}x{background_outputs[0][2]}, "
+    f"landscape={background_outputs[1][1]}x{background_outputs[1][2]}."
+)
 print(f"Configured com.sevenx.anime version {version_name} ({version_code}) with byte-identical no-crop launcher bitmaps.")
