@@ -449,17 +449,17 @@ background_color_refs = 0
 for styles in style_files:
     styles_text = styles.read_text(encoding="utf-8")
     styles_text, legacy_count = re.subn(
-        r'(<item\s+name="android:background">)\s*@drawable/splash(?:_squircle)?\s*(</item>)',
+        r'(<item\s+name="android:background">)\s*[^<]*\s*(</item>)',
         r'\g<1>@drawable/splash_composed\g<2>',
         styles_text,
     )
     styles_text, icon_count = re.subn(
-        r'(<item\s+name="(?:android:)?windowSplashScreenAnimatedIcon">)\s*@drawable/splash(?:_squircle)?\s*(</item>)',
+        r'(<item\s+name="(?:android:)?windowSplashScreenAnimatedIcon">)\s*[^<]*\s*(</item>)',
         r'\g<1>@drawable/splash_foreground\g<2>',
         styles_text,
     )
     styles_text, color_count = re.subn(
-        r'(<item\s+name="(?:android:)?windowSplashScreenBackground">)\s*(?:@color/[\w.]+|#[0-9A-Fa-f]{6,8})\s*(</item>)',
+        r'(<item\s+name="(?:android:)?windowSplashScreenBackground">)\s*[^<]*\s*(</item>)',
         r'\g<1>#1E0D1B\g<2>',
         styles_text,
     )
