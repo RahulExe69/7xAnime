@@ -95,6 +95,71 @@ if proguard_replacements == 0 and "proguard-android-optimize.txt" not in text:
     print("ERROR: could not update the generated ProGuard defaults for AGP 9.", file=sys.stderr)
     raise SystemExit(1)
 
+# The stock Capacitor template disables shrinking. Turn R8 and Android resource
+# shrinking on for release builds by default, with explicit overrides for the
+# reproducible size-audit workflow. Debug builds remain unaffected.
+def env_bool(name: str, default: bool) -> bool:
+    raw = os.environ.get(name, "").strip().lower()
+    if not raw:
+        return default
+    if raw in ("1", "true", "yes", "on"):
+        return True
+    if raw in ("0", "false", "no", "off"):
+        return False
+    print(f"ERROR: {name} must be true or false, not {raw!r}.", file=sys.stderr)
+    raise SystemExit(1)
+
+release_minify = env_bool("ANDROID_RELEASE_MINIFY", True)
+release_shrink = env_bool("ANDROID_RELEASE_SHRINK_RESOURCES", True)
+minify_pattern = r"(?m)^(\\s*)minifyEnabled\\s+(?:true|false)\\s*$"
+text, minify_count = re.subn(
+    minify_pattern,
+    lambda match: match.group(1) + "minifyEnabled " + str(release_minify).lower(),
+    text,
+    count=1,
+)
+if minify_count != 1:
+    print("ERROR: could not configure the generated release minifyEnabled setting.", file=sys.stderr)
+    raise SystemExit(1)
+
+shrink_pattern = r"(?m)^(\\s*)shrinkResources\\s+(?:true|false)\\s*$"
+if re.search(shrink_pattern, text):
+    text, shrink_count = re.subn(
+        shrink_pattern,
+        lambda match: match.group(1) + "shrinkResources " + str(release_shrink).lower(),
+        text,
+        count=1,
+    )
+else:
+    text, shrink_count = re.subn(
+        minify_pattern,
+        lambda match: match.group(0) + "\\n" + match.group(1) + "shrinkResources " + str(release_shrink).lower(),
+        text,
+        count=1,
+    )
+if shrink_count != 1:
+    print("ERROR: could not configure the generated release shrinkResources setting.", file=sys.stderr)
+    raise SystemExit(1)
+
+# Keep the project's narrow WebView bridge and Capacitor plugin/JNI entry points
+# across optimization. The rules file is copied into the generated app by the
+# local-backend configurator.
+proguard_rules = "proguard-7xanime-rules.pro"
+proguard_lines = re.findall(r"(?m)^\\s*proguardFiles\\s+[^\\n]+", text)
+if not proguard_lines:
+    print("ERROR: could not locate release proguardFiles declaration.", file=sys.stderr)
+    raise SystemExit(1)
+if proguard_rules not in proguard_lines[0]:
+    text, rules_count = re.subn(
+        r"(?m)^(\\s*proguardFiles\\s+[^\\n]+)$",
+        lambda match: match.group(1) + ", '" + proguard_rules + "'",
+        text,
+        count=1,
+    )
+    if rules_count != 1:
+        print("ERROR: could not attach the 7xAnime ProGuard rules.", file=sys.stderr)
+        raise SystemExit(1)
+
 app_gradle.write_text(text, encoding="utf-8")
 
 # Capacitor plugins contain their own Android library build files under node_modules.
@@ -238,17 +303,34 @@ for mipmap_dir in resource_root.glob("mipmap-*"):
         generated_icon.unlink()
 
 approved_icon_bytes = brand_icon.read_bytes()
-launcher_names = (
-    "ic_launcher.png",
-    "ic_launcher_round.png",
-    "ic_launcher_static.png",
-    "ic_launcher_static_round.png",
+# Keep one physical launcher bitmap rather than storing four byte-identical
+# PNG files in the APK. Values-resource aliases preserve the existing resource
+# names while resolving to the single approved source bitmap.
+launcher_output = launcher_dir / "ic_launcher.png"
+launcher_output.write_bytes(approved_icon_bytes)
+if launcher_output.read_bytes() != approved_icon_bytes:
+    print(f"ERROR: launcher bitmap differs from approved source: {launcher_output}", file=sys.stderr)
+    raise SystemExit(1)
+for redundant_name in ("ic_launcher_round.png", "ic_launcher_static.png", "ic_launcher_static_round.png"):
+    redundant_icon = launcher_dir / redundant_name
+    if redundant_icon.exists():
+        redundant_icon.unlink()
+
+alias_file = resource_root / "values" / "7xanime-launcher-aliases.xml"
+alias_file.parent.mkdir(parents=True, exist_ok=True)
+alias_file.write_text(
+    '''<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <item type="mipmap" name="ic_launcher_round">@mipmap/ic_launcher</item>
+    <item type="mipmap" name="ic_launcher_static">@mipmap/ic_launcher</item>
+    <item type="mipmap" name="ic_launcher_static_round">@mipmap/ic_launcher</item>
+</resources>
+''',
+    encoding="utf-8",
 )
-for name in launcher_names:
-    output = launcher_dir / name
-    output.write_bytes(approved_icon_bytes)
-    if output.read_bytes() != approved_icon_bytes:
-        print(f"ERROR: launcher bitmap differs from approved source: {output}", file=sys.stderr)
+for alias_name in ("ic_launcher_round", "ic_launcher_static", "ic_launcher_static_round"):
+    if f'name="{alias_name}"' not in alias_file.read_text(encoding="utf-8"):
+        print(f"ERROR: launcher alias {alias_name} was not generated.", file=sys.stderr)
         raise SystemExit(1)
 
 # Render the native launch artwork as a true transparent squircle. Keep the approved
@@ -284,8 +366,20 @@ splash_source.putalpha(Image.composite(splash_source.getchannel("A"), Image.new(
 
 splash_dir = resource_root / "drawable-nodpi"
 splash_dir.mkdir(parents=True, exist_ok=True)
-splash_output = splash_dir / "splash_squircle.png"
-splash_source.save(splash_output, format="PNG", optimize=True)
+# The splash image is not a launcher icon. Store it as lossless WebP (supported
+# by our minSdk 26) to reduce its APK footprint while preserving transparency and
+# exact pixels. Fall back to optimized PNG if the installed Pillow lacks WebP.
+legacy_splash = splash_dir / "splash_squircle.png"
+if legacy_splash.exists():
+    legacy_splash.unlink()
+splash_output = splash_dir / "splash_squircle.webp"
+try:
+    splash_source.save(splash_output, format="WEBP", lossless=True, method=6)
+except (OSError, ValueError):
+    if splash_output.exists():
+        splash_output.unlink()
+    splash_output = splash_dir / "splash_squircle.png"
+    splash_source.save(splash_output, format="PNG", optimize=True)
 
 # Capacitor's generated launch theme references @drawable/splash for both legacy
 # window background and Android 12+ launch icon. Point those references to our
