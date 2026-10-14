@@ -366,20 +366,28 @@ splash_source.putalpha(Image.composite(splash_source.getchannel("A"), Image.new(
 
 splash_dir = resource_root / "drawable-nodpi"
 splash_dir.mkdir(parents=True, exist_ok=True)
-# The splash image is not a launcher icon. Store it as lossless WebP (supported
-# by our minSdk 26) to reduce its APK footprint while preserving transparency and
-# exact pixels. Fall back to optimized PNG if the installed Pillow lacks WebP.
-legacy_splash = splash_dir / "splash_squircle.png"
-if legacy_splash.exists():
-    legacy_splash.unlink()
-splash_output = splash_dir / "splash_squircle.webp"
+# The splash image is not a launcher icon. Compare lossless WebP and optimized
+# PNG, then retain whichever is smaller. Both encodings preserve the generated
+# transparent pixels; WebP is supported by the app's minSdk 26.
+splash_png = splash_dir / "splash_squircle.png"
+splash_webp = splash_dir / "splash_squircle.webp"
+for previous_output in (splash_png, splash_webp):
+    if previous_output.exists():
+        previous_output.unlink()
+splash_source.save(splash_png, format="PNG", optimize=True)
 try:
-    splash_source.save(splash_output, format="WEBP", lossless=True, method=6)
+    splash_source.save(splash_webp, format="WEBP", lossless=True, method=6)
 except (OSError, ValueError):
-    if splash_output.exists():
-        splash_output.unlink()
-    splash_output = splash_dir / "splash_squircle.png"
-    splash_source.save(splash_output, format="PNG", optimize=True)
+    if splash_webp.exists():
+        splash_webp.unlink()
+
+if splash_webp.is_file() and splash_webp.stat().st_size < splash_png.stat().st_size:
+    splash_png.unlink()
+    splash_output = splash_webp
+else:
+    if splash_webp.exists():
+        splash_webp.unlink()
+    splash_output = splash_png
 
 # Capacitor's generated launch theme references @drawable/splash for both legacy
 # window background and Android 12+ launch icon. Point those references to our
