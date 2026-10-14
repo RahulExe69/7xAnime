@@ -239,7 +239,7 @@ jobs:
           )
 
       - name: Verify signature and package ARM64-only release APK
-        id: package-arm64
+        id: package_arm64
         run: |
           set -euo pipefail
           APK="android/app/build/outputs/apk/release/app-release.apk"
@@ -294,9 +294,9 @@ jobs:
           APK_FILE: ${{ steps.package.outputs.apk_file }}
           APK_SHA256: ${{ steps.package.outputs.apk_sha256 }}
           APK_SIZE_MB: ${{ steps.package.outputs.apk_size_mb }}
-          ARM64_APK_FILE: ${{ steps.package-arm64.outputs.arm64_apk_file }}
-          ARM64_APK_SHA256: ${{ steps.package-arm64.outputs.arm64_apk_sha256 }}
-          ARM64_APK_SIZE_MB: ${{ steps.package-arm64.outputs.arm64_apk_size_mb }}
+          ARM64_APK_FILE: ${{ steps.package_arm64.outputs.arm64_apk_file }}
+          ARM64_APK_SHA256: ${{ steps.package_arm64.outputs.arm64_apk_sha256 }}
+          ARM64_APK_SIZE_MB: ${{ steps.package_arm64.outputs.arm64_apk_size_mb }}
           CUSTOM_NOTES: ${{ inputs.release_notes }}
           PUBLIC_RELEASE_REPO: RahulExe69/7xAnime-Releases
         run: |
@@ -364,7 +364,7 @@ jobs:
           path: |
             ${{ steps.package.outputs.apk_file }}
             ${{ steps.package.outputs.apk_file }}.sha256
-            ${{ steps.package-arm64.outputs.arm64_apk_file }}
-            ${{ steps.package-arm64.outputs.arm64_apk_file }}.sha256
+            ${{ steps.package_arm64.outputs.arm64_apk_file }}
+            ${{ steps.package_arm64.outputs.arm64_apk_file }}.sha256
           if-no-files-found: error
           retention-days: 90
