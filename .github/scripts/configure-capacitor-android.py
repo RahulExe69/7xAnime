@@ -400,8 +400,13 @@ for styles in style_files:
         styles.write_text(styles_text, encoding="utf-8")
         splash_refs += updated_refs
 if splash_refs < 1:
-    print("ERROR: could not find a generated @drawable/splash theme reference in any values*/styles.xml.", file=sys.stderr)
-    raise SystemExit(1)
+    already_configured = any(
+        "@drawable/splash_squircle" in styles.read_text(encoding="utf-8")
+        for styles in style_files
+    )
+    if not already_configured:
+        print("ERROR: could not find a generated @drawable/splash theme reference in any values*/styles.xml.", file=sys.stderr)
+        raise SystemExit(1)
 
 print(f"Configured native squircle splash from {brand_icon} ({width}x{height}); original artwork and launcher assets remain unchanged.")
 
