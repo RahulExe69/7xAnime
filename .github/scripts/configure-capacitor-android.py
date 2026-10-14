@@ -442,7 +442,7 @@ for previous_output in (portrait_dir / "splash_squircle.png", portrait_dir / "sp
 # Legacy Android uses the composed full-screen drawable. Android 12+ requires a solid
 # windowSplashScreenBackground colour and a separate centered splash icon; use the SVG's
 # own base colour there, and keep the generated window background on the same composition.
-style_files = sorted(resource_root.glob("values*/styles.xml"))
+style_files = sorted({*resource_root.glob("values*/styles.xml"), *resource_root.glob("values*/themes.xml")})
 legacy_refs = 0
 animated_icon_refs = 0
 background_color_refs = 0
