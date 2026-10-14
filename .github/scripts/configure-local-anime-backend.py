@@ -215,7 +215,7 @@ def patch_app_gradle() -> None:
 
     if "abiFilters" in default_config:
         default_config, abi_count = re.subn(
-            r"(?m)^(\\s*)abiFilters\\s+[^\\n]+$",
+            r"(?m)^(\s*)abiFilters\s+[^\n]+$",
             lambda match: match.group(1) + abi_filters,
             default_config,
             count=1,
@@ -226,7 +226,7 @@ def patch_app_gradle() -> None:
     else:
         text = (
             text[:default_close]
-            + "\\n        ndk {\\n            " + abi_filters + "\\n        }\\n    "
+            + "\n        ndk {\n            " + abi_filters + "\n        }\n    "
             + text[default_close:]
         )
 
