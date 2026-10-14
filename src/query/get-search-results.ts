@@ -60,6 +60,7 @@ const searchAnime = async (params: SearchAnimeParams): Promise<IAnimeSearch> => 
         dub: 0,
       },
       type: m.format as any,
+      score: m.averageScore,
     })),
     totalPages: totalPages > 0 ? totalPages : 1,
     hasNextPage: data.hasNextPage,
