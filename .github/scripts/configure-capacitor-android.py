@@ -277,7 +277,7 @@ debug_strings.write_text(
 )
 
 
-# Match 7xTune's proven no-crop launcher strategy: do not use Android adaptive-icon
+# Match 7xTune's proven no-crop launcher strategy: do not use Android adaptive icon
 # XML for this artwork. That XML treats the complete icon image as a foreground layer and
 # applies an OEM-dependent mask/scale to it, which clips the outer 7x mark on some launchers.
 # Copy the approved PNG byte-for-byte into mipmap-nodpi and point @mipmap launcher refs at it.
