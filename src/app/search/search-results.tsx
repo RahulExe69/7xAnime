@@ -251,7 +251,7 @@ const SearchResults = () => {
           <Link href="/search?collection=popular" className="shrink-0 text-xs font-semibold text-[#ff9fbe] hover:text-white">Clear search</Link>
         </div>
       )}
-      {collectionTitle && <p className="text-xs font-medium text-[#a39ab6]">{collectionTitle} · curated for you</p>}
+      {collectionTitle && !["popular", "trending"].includes(params.collection || "") && <p className="text-xs font-medium text-[#a39ab6]">{collectionTitle} · curated for you</p>}
 
       {isLoading && (
         <div className="grid w-full grid-cols-2 content-start gap-x-3 gap-y-4 sm:grid-cols-3 sm:gap-4 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7">
@@ -274,7 +274,7 @@ const SearchResults = () => {
           handlePageChange={handlePageChange} handlePreviousPage={handlePreviousPage} />
       )}
     </main>
-  );;
+  );
 };
 
 export default SearchResults;
