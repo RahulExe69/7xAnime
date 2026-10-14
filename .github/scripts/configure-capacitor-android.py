@@ -195,6 +195,10 @@ if not root_gradle.is_file():
 agp_pattern = r"com\.android\.tools\.build:gradle:[0-9.]+"
 agp_files = []
 for gradle_file in Path("android").rglob("*.gradle"):
+    # Gradle creates an android/.gradle cache directory whose name also matches
+    # "*.gradle". Only patch actual build script files, never cache directories.
+    if not gradle_file.is_file():
+        continue
     gradle_text = gradle_file.read_text(encoding="utf-8")
     gradle_text, agp_count = re.subn(
         agp_pattern,
