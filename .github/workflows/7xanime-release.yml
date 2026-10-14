@@ -226,6 +226,9 @@ jobs:
       - name: Configure and compile ARM64-only release APK
         env:
           ANDROID_ABI_FILTERS: "arm64-v8a"
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           set -euo pipefail
           python3 .github/scripts/configure-local-anime-backend.py
