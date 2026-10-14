@@ -459,6 +459,9 @@ jobs:
               ./gradlew clean assembleRelease --no-daemon --parallel --build-cache --stacktrace
             )
             local apk="android/app/build/outputs/apk/release/app-release.apk"
+            if [[ ! -s "${apk}" ]]; then
+              apk="android/app/build/outputs/apk/release/app-release-unsigned.apk"
+            fi
             test -s "${apk}"
             cp "${apk}" "artifacts/size-audit/${label}.apk"
             echo "Built ${label}: $(stat -c%s "artifacts/size-audit/${label}.apk") bytes"
