@@ -120,7 +120,7 @@ export default function ForceUpdateGate() {
         // older native bridges, and devices without a matching architecture asset.
         const universalApk = apkAssets.find((asset) =>
           !/-(?:arm64-v8a|x86_64|armeabi-v7a|x86)\.apk$/i.test(asset.name || ""));
-        const apk = architectureApk || universalApk || apkAssets[0];
+        const apk = architectureApk || universalApk;
         if (!/^v?\d+\.\d+\.\d+(?:[-+][0-9a-z.-]+)?$/i.test(tag) || !apk?.browser_download_url) {
           throw new Error("The latest published release does not contain a valid versioned APK.");
         }
