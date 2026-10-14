@@ -1,3 +1,6 @@
+# Preserve runtime annotations used by WebView and Capacitor's reflective plugin discovery.
+-keepattributes *Annotation*
+
 # Keep JavaScript-bridge methods exposed to WebView by name. These methods are
 # discovered reflectively by Android and cannot be safely renamed by R8.
 -keepclassmembers class com.sevenx.anime.UpdateBridge {
