@@ -277,7 +277,7 @@ jobs:
             echo
             echo "- APK: $(basename "${OUTPUT}")"
             echo "- Size: ${SIZE_MB} MiB"
-            echo "- Universal APK: ${OUTPUT/ -arm64-v8a/}"
+            echo "- Universal APK: artifacts/7xAnime-v${VERSION_NAME}.apk"
             echo "- Saved versus universal APK: ${SAVED_MB} MiB (${SAVED_PCT}%)"
             echo "- Native architecture: arm64-v8a only"
             echo "- SHA-256: ${SHA256}"
