@@ -6,7 +6,6 @@ import {
   Compass,
   ExternalLink,
   Heart,
-  Music2,
   PlayCircle,
   Search,
   ShieldCheck,
@@ -33,6 +32,7 @@ const ECOSYSTEM_PRODUCTS = [
     description: "Music & listening",
     accent: "#7657FF",
     src: BRAND_ASSET_URLS.tuneIcon,
+    fallbackSrc: undefined,
     fallbackLabel: "7xTune",
   },
 ];
