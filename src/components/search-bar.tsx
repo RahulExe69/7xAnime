@@ -7,9 +7,10 @@ import Image from "next/image";
 import Link from "next/link";
 import { ROUTES } from "@/constants/routes";
 import { cn } from "@/lib/utils";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "./ui/button";
 import Tooltip from "./common/tooltip";
+import useAnimeAvailabilityFilter from "@/hooks/use-anime-availability-filter";
 
 const SearchBar = ({
   className,
@@ -25,8 +26,12 @@ const SearchBar = ({
   const debouncedValue = useDebounce(searchValue, 350);
   const resultsRef = useRef<HTMLDivElement | null>(null);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const availableOnly = searchParams.get("available") === "1";
 
   const { data: searchResults, isLoading } = useSearchAnime(debouncedValue);
+  const availability = useAnimeAvailabilityFilter(searchResults, availableOnly);
+  const visibleResults = availableOnly ? availability.filteredItems : (searchResults || []);
 
   const handleBlur = () => {
     setTimeout(() => {
@@ -50,7 +55,9 @@ const SearchBar = ({
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter" && searchValue.trim()) {
       // Redirect to the search results page
-      router.push(`${ROUTES.SEARCH}?q=${encodeURIComponent(searchValue)}`);
+      const next = new URLSearchParams({ q: searchValue.trim() });
+      if (availableOnly) next.set("available", "1");
+      router.push(`${ROUTES.SEARCH}?${next.toString()}`);
       setIsFocused(false); // Hide the dropdown results
       if (onAnimeClick) {
         onAnimeClick();
@@ -76,7 +83,7 @@ const SearchBar = ({
           variant="secondary"
           className="absolute right-1.5 top-1/2 h-8 -translate-y-1/2 rounded-lg text-zinc-300 hover:bg-rose-500/15 hover:text-rose-200"
           onClick={() => {
-            router.push(ROUTES.SEARCH + '?q=""');
+            router.push(ROUTES.SEARCH + (availableOnly ? '?q=""&available=1' : '?q=""'));
           }}
         >
           <Tooltip side="bottom" content="Filter">
@@ -90,7 +97,7 @@ const SearchBar = ({
           className="absolute w-full max-h-[40vh] hidden lg:flex overflow-y-auto flex-col gap-5 px-5 py-5 bg-secondary top-[110%] rounded-md"
         >
           <div className="grid grid-cols-1 gap-2">
-            {(isLoading || (!searchResults && !!searchValue)) &&
+            {(isLoading || (availableOnly && availability.isChecking) || (!searchResults && !!searchValue)) &&
               [1, 2, 3, 4].map((_, idx) => {
                 return (
                   <div
@@ -102,7 +109,7 @@ const SearchBar = ({
                 );
               })}
 
-            {searchResults?.map((anime) => (
+            {visibleResults.map((anime) => (
               <a key={anime.id} href={ROUTES.animeDetails(anime.id)}>
                 <div
                   className="flex items-start gap-4 hover:bg-[#121212] rounded-md p-2 cursor-pointer"
@@ -133,7 +140,7 @@ const SearchBar = ({
             ))}
             <Link
               className="w-full"
-              href={`${ROUTES.SEARCH}?q=${encodeURIComponent(searchValue)}`}
+              href={`${ROUTES.SEARCH}?q=${encodeURIComponent(searchValue)}${availableOnly ? "&available=1" : ""}`}
             >
               <Button className="w-full bg-[#ff3b72] text-white">
                 Show More
@@ -161,7 +168,7 @@ const SearchBar = ({
                 );
               })}
 
-            {searchResults?.slice(0, 5).map((anime) => (
+            {visibleResults.slice(0, 5).map((anime) => (
               <Link key={anime.id} href={ROUTES.animeDetails(anime.id)}>
                 <div
                   className="flex items-center gap-2 hover:bg-[#121212] rounded-md p-1 cursor-pointer"
