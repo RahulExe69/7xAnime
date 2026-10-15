@@ -34,6 +34,7 @@ const ECOSYSTEM_PRODUCTS = [
     src: BRAND_ASSET_URLS.tuneIcon,
     fallbackSrc: undefined,
     fallbackLabel: "7xTune",
+    current: false,
   },
 ];
 
