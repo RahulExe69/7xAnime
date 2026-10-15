@@ -335,6 +335,42 @@ class LocalAnimeApiTests(unittest.TestCase):
                 self.assertIn("anixo", third["providers"])
                 self.assertIn("megavid", third["providers"])
                 self.assertTrue(third["complete"])
+                self.assertEqual(third["providerNames"], ["anixo", "megavid"])
+                self.assertEqual(third["failedProviders"], [])
+
+            local_api._episode_discovery_cache.pop(anime_id, None)
+            local_api._LOCAL_CONTEXT_CACHE.pop(anime_id, None)
+            local_api._LOCAL_CONTEXT_TASKS.pop(loop_task_key, None)
+
+        asyncio.run(exercise())
+
+    def test_episode_discovery_reports_failed_providers_separately(self) -> None:
+        async def exercise() -> None:
+            anime_id = 87654322
+            loop_task_key = (id(asyncio.get_running_loop()), anime_id)
+            local_api._episode_discovery_cache.pop(anime_id, None)
+            local_api._LOCAL_CONTEXT_CACHE.pop(anime_id, None)
+            local_api._LOCAL_CONTEXT_TASKS.pop(loop_task_key, None)
+
+            async def fake_provider_episodes(mod, name, requested_id, ctx):
+                if name == "anixo":
+                    raise TimeoutError("provider timed out")
+                return name, {"episodes": {"sub": [], "dub": []}}
+
+            fake_modules = [("anixo", object()), ("megavid", object())]
+            with (
+                patch.object(local_api.provider_race, "providers", return_value=fake_modules),
+                patch.object(local_api.provider_race, "build_ctx", new=AsyncMock(return_value={"media": {"id": anime_id, "title": {"english": "Test"}}, "anizip": None})),
+                patch.object(local_api.provider_race, "_episodes_one", new=AsyncMock(side_effect=fake_provider_episodes)),
+            ):
+                response = await local_api._progressive_merged_episodes(anime_id)
+
+            self.assertIsNotNone(response)
+            self.assertTrue(response["complete"])
+            self.assertEqual(response["providerNames"], ["anixo", "megavid"])
+            self.assertEqual(response["failedProviders"], ["anixo"])
+            self.assertIn("megavid", response["providers"])
+            self.assertNotIn("anixo", response["providers"])
 
             local_api._episode_discovery_cache.pop(anime_id, None)
             local_api._LOCAL_CONTEXT_CACHE.pop(anime_id, None)
