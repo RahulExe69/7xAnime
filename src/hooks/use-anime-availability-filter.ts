@@ -1,10 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import {
-  AnimeAudioAvailability,
-  filterAnimeByAvailability,
-} from "@/lib/anime-availability";
+import { filterAnimeByAvailability, type AnimeAudioAvailability } from "@/lib/anime-availability";
 
 type IdentifiableAnime = { id: string | number };
 type AvailabilityState = {
