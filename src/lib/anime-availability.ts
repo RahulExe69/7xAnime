@@ -1,5 +1,5 @@
 import { api } from "@/lib/api";
-import { EpisodeResponse } from "@/types/miruro-api";
+import type { EpisodeResponse } from "@/types/miruro-api";
 
 export type AnimeAudioAvailability = "any" | "sub" | "dub";
 export type AnimeAvailabilityStatus = "available" | "unavailable" | "unknown";
