@@ -2,34 +2,39 @@ import Image from "next/image";
 import Link from "next/link";
 import {
   ArrowLeft,
-  BookOpen,
   CheckCircle2,
-  Clapperboard,
   Compass,
   ExternalLink,
-  Gamepad2,
   Heart,
-  Image as ImageIcon,
   Music2,
   PlayCircle,
   Search,
   ShieldCheck,
   Sparkles,
-  Wrench,
 } from "lucide-react";
 import Container from "@/components/container";
+import CachedBrandImage from "@/components/cached-brand-image";
+import { BRAND_ASSET_URLS } from "@/lib/brand-assets";
 
 const PROFILE_IMAGE = "https://avatars.githubusercontent.com/u/203097752?v=4";
 
 const ECOSYSTEM_PRODUCTS = [
-  { name: "7xAnime", description: "Anime discovery", accent: "#FF315E", icon: PlayCircle, current: true },
-  { name: "7xTune", description: "Music & listening", accent: "#7657FF", icon: Music2 },
-  { name: "7xCinema", description: "Films & cinema", accent: "#FFC247", icon: Clapperboard },
-  { name: "7xRead", description: "Reading", accent: "#20DCA6", icon: BookOpen },
-  { name: "7xGame", description: "Gaming", accent: "#168BFF", icon: Gamepad2 },
-  { name: "7xWall", description: "Wallpapers & art", accent: "#F02AA9", icon: ImageIcon },
-  { name: "7xTools", description: "Everyday utilities", accent: "#19C8E8", icon: Wrench },
-  { name: "7xAI", description: "AI & discovery", accent: "#A16AFF", icon: Sparkles },
+  {
+    name: "7xAnime",
+    description: "Anime discovery",
+    accent: "#FF315E",
+    src: BRAND_ASSET_URLS.animeIcon,
+    fallbackSrc: "/brand/7xanime-icon.png",
+    fallbackLabel: "7x",
+    current: true,
+  },
+  {
+    name: "7xTune",
+    description: "Music & listening",
+    accent: "#7657FF",
+    src: BRAND_ASSET_URLS.tuneIcon,
+    fallbackLabel: "7xTune",
+  },
 ];
 
 const FEATURES = [
@@ -71,13 +76,13 @@ export default function AboutPage() {
         <div className="pointer-events-none absolute -right-10 -top-16 -z-10 h-48 w-48 rounded-full bg-[#ff3b72]/15 blur-3xl" />
         <div className="relative flex flex-col items-center text-center">
           <div className="grid h-24 w-24 place-items-center rounded-[24px] border border-white/[0.12] bg-black/25 p-3 shadow-xl shadow-[#ff3b72]/10 sm:h-28 sm:w-28">
-            <Image
-              src="/brand/7xanime-icon.png"
-              alt="7xAnime app icon"
-              width={1254}
-              height={1254}
-              priority
-              className="h-full w-full object-contain"
+            <CachedBrandImage
+              src={BRAND_ASSET_URLS.masterIcon}
+              alt="Master 7x brand icon"
+              width={1024}
+              height={1024}
+              fallbackLabel="7x"
+              className="h-full w-full text-2xl"
             />
           </div>
           <Image
@@ -137,11 +142,10 @@ export default function AboutPage() {
           </a>
         </div>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-[#b49aa4]">
-          Shared brand roots, different product worlds. Each project has its own purpose and
-          accent colour while keeping the 7x identity connected.
+          Two products, one shared identity. 7xAnime brings anime discovery; 7xTune brings music and listening.
         </p>
-        <div className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
-          {ECOSYSTEM_PRODUCTS.map(({ name, description, accent, icon: Icon, current }) => (
+        <div className="mt-4 grid grid-cols-2 gap-3 sm:gap-4">
+          {ECOSYSTEM_PRODUCTS.map(({ name, description, accent, src, fallbackSrc, fallbackLabel, current }) => (
             <article
               key={name}
               aria-current={current ? "true" : undefined}
@@ -151,16 +155,15 @@ export default function AboutPage() {
                 backgroundColor: current ? `${accent}18` : `${accent}0c`,
               }}
             >
-              <div
-                className="grid h-9 w-9 place-items-center rounded-xl border"
-                style={{
-                  color: accent,
-                  borderColor: `${accent}45`,
-                  backgroundColor: `${accent}18`,
-                }}
-              >
-                <Icon className="h-[18px] w-[18px]" />
-              </div>
+              <CachedBrandImage
+                src={src}
+                alt={`${name} app icon`}
+                width={512}
+                height={512}
+                fallbackSrc={fallbackSrc}
+                fallbackLabel={fallbackLabel}
+                className="h-[68px] w-[68px] rounded-2xl border p-2"
+              />
               <h3 className="mt-3 truncate text-sm font-extrabold text-[#fff0f5]">{name}</h3>
               <p className="mt-1 text-[11px] leading-5 text-[#b49aa4]">{description}</p>
               {current && (
