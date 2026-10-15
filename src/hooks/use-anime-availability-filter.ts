@@ -88,7 +88,7 @@ export default function useAnimeAvailabilityFilter<T extends IdentifiableAnime>(
     return () => {
       active = false;
     };
-  }, [itemsKey, enabled, audio]);
+  }, [stateKey, enabled, audio]);
 
   const stateMatchesItems = state.key === stateKey;
   const filteredItems = !enabled
