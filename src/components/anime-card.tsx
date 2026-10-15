@@ -2,7 +2,6 @@ import React from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { Info } from "lucide-react";
-import AnimeLanguageBadges from "@/components/anime-language-badges";
 import { cn, formatSecondsToMMSS } from "@/lib/utils";
 import { ROUTES } from "@/constants/routes";
 import { WatchHistory } from "@/hooks/use-get-bookmark";
@@ -14,7 +13,7 @@ type Props = {
   subTitle?: string; displayDetails?: boolean; variant?: "sm" | "lg";
   href?: string; quickWatchHref?: string | null; showGenre?: boolean;
   watchDetail?: WatchHistory | null; episodeLabel?: string | null;
-  statusLabel?: string | null; animeId?: string | number; languageAliases?: string[];
+  statusLabel?: string | null; animeId?: string | number;
 };
 
 const formatScore = (score?: number | null) => {
@@ -70,7 +69,6 @@ const AnimeCard = ({ displayDetails = true, variant = "sm", ...props }: Props) =
           {props.watchDetail && <div className="mt-1 flex flex-col gap-1 text-[10px] text-zinc-300"><span>Ep {props.watchDetail.episodeNumber} · {formatSecondsToMMSS(props.watchDetail.current)} left</span><Progress value={percentage} className="h-1 bg-white/20" /></div>}
         </div>}
         {animeId && <Link href={detailsHref} title={`Details for ${props.title}`} aria-label={`Details for ${props.title}`} className="absolute bottom-2 right-2 z-30 grid h-8 w-8 place-items-center rounded-lg border border-white/20 bg-[#0a0306]/85 text-white shadow-lg backdrop-blur transition-colors hover:border-[#ff3b72] hover:bg-[#ff3b72] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"><Info className="h-4 w-4" aria-hidden="true" /></Link>}
-        {animeId && <AnimeLanguageBadges animeId={animeId} titles={[props.title, props.subTitle || "", ...(props.languageAliases || [])].filter(Boolean)} />}
       </div>
     </article>
   );

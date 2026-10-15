@@ -55,7 +55,6 @@ export default function AnimeShelf({ title, items = [], loading = false, icon, e
           return <div key={anime.id} className="w-[42vw] max-w-[11.5rem] shrink-0 snap-start sm:w-[28vw] md:w-[22vw] lg:w-[16vw]">
             <AnimeCard
               title={titleText}
-              languageAliases={[anime.title?.native || "", anime.title?.romaji || ""].filter((alias) => alias && alias !== titleText)}
               poster={poster}
               score={anime.averageScore}
               format={anime.format}

@@ -1,0 +1,107 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import { filterAnimeByAvailability, type AnimeAudioAvailability } from "@/lib/anime-availability";
+
+type IdentifiableAnime = { id: string | number };
+type AvailabilityState = {
+  key: string;
+  availableIds: string[];
+  isChecking: boolean;
+  checkedCount: number;
+  unavailableCount: number;
+  unknownCount: number;
+};
+
+const EMPTY_ITEMS: never[] = [];
+
+export default function useAnimeAvailabilityFilter<T extends IdentifiableAnime>(
+  items: T[] | undefined,
+  enabled: boolean,
+  audio: AnimeAudioAvailability = "any",
+) {
+  const safeItems = items ?? EMPTY_ITEMS;
+  const itemsKey = JSON.stringify(safeItems.map((item) => String(item.id)));
+  const stateKey = `${enabled ? "available" : "all"}:${audio}:${itemsKey}`;
+  const itemsRef = useRef(safeItems);
+  itemsRef.current = safeItems;
+
+  const [state, setState] = useState<AvailabilityState>({
+    key: "",
+    availableIds: [],
+    isChecking: false,
+    checkedCount: 0,
+    unavailableCount: 0,
+    unknownCount: 0,
+  });
+
+  useEffect(() => {
+    const requestItems = itemsRef.current;
+    if (!enabled) {
+      setState({
+        key: stateKey,
+        availableIds: [],
+        isChecking: false,
+        checkedCount: 0,
+        unavailableCount: 0,
+        unknownCount: 0,
+      });
+      return;
+    }
+
+    let active = true;
+    setState({
+      key: stateKey,
+      availableIds: [],
+      isChecking: requestItems.length > 0,
+      checkedCount: 0,
+      unavailableCount: 0,
+      unknownCount: 0,
+    });
+
+    if (requestItems.length === 0) return () => { active = false; };
+
+    void filterAnimeByAvailability(requestItems, audio, () => active, 3)
+      .then((result) => {
+        if (!active) return;
+        setState({
+          key: stateKey,
+          availableIds: result.availableIds,
+          isChecking: false,
+          checkedCount: result.checkedCount,
+          unavailableCount: result.unavailableCount,
+          unknownCount: result.unknownCount,
+        });
+      })
+      .catch(() => {
+        if (!active) return;
+        setState({
+          key: stateKey,
+          availableIds: [],
+          isChecking: false,
+          checkedCount: 0,
+          unavailableCount: 0,
+          unknownCount: requestItems.length,
+        });
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [stateKey, enabled, audio]);
+
+  const stateMatchesItems = state.key === stateKey;
+  const filteredItems = !enabled
+    ? safeItems
+    : stateMatchesItems
+      ? safeItems.filter((item) => state.availableIds.includes(String(item.id)))
+      : [];
+
+  return {
+    filteredItems,
+    isChecking: enabled && (!stateMatchesItems || state.isChecking),
+    checkedCount: stateMatchesItems ? state.checkedCount : 0,
+    unavailableCount: stateMatchesItems ? state.unavailableCount : 0,
+    unknownCount: stateMatchesItems ? state.unknownCount : 0,
+  };
+}
