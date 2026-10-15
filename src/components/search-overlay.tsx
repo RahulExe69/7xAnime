@@ -8,7 +8,6 @@ import { Info, Search, X } from "lucide-react";
 import useDebounce from "@/hooks/use-debounce";
 import { useSearchAnime } from "@/query/search-anime";
 import { ROUTES } from "@/constants/routes";
-import AnimeLanguageBadges from "@/components/anime-language-badges";
 
 type Props = { open: boolean; onClose: () => void };
 
@@ -73,7 +72,7 @@ export default function SearchOverlay({ open, onClose }: Props) {
               <div className="space-y-1.5">{results.slice(0, 10).map((anime) => (
                 <div key={anime.id} className="flex items-center gap-2 rounded-xl p-2.5 transition hover:bg-[#eeebf7] dark:hover:bg-white/[0.06]">
                   <Link href={ROUTES.watchAnime(anime.id)} onClick={onClose} aria-label={`Watch ${anime.name || anime.jname}`} className="flex min-w-0 flex-1 items-center gap-3">
-                  <div className="relative h-[70px] w-[50px] shrink-0 overflow-hidden rounded-lg bg-[#e8e5f1] dark:bg-[#262233]"><Image src={anime.poster || "/brand/7xanime-mark.svg"} alt={anime.name} fill sizes="50px" className="object-cover" /><AnimeLanguageBadges animeId={String(anime.id)} titles={[anime.name || "", anime.jname || ""]} /></div>
+                  <div className="relative h-[70px] w-[50px] shrink-0 overflow-hidden rounded-lg bg-[#e8e5f1] dark:bg-[#262233]"><Image src={anime.poster || "/brand/7xanime-mark.svg"} alt={anime.name} fill sizes="50px" className="object-cover" /></div>
                   <div className="min-w-0 flex-1"><p className="line-clamp-2 text-sm font-bold text-[#28243f] dark:text-white">{anime.name || anime.jname}</p><p className="mt-1 text-xs text-[#7f7996] dark:text-[#d6abbc]">{anime.moreInfo?.filter(Boolean).join(" · ") || anime.type || "Anime"}</p></div>
                   <span className="px-1 text-xs font-semibold text-[#8b83a3]">▶</span>
                   </Link>
