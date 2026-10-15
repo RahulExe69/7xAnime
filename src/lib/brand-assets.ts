@@ -1,5 +1,3 @@
-"use client";
-
 export const BRAND_ASSET_URLS = {
   masterIcon:
     "https://cdn.jsdelivr.net/gh/RahulExe69/7x@main/brand/assets/icon.png",
