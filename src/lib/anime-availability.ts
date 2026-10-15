@@ -10,7 +10,7 @@ type CachedAvailability = {
 };
 
 const POSITIVE_CACHE_MS = 10 * 60 * 1000;
-const NEGATIVE_CACHE_MS = 2 * 60 * 1000;
+const NEGATIVE_CACHE_MS = 60 * 1000;
 const MAX_DISCOVERY_ATTEMPTS = 4;
 const DISCOVERY_RETRY_DELAY_MS = 650;
 const REQUEST_TIMEOUT_MS = 9000;
@@ -73,6 +73,9 @@ const inspectAvailability = (
   }
 
   if (!response?.providers || typeof response.providers !== "object") {
+    return "unknown";
+  }
+  if (Object.keys(response.providers).length === 0 && response.complete !== true) {
     return "unknown";
   }
 
