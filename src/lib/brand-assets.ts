@@ -59,7 +59,12 @@ async function refreshAsset(url: string, cache: Cache | null): Promise<void> {
       throw new Error(`Brand asset request failed (${response.status}).`);
     }
 
-    if (cache) await cache.put(url, response.clone());
+    if (cache) {
+      await cache.put(url, response.clone());
+    } else {
+      // Consume the response so a cache-less WebView still finishes the first-run download.
+      await response.blob();
+    }
     markRefreshed(url);
   })();
 
