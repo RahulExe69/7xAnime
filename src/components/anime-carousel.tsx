@@ -53,7 +53,6 @@ const AnimeCarousel = (props: Props) => {
             >
               <AnimeCard
                 title={ani.name}
-                languageAliases={[ani.jname || ""]}
                 format={ani.type}
                 href={ROUTES.animeDetails(ani.id)}
                 quickWatchHref={ROUTES.watchAnime(ani.id)}
