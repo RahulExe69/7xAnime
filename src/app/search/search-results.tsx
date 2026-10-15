@@ -4,7 +4,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import SearchBar from "@/components/search-bar";
-import { BarChart3, Bookmark, CalendarDays, Flame, Search, SearchX, SlidersHorizontal, Sparkles, TrendingUp, X } from "lucide-react";
+import { BarChart3, Bookmark, CalendarDays, CheckCircle2, Flame, Search, SearchX, SlidersHorizontal, Sparkles, TrendingUp, X } from "lucide-react";
 import { ROUTES } from "@/constants/routes";
 
 import { useRouter, useSearchParams } from "next/navigation";
@@ -25,6 +25,7 @@ import { IAnime, SearchAnimeParams } from "@/types/anime";
 import Button from "@/components/common/custom-button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { cn } from "@/lib/utils";
+import useAnimeAvailabilityFilter from "@/hooks/use-anime-availability-filter";
 
 const COLLECTION_TITLES: Record<string, string> = {
   new: "New Today",
@@ -87,7 +88,12 @@ const SearchResults = () => {
     : requestParams.sort || (requestParams.collection === "top-airing" ? "score" : undefined);
 
   const { data: searchResults, isLoading } = useGetSearchAnimeResults(requestParams);
+  const availableOnly = searchParams.get("available") === "1";
+  const { filteredItems: visibleAnimes, isChecking: isCheckingAvailability, unknownCount } = useAnimeAvailabilityFilter(searchResults?.animes, availableOnly);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const noSearchMatches = !isLoading && !isCheckingAvailability && !!searchResults && (
+    availableOnly ? visibleAnimes.length === 0 : searchResults.animes.length === 0
+  );
 
   const [filters, setFilters] = React.useState<SearchAnimeParams>({
     q: params.q,
@@ -132,8 +138,19 @@ const SearchResults = () => {
   };
 
   const choosePreset = (preset: (typeof SORT_PRESETS)[number]) => {
-    if (preset.mode === "collection") router.push(`/search?collection=${preset.value}`);
-    else router.push(`/search?sort=${preset.value}`);
+    const next = new URLSearchParams();
+    if (preset.mode === "collection") next.set("collection", preset.value);
+    else next.set("sort", preset.value);
+    if (availableOnly) next.set("available", "1");
+    router.push(`/search?${next.toString()}`);
+  };
+
+  const toggleAvailability = () => {
+    const next = new URLSearchParams(searchParams.toString());
+    if (availableOnly) next.delete("available");
+    else next.set("available", "1");
+    next.set("page", "1");
+    router.push(`/search?${next.toString()}`);
   };
 
   const applyFilters = () => {
@@ -142,6 +159,7 @@ const SearchResults = () => {
       if (key === "page") return;
       if (typeof value === "string" && value.trim() !== "") next.set(key, value);
     });
+    if (availableOnly) next.set("available", "1");
     const query = next.toString();
     router.push(query ? `/search?${query}` : "/search?collection=popular");
     setFiltersOpen(false);
@@ -176,13 +194,17 @@ const SearchResults = () => {
             </h1>
           </div>
           <p className="mt-1 pl-10 text-xs font-medium text-[#b8afcb] sm:text-sm">
-            {isLoading ? "Finding your next favourite…" : searchResults ? `${searchResults.animes.length}${searchResults.hasNextPage ? "+" : ""} results` : "Discover your next favourite"}
+            {isLoading ? "Finding your next favourite…" : availableOnly && isCheckingAvailability ? "Checking provider episodes…" : availableOnly ? `${visibleAnimes.length} confirmed on this page${unknownCount ? ` · ${unknownCount} unverified` : ""}` : searchResults ? `${searchResults.animes.length}${searchResults.hasNextPage ? "+" : ""} results` : "Discover your next favourite"}
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <Link href="/library" aria-label="My List" title="My List" className="hidden h-10 items-center justify-center gap-2 rounded-xl border border-white/[0.10] bg-white/[0.035] px-3 text-sm font-semibold text-[#d9cbdc] transition hover:border-[#ff3b72]/40 hover:text-[#ffbad0] sm:inline-flex">
             <Bookmark className="h-4 w-4" /> My List
           </Link>
+          <button type="button" onClick={toggleAvailability} aria-pressed={availableOnly} aria-label="Filter to titles with provider episode listings" title="Show only titles with provider episode listings"
+            className={`inline-flex h-10 items-center justify-center gap-1.5 rounded-xl border px-2.5 text-xs font-semibold transition ${availableOnly ? "border-[#ff3b72]/50 bg-[#ff3b72]/12 text-[#ffbad0]" : "border-white/[0.12] bg-white/[0.035] text-[#d9cbdc] hover:border-[#ff3b72]/40 hover:text-[#ffbad0]"}`}>
+            <CheckCircle2 className="h-4 w-4" /><span className="hidden sm:inline">Available</span>
+          </button>
           <button type="button" onClick={() => setFiltersOpen((open) => !open)} aria-expanded={filtersOpen} aria-controls="explore-filters"
             className={`inline-flex h-10 items-center justify-center gap-2 rounded-xl border px-3 text-sm font-semibold transition ${filtersOpen ? "border-[#ff3b72]/50 bg-[#ff3b72]/12 text-[#ffbad0]" : "border-white/[0.12] bg-white/[0.035] text-[#d9cbdc] hover:border-[#ff3b72]/40 hover:text-[#ffbad0]"}`}>
             {filtersOpen ? <X className="h-4 w-4" /> : <SlidersHorizontal className="h-4 w-4" />}
@@ -248,27 +270,28 @@ const SearchResults = () => {
       {displayPhrase && (
         <div className="flex items-center justify-between gap-2">
           <h2 className="min-w-0 truncate text-sm font-semibold text-[#e7dce9]">Results for “{displayPhrase}”</h2>
-          <Link href="/search?collection=popular" className="shrink-0 text-xs font-semibold text-[#ff9fbe] hover:text-white">Clear search</Link>
+          <Link href={availableOnly ? "/search?collection=popular&available=1" : "/search?collection=popular"} className="shrink-0 text-xs font-semibold text-[#ff9fbe] hover:text-white">Clear search</Link>
         </div>
       )}
       {collectionTitle && !["popular", "trending"].includes(params.collection || "") && <p className="text-xs font-medium text-[#a39ab6]">{collectionTitle} · curated for you</p>}
 
-      {isLoading && (
+      {(isLoading || (availableOnly && isCheckingAvailability)) && (
         <div className="grid w-full grid-cols-2 content-start gap-x-3 gap-y-4 sm:grid-cols-3 sm:gap-4 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7">
           {Array.from({ length: 10 }, (_, idx) => <div key={idx} className="aspect-[2/3] w-full animate-pulse rounded-2xl bg-white/[0.06]" />)}
         </div>
       )}
-      {!isLoading && searchResults?.animes?.length === 0 && (
+      {noSearchMatches && (
         <div className="flex flex-col items-center justify-center rounded-2xl border border-white/[0.10] bg-[#16070d] px-5 py-12 text-center">
           <SearchX className="mb-3 h-8 w-8 text-[#ff9fbe]" />
-          <h3 className="text-base font-semibold text-white">No anime found</h3>
-          <p className="mt-1 max-w-sm text-sm text-[#a39ab6]">Try a different title or loosen a few filters.</p>
+          <h3 className="text-base font-semibold text-white">{availableOnly && searchResults?.animes.length ? "No confirmed playable matches" : "No anime found"}</h3>
+          <p className="mt-1 max-w-sm text-sm text-[#a39ab6]">{availableOnly && searchResults?.animes.length ? (unknownCount > 0 ? `${unknownCount} title(s) could not be verified because a provider did not respond. They are excluded rather than shown as playable; try again later.` : "No title on this page has a confirmed provider episode listing for your selected catalogue results.") : "Try a different title or loosen a few filters."}</p>
           <button type="button" onClick={resetFilters} className="mt-4 rounded-xl bg-[#ff3b72]/12 px-4 py-2 text-sm font-semibold text-[#ffbad0]">Reset filters</button>
         </div>
       )}
       <div className="grid w-full grid-cols-2 content-start gap-x-3 gap-y-4 sm:grid-cols-3 sm:gap-4 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7">
-        {searchResults?.animes.map((anime) => <AnimeResultCard key={anime.id} anime={anime} />)}
+        {visibleAnimes.map((anime) => <AnimeResultCard key={anime.id} anime={anime} />)}
       </div>
+      {availableOnly && !isCheckingAvailability && unknownCount > 0 && <p role="status" className="text-xs text-[#a39ab6]">{unknownCount} title(s) could not be verified and are not shown as available.</p>}
       {searchResults && searchResults.totalPages && (
         <Pagination totalPages={searchResults.totalPages} currentPage={params.page} handleNextPage={handleNextPage}
           handlePageChange={handlePageChange} handlePreviousPage={handlePreviousPage} />
