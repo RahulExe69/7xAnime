@@ -16,6 +16,25 @@ const DISCOVERY_RETRY_DELAY_MS = 650;
 const REQUEST_TIMEOUT_MS = 9000;
 const availabilityCache = new Map<string, CachedAvailability>();
 const availabilityRequests = new Map<string, Promise<AnimeAvailabilityStatus>>();
+const MAX_CONCURRENT_PROVIDER_CHECKS = 3;
+let activeProviderChecks = 0;
+const providerCheckQueue: Array<() => void> = [];
+
+async function withProviderCheckSlot<T>(work: () => Promise<T>): Promise<T> {
+  if (activeProviderChecks >= MAX_CONCURRENT_PROVIDER_CHECKS) {
+    await new Promise<void>((resolve) => providerCheckQueue.push(resolve));
+  } else {
+    activeProviderChecks += 1;
+  }
+
+  try {
+    return await work();
+  } finally {
+    const next = providerCheckQueue.shift();
+    if (next) next();
+    else activeProviderChecks -= 1;
+  }
+}
 
 const delay = (milliseconds: number) =>
   new Promise<void>((resolve) => setTimeout(resolve, milliseconds));
@@ -80,7 +99,7 @@ export async function checkAnimeAvailability(
   const existing = availabilityRequests.get(key);
   if (existing) return existing;
 
-  const request = (async (): Promise<AnimeAvailabilityStatus> => {
+  const request = withProviderCheckSlot(async (): Promise<AnimeAvailabilityStatus> => {
     try {
       for (let attempt = 0; attempt < MAX_DISCOVERY_ATTEMPTS; attempt += 1) {
         const response = await api.get<EpisodeResponse>(
@@ -116,7 +135,7 @@ export async function checkAnimeAvailability(
     }
 
     return "unknown";
-  })();
+  });
 
   availabilityRequests.set(key, request);
   return request;
