@@ -261,6 +261,9 @@ export interface EpisodeResponse {
   anilistId?: number;
   source?: string;
   complete?: boolean;
+  /** Native catalogue adapters expose failures separately from genuine empty results. */
+  providerNames?: string[];
+  failedProviders?: string[];
   providers: Record<
     string,
     {
