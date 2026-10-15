@@ -156,7 +156,7 @@ const SearchBar = ({
           className="absolute w-full h-fit lg:hidden flex flex-col gap-2 px-1 py-2 bg-secondary top-[110%] rounded-md"
         >
           <div className="flex flex-col gap-1">
-            {(isLoading || (!searchResults && !!searchValue)) &&
+            {(isLoading || (availableOnly && availability.isChecking) || (!searchResults && !!searchValue)) &&
               [1, 2, 3, 4, 5].map((_, idx) => {
                 return (
                   <div
