@@ -4,9 +4,10 @@ import React, { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Info, Search, X } from "lucide-react";
+import { CheckCircle2, Info, Search, X } from "lucide-react";
 import useDebounce from "@/hooks/use-debounce";
 import { useSearchAnime } from "@/query/search-anime";
+import useAnimeAvailabilityFilter from "@/hooks/use-anime-availability-filter";
 import { ROUTES } from "@/constants/routes";
 
 type Props = { open: boolean; onClose: () => void };
@@ -17,6 +18,9 @@ export default function SearchOverlay({ open, onClose }: Props) {
   const debouncedValue = useDebounce(value, 280);
   const router = useRouter();
   const { data: results, isLoading } = useSearchAnime(debouncedValue.trim());
+  const [availableOnly, setAvailableOnly] = useState(false);
+  const availability = useAnimeAvailabilityFilter(results, availableOnly);
+  const visibleResults = availableOnly ? availability.filteredItems : (results || []);
   const query = debouncedValue.trim();
 
   useEffect(() => {
@@ -42,7 +46,9 @@ export default function SearchOverlay({ open, onClose }: Props) {
 
   const submitSearch = (search = value) => {
     if (!search.trim()) return;
-    router.push(`${ROUTES.SEARCH}?q=${encodeURIComponent(search.trim())}`);
+    const searchParams = new URLSearchParams({ q: search.trim() });
+    if (availableOnly) searchParams.set("available", "1");
+    router.push(`${ROUTES.SEARCH}?${searchParams.toString()}`);
     onClose();
   };
 
@@ -65,11 +71,19 @@ export default function SearchOverlay({ open, onClose }: Props) {
           </section>
         ) : (
           <section>
-            <div className="mb-4 flex items-center justify-between gap-3"><h2 className="text-xs font-extrabold uppercase tracking-[0.17em] text-[#77718e] dark:text-[#a39db9]">Search results</h2><button onClick={() => submitSearch()} className="text-sm font-bold text-[#ff3b72] dark:text-[#ff9fbe]">Show all</button></div>
-            {isLoading ? (
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <h2 className="text-xs font-extrabold uppercase tracking-[0.17em] text-[#77718e] dark:text-[#a39db9]">Search results</h2>
+              <div className="flex items-center gap-2">
+                <button type="button" onClick={() => setAvailableOnly((current) => !current)} aria-pressed={availableOnly} title="Only show titles with provider episode listings" className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-2 text-xs font-bold transition ${availableOnly ? "border-[#ff3b72]/55 bg-[#ff3b72]/12 text-[#ffbad0]" : "border-white/10 text-[#c8bfd7] hover:border-[#ff3b72]/35"}`}>
+                  <CheckCircle2 className="h-3.5 w-3.5" /> Available only
+                </button>
+                <button onClick={() => submitSearch()} className="text-sm font-bold text-[#ff3b72] dark:text-[#ff9fbe]">Show all</button>
+              </div>
+            </div>
+            {isLoading || (availableOnly && availability.isChecking) ? (
               <div className="space-y-2">{[0,1,2,3,4].map((key) => <div key={key} className="flex animate-pulse gap-3 rounded-xl bg-[#efedf7] p-2.5 dark:bg-[#1d1a28]"><div className="h-16 w-12 rounded-lg bg-[#e1deee] dark:bg-[#401020]" /><div className="flex-1 space-y-2 pt-2"><div className="h-3 w-4/5 rounded bg-[#e1deee] dark:bg-[#401020]" /><div className="h-3 w-2/5 rounded bg-[#e1deee] dark:bg-[#401020]" /></div></div>)}</div>
-            ) : results?.length ? (
-              <div className="space-y-1.5">{results.slice(0, 10).map((anime) => (
+            ) : visibleResults.length ? (
+              <div className="space-y-1.5">{visibleResults.slice(0, 10).map((anime) => (
                 <div key={anime.id} className="flex items-center gap-2 rounded-xl p-2.5 transition hover:bg-[#eeebf7] dark:hover:bg-white/[0.06]">
                   <Link href={ROUTES.watchAnime(anime.id)} onClick={onClose} aria-label={`Watch ${anime.name || anime.jname}`} className="flex min-w-0 flex-1 items-center gap-3">
                   <div className="relative h-[70px] w-[50px] shrink-0 overflow-hidden rounded-lg bg-[#e8e5f1] dark:bg-[#262233]"><Image src={anime.poster || "/brand/7xanime-mark.svg"} alt={anime.name} fill sizes="50px" className="object-cover" /></div>
@@ -80,8 +94,9 @@ export default function SearchOverlay({ open, onClose }: Props) {
                 </div>
               ))}</div>
             ) : (
-              <div className="rounded-2xl border border-[#40101f] bg-white px-4 py-10 text-center dark:border-[#2c2939] dark:bg-[#19070d]"><Search className="mx-auto mb-3 h-7 w-7 text-[#8e86a8]" /><p className="font-semibold">No matches found</p><p className="mt-1 text-sm text-[#8a849e] dark:text-[#a49eb8]">Try a shorter title or an alternate name.</p></div>
+              <div className="rounded-2xl border border-[#40101f] bg-white px-4 py-10 text-center dark:border-[#2c2939] dark:bg-[#19070d]"><Search className="mx-auto mb-3 h-7 w-7 text-[#8e86a8]" /><p className="font-semibold">No matches found</p><p className="mt-1 text-sm text-[#8a849e] dark:text-[#a49eb8]">{availableOnly && (results?.length || 0) > 0 ? (availability.unknownCount > 0 ? `${availability.unknownCount} title(s) could not be verified because providers did not respond. Try again later or turn off this filter.` : "No checked titles have provider episode listings for this query.") : "Try a shorter title or an alternate name."}</p></div>
             )}
+            {availableOnly && !availability.isChecking && visibleResults.length > 0 && availability.unknownCount > 0 && <p role="status" className="mt-3 text-xs text-[#a39ab6]">{availability.unknownCount} additional title(s) could not be verified and are not shown as available.</p>}
             <button onClick={() => submitSearch()} className="mt-4 w-full rounded-xl bg-[#ff3b72] px-4 py-3 text-sm font-bold text-white transition hover:bg-[#ed245c]">Show all results for “{query}”</button>
           </section>
         )}
