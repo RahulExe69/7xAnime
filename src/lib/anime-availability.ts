@@ -65,11 +65,16 @@ const inspectAvailability = (
 ): AnimeAvailabilityStatus => {
   if (hasEpisodesForAudio(response, audio)) return "available";
 
-  // The on-device backend deliberately returns a partial provider catalogue
-  // while the remaining providers finish. An empty partial response is not
-  // evidence that the title is unavailable.
-  if (response?.source === "native" && response.complete !== true) {
-    return "unknown";
+  // The on-device backend reports progressive discovery and per-provider errors.
+  // A partial list, failed scrapers, or no configured providers cannot prove absence.
+  if (response?.source === "native") {
+    if (response.complete !== true) return "unknown";
+    if (!Array.isArray(response.providerNames) || !Array.isArray(response.failedProviders)) {
+      return "unknown";
+    }
+    if (response.failedProviders.length > 0 || response.providerNames.length === 0) {
+      return "unknown";
+    }
   }
 
   if (!response?.providers || typeof response.providers !== "object") {
