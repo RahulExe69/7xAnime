@@ -19,7 +19,7 @@ export default function SearchOverlay({ open, onClose }: Props) {
   const router = useRouter();
   const { data: results, isLoading } = useSearchAnime(debouncedValue.trim());
   const [availableOnly, setAvailableOnly] = useState(false);
-  const availability = useAnimeAvailabilityFilter(results, availableOnly);
+  const availability = useAnimeAvailabilityFilter(results, open && availableOnly);
   const visibleResults = availableOnly ? availability.filteredItems : (results || []);
   const query = debouncedValue.trim();
 
