@@ -164,6 +164,7 @@ async def _collect_episode_provider(anilist_id: int, name: str, mod, ctx: dict, 
     except Exception as error:
         print(f"[7XAnime] provider episode lookup failed for {name}: {str(error)[:120]}")
         result_name, data = name, None
+        state["failed"].add(result_name)
 
     state["finished"].add(result_name)
     if data:
@@ -201,6 +202,7 @@ async def _start_episode_provider_discovery(anilist_id: int, state: dict) -> Non
         state["initialized"] = True
         state["complete"] = True
         state["finished"].update(state["provider_names"])
+        state["failed"].update(state["provider_names"])
         state["expires_at"] = time.time() + _EPISODE_DISCOVERY_TTL
 
 
@@ -217,6 +219,7 @@ async def _progressive_merged_episodes(anilist_id: int) -> dict | None:
             state = {
                 "providers": {},
                 "finished": set(),
+                "failed": set(),
                 "provider_names": [],
                 "tasks": [],
                 "initialized": False,
@@ -255,6 +258,8 @@ async def _progressive_merged_episodes(anilist_id: int) -> dict | None:
         "anilistId": anime_id,
         "source": "native",
         "providers": ordered_providers,
+        "providerNames": list(state["provider_names"]),
+        "failedProviders": sorted(state["failed"]),
         "complete": state["complete"],
     }
 
