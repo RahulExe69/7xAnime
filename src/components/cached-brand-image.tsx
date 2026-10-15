@@ -50,8 +50,8 @@ export default function CachedBrandImage({
     };
   }, [src]);
 
-  const loadedUrl = loaded?.source === src ? loaded.objectUrl : null;
-  const effectiveFallback = failedSource === src ? fallbackSrc : undefined;
+  const loadedUrl = loaded?.source === src && failedSource !== src ? loaded.objectUrl : null;
+  const effectiveFallback = fallbackSrc;
 
   return (
     <div className={`grid place-items-center overflow-hidden ${className}`}>
