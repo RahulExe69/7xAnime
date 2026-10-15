@@ -13,14 +13,14 @@ type AvailabilityState = {
   unknownCount: number;
 };
 
-const EMPTY_ITEMS: IdentifiableAnime[] = [];
+const EMPTY_ITEMS: never[] = [];
 
 export default function useAnimeAvailabilityFilter<T extends IdentifiableAnime>(
   items: T[] | undefined,
   enabled: boolean,
   audio: AnimeAudioAvailability = "any",
 ) {
-  const safeItems = (items ?? EMPTY_ITEMS) as T[];
+  const safeItems = items ?? EMPTY_ITEMS;
   const itemsKey = JSON.stringify(safeItems.map((item) => String(item.id)));
   const itemsRef = useRef(safeItems);
   itemsRef.current = safeItems;
