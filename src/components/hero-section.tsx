@@ -117,7 +117,7 @@ const HeroCarouselItem = ({ anime }: { anime: MediaList }) => {
               )}
               {!!anime.averageScore && (
                 <Badge variant="secondary" className="bg-black/40 text-yellow-200 border border-yellow-300/30">
-                  ⭐ {anime.averageScore}% Score
+                  ⭐ {(anime.averageScore > 10 ? anime.averageScore / 10 : anime.averageScore).toFixed(1)}
                 </Badge>
               )}
               {anime.genres?.slice(0, 3).map((g) => (
