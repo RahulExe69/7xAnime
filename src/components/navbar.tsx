@@ -71,7 +71,7 @@ export default function NavBar() {
     <>
       <header className="fixed inset-x-0 top-0 z-[100] border-b border-white/[0.07] bg-[#100309]/95 text-[#ffeaf0] shadow-[0_6px_24px_rgba(0,0,0,0.18)] backdrop-blur-xl">
         <Container className="flex items-center justify-between px-3 py-1.5 sm:px-5 lg:h-[72px] lg:gap-6 lg:py-0">
-          <div className="flex h-[43px] min-w-0 items-center justify-between gap-2 lg:contents">
+          <div className="flex h-[43px] w-full min-w-0 items-center justify-between gap-2 lg:contents">
             <Link href={ROUTES.HOME} aria-label="7xAnime home" className="flex min-w-0 shrink-0 items-center">
               <Image src="/brand/7xanime-wordmark.png" alt="7xAnime" width={2107} height={746} className="h-10 w-[122px] object-contain object-left sm:h-11 sm:w-[134px] lg:h-12 lg:w-[146px]" />
             </Link>

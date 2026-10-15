@@ -91,7 +91,7 @@ const getAnimeDetails = async (animeId: string): Promise<IAnimeDetails> => {
         bannerImage: media.bannerImage || media.coverImage?.extraLarge || "",
         description: media.description || "",
         stats: {
-          rating: media.averageScore ? `${media.averageScore}%` : "N/A",
+          rating: media.averageScore ? (media.averageScore > 10 ? media.averageScore / 10 : media.averageScore).toFixed(1) : "N/A",
           quality: "HD",
           episodes: {
             sub: media.episodes || 0,
