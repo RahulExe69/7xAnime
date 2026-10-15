@@ -22,6 +22,7 @@ export default function useAnimeAvailabilityFilter<T extends IdentifiableAnime>(
 ) {
   const safeItems = items ?? EMPTY_ITEMS;
   const itemsKey = JSON.stringify(safeItems.map((item) => String(item.id)));
+  const stateKey = `${enabled ? "available" : "all"}:${audio}:${itemsKey}`;
   const itemsRef = useRef(safeItems);
   itemsRef.current = safeItems;
 
@@ -38,7 +39,7 @@ export default function useAnimeAvailabilityFilter<T extends IdentifiableAnime>(
     const requestItems = itemsRef.current;
     if (!enabled) {
       setState({
-        key: itemsKey,
+        key: stateKey,
         availableIds: [],
         isChecking: false,
         checkedCount: 0,
@@ -50,7 +51,7 @@ export default function useAnimeAvailabilityFilter<T extends IdentifiableAnime>(
 
     let active = true;
     setState({
-      key: itemsKey,
+      key: stateKey,
       availableIds: [],
       isChecking: requestItems.length > 0,
       checkedCount: 0,
@@ -64,7 +65,7 @@ export default function useAnimeAvailabilityFilter<T extends IdentifiableAnime>(
       .then((result) => {
         if (!active) return;
         setState({
-          key: itemsKey,
+          key: stateKey,
           availableIds: result.availableIds,
           isChecking: false,
           checkedCount: result.checkedCount,
@@ -75,7 +76,7 @@ export default function useAnimeAvailabilityFilter<T extends IdentifiableAnime>(
       .catch(() => {
         if (!active) return;
         setState({
-          key: itemsKey,
+          key: stateKey,
           availableIds: [],
           isChecking: false,
           checkedCount: 0,
@@ -89,7 +90,7 @@ export default function useAnimeAvailabilityFilter<T extends IdentifiableAnime>(
     };
   }, [itemsKey, enabled, audio]);
 
-  const stateMatchesItems = state.key === itemsKey;
+  const stateMatchesItems = state.key === stateKey;
   const filteredItems = !enabled
     ? safeItems
     : stateMatchesItems
