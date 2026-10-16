@@ -907,7 +907,7 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
         detail: { href: nextUrl.pathname + nextUrl.search },
       }));
     }
-  }, [activeCategory, activeEpisodeId, allEpisodesData?.episodes, animeIdParam, currentEpNumber, currentProviderName, isWatchRoute, providerNames, rawProviders, setSelectedEpisode]);
+  }, [activeCategory, activeEpisodeId, allEpisodesData?.episodes, animeIdParam, currentEpNumber, currentProviderName, isWatchRoute, nativeCatalogueComplete, providerNames, rawProviders, setSelectedEpisode]);
   const availableProviderNames = providerNames.filter(
     (providerName) => (rawProviders[providerName]?.episodes?.[activeCategory] || []).length > 0,
   );
@@ -1170,7 +1170,7 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
           .trim()
           .replace(/([a-z0-9])([A-Z])/g, "$1-$2")
           .toLowerCase()
-          .replace(/[\\s_]+/g, "-");
+          .replace(/[\s_]+/g, "-");
       const eventNames = [payload.event, payload.type, payload.action, payload.name, payload.status]
         .map(normalizeEventName)
         .filter(Boolean);
