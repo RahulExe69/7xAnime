@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { App } from "@capacitor/app";
 import { useAnimeStore } from "@/store/anime-store";
 import dynamic from "next/dynamic";
 
@@ -85,6 +86,43 @@ const VideoPlayerSection = () => {
       setPreferredCategory(savedAudio);
     }
   }, []);
+
+  useEffect(() => {
+    if (!isLocalBackendEnabled()) return;
+
+    let disposed = false;
+    let appListener: { remove: () => Promise<void> } | null = null;
+
+    const onPipMode = (event: Event) => {
+      const detail = (event as CustomEvent<{ active?: boolean }>).detail;
+      setNativePipActive(detail?.active === true);
+    };
+    window.addEventListener("7xanime:pip-mode", onPipMode);
+
+    void App.addListener("appStateChange", ({ isActive }) => {
+      if (isActive) {
+        setAppIsActive(true);
+        return;
+      }
+
+      // PiP mode is marked before Android backgrounds the Activity. Keep the
+      // player mounted only when the app really entered its floating-player mode.
+      const pipActive = document.documentElement.classList.contains("sevenx-pip-mode");
+      setNativePipActive(pipActive);
+      setAppIsActive(false);
+    }).then((listener) => {
+      if (disposed) void listener.remove();
+      else appListener = listener;
+    }).catch(() => {
+      // The browser preview has no native App lifecycle listener.
+    });
+
+    return () => {
+      disposed = true;
+      window.removeEventListener("7xanime:pip-mode", onPipMode);
+      if (appListener) void appListener.remove();
+    };
+  }, []);
   const requestedEpisodeNumber = Math.max(1, Number(epParam) || 1);
 
   const rawProviders = useMemo(
@@ -136,6 +174,8 @@ const VideoPlayerSection = () => {
   const [useFallback, setUseFallback] = useState<boolean>(false);
   const [isHindiMode, setIsHindiMode] = useState<boolean>(false);
   const [selectedHindiServer, setSelectedHindiServer] = useState<number>(0);
+  const [appIsActive, setAppIsActive] = useState(true);
+  const [nativePipActive, setNativePipActive] = useState(false);
   const [manualProviderPlaybackFailed, setManualProviderPlaybackFailed] = useState(false);
   const [fallbackPlaybackFailed, setFallbackPlaybackFailed] = useState(false);
   const [playbackSourceIndex, setPlaybackSourceIndex] = useState(0);
@@ -1033,6 +1073,14 @@ const VideoPlayerSection = () => {
     observedEmbedProvider, observedEmbedSource?.type, observedEmbedSource?.url,
     isFallbackActive, handlePlayerError,
   ]);
+
+  if (isLocalBackendEnabled() && !appIsActive && !nativePipActive) {
+    return (
+      <div className="flex aspect-video w-full items-center justify-center rounded-2xl border border-white/10 bg-black px-6 text-center text-sm text-zinc-300">
+        Playback paused because 7xAnime is in the background. Return to the app to continue, or use Picture-in-picture for floating playback.
+      </div>
+    );
+  }
 
   const playerAnimeInfo = useMemo(
     () => ({
