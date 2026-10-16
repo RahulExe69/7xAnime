@@ -279,6 +279,10 @@ jobs:
               raise SystemExit("Automatic next-episode routing is missing")
           if "aniembed:ended" not in watch_section or "lastWatchParamsRef.current = {" not in watch_section:
               raise SystemExit("Embedded ended events or mini-player episode state sync is missing")
+          if "if (nativeCatalogueComplete && !catalogueEpisode)" not in watch_section:
+              raise SystemExit("Auto-next must stop at the end of a complete native episode catalogue")
+          if "normalizeEventName" not in watch_section or "eventNames.some((name)" not in watch_section:
+              raise SystemExit("Embedded completion events must normalize provider-specific end signals")
           if "legacyId?: string" not in player_component or "animeInfo.legacyId" not in player_component:
               raise SystemExit("Legacy local watch-progress keys must remain readable")
           if "progressAnimeId" not in watch_section:
