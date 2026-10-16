@@ -258,7 +258,7 @@ jobs:
           if 'data-persistent-watch-player="true"' not in persistent_host or "lastWatchHrefRef" not in persistent_host:
               raise SystemExit("Persistent player session/restore routing is missing")
           for action in ("expand-mini-player", "minimize-player", "close-mini-player"):
-              if f"7xanime:{action}" not in viewport:
+              if f'dispatchPlayerAction("{action}")' not in viewport:
                   raise SystemExit(f"Player action is missing: {action}")
           if '[data-persistent-watch-player][data-player-mode="mini"]' not in css:
               raise SystemExit("Mini-player browse-mode styling is missing")
