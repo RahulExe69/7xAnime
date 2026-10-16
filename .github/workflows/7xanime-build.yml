@@ -24,6 +24,11 @@ on:
         required: false
         type: string
         default: ""
+      compare_apk_sizes:
+        description: Run the slower three-variant release APK size audit after the debug build
+        required: true
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -513,7 +518,7 @@ jobs:
       # Build unoptimized universal, optimized universal, and optimized ARM64
       # variants from the same sources to measure each size reduction.
       - name: Compare release APK size variants
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'workflow_dispatch' && inputs.build_type == 'debug' && inputs.compare_apk_sizes
         shell: bash
         run: |
           set -euo pipefail
@@ -597,7 +602,7 @@ jobs:
           PY
 
       - name: Upload APK size comparison
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'workflow_dispatch' && inputs.build_type == 'debug' && inputs.compare_apk_sizes
         uses: actions/upload-artifact@v4
         with:
           name: 7xAnime-v${{ env.VERSION_NAME }}-apk-size-audit
