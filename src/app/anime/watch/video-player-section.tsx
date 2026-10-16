@@ -1152,6 +1152,12 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
       const eventType = String(payload.event || payload.type || payload.action || "").toLowerCase();
       const status = String(payload.status || "").toLowerCase();
       const failed = eventType.includes("error") || status === "error";
+
+      const completionType = String(payload.type || "").toLowerCase();
+      if (completionType === "aniembed:ended" || ["ended", "video-ended", "episode-ended", "complete", "completed"].includes(eventType)) {
+        advanceToNextEpisode();
+        return;
+      }
       if (failed) {
         handlePlayerError(`${getProviderDisplayName(observedEmbedProvider)} reported a playback error.`);
         return;
@@ -1194,6 +1200,7 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
     handlePlayerError,
     isFallbackActive,
     requestEmbedResume,
+    advanceToNextEpisode,
   ]);
 
   // Known event-reporting iframe players (MegaPlay, AniXo, Megavid, MegaFlix)
@@ -1682,6 +1689,7 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
           autoSkip={autoSkip}
           onError={handlePlayerError}
           onPlaybackReady={handlePlayerPlaybackReady}
+          onEpisodeEnded={advanceToNextEpisode}
         />
       </PlayerViewport>
       {playerControls}
