@@ -229,7 +229,7 @@ const VideoPlayerSection = () => {
     const progress = getLocalWatchProgress(
       animeIdParam || anime?.anime?.info?.id || "0",
       activeEpisodeId,
-      Number(currentEpNumber) || 1,
+      requestedEpisodeNumber,
     );
     if (!progress || progress.current < 5 || progress.duration <= 0 ||
         progress.current >= progress.duration - 15) return;
@@ -248,7 +248,7 @@ const VideoPlayerSection = () => {
       }, delay);
       embedResumeTimersRef.current.push(timer);
     }
-  }, [animeIdParam, anime?.anime?.info?.id, activeEpisodeId, currentEpNumber]);
+  }, [animeIdParam, anime?.anime?.info?.id, activeEpisodeId, requestedEpisodeNumber]);
 
   useEffect(() => () => {
     embedResumeTimersRef.current.forEach((timer) => window.clearTimeout(timer));
