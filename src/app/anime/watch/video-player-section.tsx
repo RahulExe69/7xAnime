@@ -989,6 +989,7 @@ const VideoPlayerSection = () => {
       tryembed: "tryembed.us.cc",
       cinexstream: "cinextream.cc",
       nontongo: "nontongo.win",
+      animeparadise: "animeparadise.moe",
     };
     const expectedHost = expectedHosts[observedEmbedProvider];
     if (!expectedHost) return;
@@ -1048,7 +1049,7 @@ const VideoPlayerSection = () => {
   // get more startup time. We cannot inspect/click inside a cross-origin iframe,
   // so this watchdog relies on documented player events.
   useEffect(() => {
-    const watchedProviders = ["megaplay", "anixo", "megavid", "megaflix"];
+    const watchedProviders = ["megaplay", "anixo", "megavid", "megaflix", "tryembed", "cinexstream", "nontongo", "animeparadise"];
     if (
       !isLocalBackendEnabled() ||
       (!isFallbackActive && observedEmbedSource?.type !== "embed") ||
