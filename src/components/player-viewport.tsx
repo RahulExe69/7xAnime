@@ -2,8 +2,9 @@
 
 import React, { PointerEvent, ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { App } from "@capacitor/app";
-import { Maximize2, Minimize2 } from "lucide-react";
-import { enterNativePlayerFullscreen, exitNativePlayerFullscreen } from "@/lib/native-player-fullscreen";
+import { Capacitor } from "@capacitor/core";
+import { Maximize2, Minimize2, PictureInPicture } from "lucide-react";
+import { enterNativePictureInPicture, enterNativePlayerFullscreen, exitNativePlayerFullscreen } from "@/lib/native-player-fullscreen";
 
 type PlayerViewportProps = {
   children: ReactNode;
@@ -43,6 +44,10 @@ export function PlayerViewport({
     if (isFullscreen) void exitFullscreen();
     else void enterFullscreen();
   }, [enterFullscreen, exitFullscreen, isFullscreen]);
+
+  const enterPictureInPicture = useCallback(() => {
+    void enterNativePictureInPicture();
+  }, []);
 
   const startGesture = useCallback((event: PointerEvent<HTMLElement>) => {
     if (event.pointerType === "mouse") return;
@@ -148,11 +153,29 @@ export function PlayerViewport({
       onPointerUp={finishGesture}
       onPointerCancel={() => { gestureStartRef.current = null; }}
       data-player-fullscreen={isFullscreen ? "true" : "false"}
+      data-player-viewport="true"
       aria-label={title}
     >
       <div className="absolute inset-0 h-full w-full">
         {children}
       </div>
+
+      {Capacitor.isNativePlatform() && (
+        <button
+          type="button"
+          onPointerDown={(event) => event.stopPropagation()}
+          onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            enterPictureInPicture();
+          }}
+          title="Picture-in-picture"
+          aria-label="Picture-in-picture"
+          className="absolute right-14 top-2 z-[10002] flex h-10 w-10 items-center justify-center rounded-xl border border-white/15 bg-black/65 text-white shadow-lg backdrop-blur-sm transition hover:bg-black/85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-400"
+        >
+          <PictureInPicture size={18} />
+        </button>
+      )}
 
       <button
         type="button"
@@ -161,7 +184,7 @@ export function PlayerViewport({
           event.preventDefault();
           event.stopPropagation();
           toggleFullscreen();
-        }}
+        }
         title={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
         aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
         className="absolute right-2 top-2 z-[10002] flex h-10 w-10 items-center justify-center rounded-xl border border-white/15 bg-black/65 text-white shadow-lg backdrop-blur-sm transition hover:bg-black/85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-400"
