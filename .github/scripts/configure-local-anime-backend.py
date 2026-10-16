@@ -317,6 +317,43 @@ def patch_manifest() -> None:
         fail("Could not add Android REQUEST_INSTALL_PACKAGES permission.")
     if provider_authority not in text or "@xml/file_paths" not in text:
         fail("Could not configure Android FileProvider for update installation.")
+    # Enable Android PiP for the Activity that hosts embedded streams.
+    # Merge configChanges rather than replacing existing Capacitor entries.
+    activity_match = re.search(
+        r"<activity\b(?=[^>]*android:name=[\"'][^\"']*MainActivity[^\"']*[\"'])[^>]*>",
+        text,
+        re.DOTALL,
+    )
+    if not activity_match:
+        fail("Could not locate MainActivity in AndroidManifest.xml for PiP support.")
+    activity_tag = activity_match.group(0)
+
+    def ensure_attribute(tag: str, name: str, value: str) -> str:
+        pattern = re.compile(r"\s" + re.escape(name) + r"=[\"']([^\"']*)[\"']")
+        existing = pattern.search(tag)
+        if existing:
+            if name == "android:configChanges":
+                values = [item for item in existing.group(1).split("|") if item]
+                for required in value.split("|"):
+                    if required not in values:
+                        values.append(required)
+                updated = "|".join(values)
+            else:
+                updated = value
+            return tag[:existing.start(1)] + updated + tag[existing.end(1):]
+        attribute = " " + name + '="' + value + '"'
+        if tag.endswith("/>"):
+            return tag[:-2] + attribute + "/>"
+        return tag[:-1] + attribute + ">"
+
+    activity_tag = ensure_attribute(activity_tag, "android:supportsPictureInPicture", "true")
+    activity_tag = ensure_attribute(activity_tag, "android:resizeableActivity", "true")
+    activity_tag = ensure_attribute(
+        activity_tag,
+        "android:configChanges",
+        "screenSize|smallestScreenSize|screenLayout|orientation",
+    )
+    text = text[:activity_match.start()] + activity_tag + text[activity_match.end():]
     path.write_text(text, encoding="utf-8")
 
 def add_import(text: str, import_statement: str) -> str:
