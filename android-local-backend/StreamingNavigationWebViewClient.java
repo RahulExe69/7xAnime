@@ -2,6 +2,7 @@ package com.sevenx.anime;
 
 import android.net.Uri;
 import android.util.Log;
+import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebResourceResponse;
 import android.webkit.WebView;
@@ -24,6 +25,20 @@ import java.util.Set;
  */
 public final class StreamingNavigationWebViewClient extends BridgeWebViewClient {
     private static final String TAG = "7xAnimeNavigation";
+
+    // Domains where a failed embedded HTML document should be reported to the
+    // watch page. This intentionally excludes images, scripts, ad resources,
+    // and arbitrary third-party frames.
+    private static final Set<String> EMBED_PLAYER_DOMAINS = new HashSet<>(Arrays.asList(
+        "megaplay.buzz",
+        "anixo.buzz",
+        "megavid.buzz",
+        "megaflix.buzz",
+        "tryembed.us.cc",
+        "cinextream.cc",
+        "nontongo.win",
+        "animeparadise.moe"
+    ));
 
     private static final Set<String> BLOCKED_AD_DOMAINS = new HashSet<>(Arrays.asList(
         "doubleclick.net",
@@ -152,6 +167,66 @@ public final class StreamingNavigationWebViewClient extends BridgeWebViewClient 
             }
         }
         return super.shouldInterceptRequest(view, request);
+    }
+
+    private static boolean isEmbeddedPlayerDocument(WebResourceRequest request) {
+        if (request == null || request.isForMainFrame()) return false;
+        Uri url = request.getUrl();
+        if (url == null || !"https".equalsIgnoreCase(url.getScheme())) return false;
+        String host = url.getHost() == null ? "" : url.getHost().toLowerCase(Locale.ROOT);
+
+        boolean knownPlayerHost = false;
+        for (String domain : EMBED_PLAYER_DOMAINS) {
+            if (host.equals(domain) || host.endsWith("." + domain)) {
+                knownPlayerHost = true;
+                break;
+            }
+        }
+        if (!knownPlayerHost) return false;
+
+        String accept = "";
+        for (java.util.Map.Entry<String, String> header : request.getRequestHeaders().entrySet()) {
+            if ("accept".equalsIgnoreCase(header.getKey())) {
+                accept = header.getValue() == null ? "" : header.getValue().toLowerCase(Locale.ROOT);
+                break;
+            }
+        }
+        return accept.contains("text/html");
+    }
+
+    private static void reportEmbeddedDocumentFailure(WebView view, Uri url, String reason) {
+        if (view == null) return;
+        String host = url == null || url.getHost() == null
+            ? "unknown"
+            : url.getHost().replaceAll("[^A-Za-z0-9.\\-]", "");
+        String safeReason = reason == null ? "embed-load-error" : reason.replaceAll("[^A-Za-z0-9_-]", "");
+        String script = "window.dispatchEvent(new CustomEvent('7xanime:blocked-player-action',{detail:{reason:'"
+            + safeReason + "',host:'" + host + "'}}));";
+        view.post(() -> view.evaluateJavascript(script, null));
+    }
+
+    @Override
+    public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
+        super.onReceivedError(view, request, error);
+        if (error == null || !isEmbeddedPlayerDocument(request)) return;
+
+        int code = error.getErrorCode();
+        // Chromium's net::ERR_BLOCKED_BY_RESPONSE error code is -27, often emitted
+        // when an embed host's response policy blocks display in a nested frame.
+        String reason = code == -27 ? "embed-blocked-by-response" : "embed-load-error";
+        Log.d(TAG, "Embedded player document failed (" + reason + ", code " + code + ")");
+        reportEmbeddedDocumentFailure(view, request.getUrl(), reason);
+    }
+
+    @Override
+    public void onReceivedHttpError(WebView view, WebResourceRequest request, WebResourceResponse response) {
+        super.onReceivedHttpError(view, request, response);
+        if (response == null || !isEmbeddedPlayerDocument(request)) return;
+
+        int statusCode = response.getStatusCode();
+        if (statusCode < 400) return;
+        Log.d(TAG, "Embedded player document returned HTTP " + statusCode);
+        reportEmbeddedDocumentFailure(view, request.getUrl(), "embed-http-error");
     }
 
     private static boolean isExternalTopLevel(Uri url) {
