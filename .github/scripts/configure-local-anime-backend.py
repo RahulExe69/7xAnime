@@ -765,6 +765,80 @@ def install_update_bridge(main_activity: Path) -> None:
 
     main_activity.write_text(text, encoding="utf-8")
 
+def install_player_swipe_observer(main_activity: Path) -> None:
+    """Observe embedded-player swipes without consuming their touch events."""
+    text = main_activity.read_text(encoding="utf-8")
+    text = add_import(text, "import android.view.MotionEvent;")
+    text = add_import(text, "import android.webkit.WebView;")
+
+    if "private void installPlayerSwipeObserver()" not in text:
+        close = text.rfind("}")
+        class_match = re.search(r"class\\s+MainActivity\\s+extends\\s+BridgeActivity\\s*\\{", text)
+        if not class_match or close < class_match.end():
+            fail("Could not locate MainActivity for embedded-player swipe observation.")
+        method = r"""
+    private void installPlayerSwipeObserver() {
+        if (getBridge() == null || getBridge().getWebView() == null) return;
+        final WebView webView = getBridge().getWebView();
+        webView.setOnTouchListener(new View.OnTouchListener() {
+            private float startX;
+            private float startY;
+            private long startAt;
+
+            @Override
+            public boolean onTouch(View view, MotionEvent event) {
+                if (event.getActionMasked() == MotionEvent.ACTION_DOWN) {
+                    startX = event.getX();
+                    startY = event.getY();
+                    startAt = event.getEventTime();
+                    return false;
+                }
+                if (event.getActionMasked() != MotionEvent.ACTION_UP) return false;
+
+                float deltaX = event.getX() - startX;
+                float deltaY = event.getY() - startY;
+                long elapsed = event.getEventTime() - startAt;
+                float density = view.getResources().getDisplayMetrics().density;
+                if (Math.abs(deltaY) < 72f * density
+                    || Math.abs(deltaX) > 120f * density
+                    || elapsed > 900L) {
+                    return false;
+                }
+
+                final float cssX = startX / density;
+                final float cssY = startY / density;
+                final float cssDeltaY = deltaY / density;
+                String script = "(function(){"
+                    + "var target=document.elementFromPoint(" + cssX + "," + cssY + ");"
+                    + "if(target&&target.tagName==='IFRAME'&&target.closest('[data-player-viewport=\\\"true\\\"]')){"
+                    + "window.dispatchEvent(new CustomEvent('7xanime:native-player-swipe',{detail:{deltaY:"
+                    + cssDeltaY + "}}));"
+                    + "}"
+                    + "})();";
+                webView.post(() -> webView.evaluateJavascript(script, null));
+                return false;
+            }
+        });
+    }
+"""
+        text = text[:close] + method + text[close:]
+
+    if "installPlayerSwipeObserver();" not in text:
+        on_create = re.search(r"(?s)void\\s+onCreate\\s*\\([^)]*\\)\\s*\\{", text)
+        if not on_create:
+            fail("Could not find MainActivity.onCreate for embedded-player swipe observation.")
+        open_brace = text.find("{", on_create.start())
+        close_brace = matching_brace(text, open_brace)
+        body = text[open_brace + 1:close_brace]
+        super_call = re.search(r"super\\.onCreate\\s*\\(\\s*savedInstanceState\\s*\\)\\s*;", body)
+        if not super_call:
+            fail("Could not find the MainActivity.onCreate super call for swipe observation.")
+        insert_at = open_brace + 1 + super_call.end()
+        text = text[:insert_at] + "\\n        installPlayerSwipeObserver();\\n" + text[insert_at:]
+
+    main_activity.write_text(text, encoding="utf-8")
+
+
 def install_system_bar_theme(main_activity: Path) -> None:
     """Apply 7xAnime's dark theme to Android status/navigation system bars."""
     text = main_activity.read_text(encoding="utf-8")
@@ -861,6 +935,7 @@ def main() -> None:
     install_background_playback_guard(candidates[0])
     install_update_bridge(candidates[0])
     install_system_bar_theme(candidates[0])
+    install_player_swipe_observer(candidates[0])
 
     print("Configured 7xAnime with provider recovery, ad blocking, fullscreen, PiP, background playback protection, and themed system bars.")
 

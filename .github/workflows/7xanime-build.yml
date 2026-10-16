@@ -147,6 +147,7 @@ jobs:
               "streamingWebChromeClient.handleBackPressed()",
               "streamingWebChromeClient.stopFullscreenForBackground()",
               "applySevenXSystemBarTheme();",
+              "installPlayerSwipeObserver();",
               "setStatusBarColor",
               "setNavigationBarColor",
               "setNavigationBarContrastEnforced",
@@ -255,6 +256,10 @@ jobs:
           css = Path("src/app/globals.css").read_text(encoding="utf-8")
           if "PersistentWatchExperience" not in layout:
               raise SystemExit("Persistent player host is not mounted from the root layout")
+          if "MotionEvent.ACTION_UP" not in main_activity:
+              raise SystemExit("Native embedded-player swipe observation is not installed")
+          if "7xanime:native-player-swipe" not in viewport:
+              raise SystemExit("Embedded-player swipe events are not handled in the viewport")
           if 'data-persistent-watch-player="true"' not in persistent_host or "lastWatchHrefRef" not in persistent_host:
               raise SystemExit("Persistent player session/restore routing is missing")
           for action in ("expand-mini-player", "minimize-player", "close-mini-player"):

@@ -68,6 +68,18 @@ export function PlayerViewport({
     else dispatchPlayerAction("minimize-player");
   }, [dispatchPlayerAction, enterFullscreen, exitFullscreen, isFullscreen, isMiniPlayer]);
 
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+    const handleNativeIframeSwipe = (event: Event) => {
+      const detail = (event as CustomEvent<{ deltaY?: number }>).detail;
+      if (typeof detail?.deltaY === "number" && Math.abs(detail.deltaY) >= SWIPE_THRESHOLD) {
+        handleVerticalSwipe(detail.deltaY);
+      }
+    };
+    window.addEventListener("7xanime:native-player-swipe", handleNativeIframeSwipe);
+    return () => window.removeEventListener("7xanime:native-player-swipe", handleNativeIframeSwipe);
+  }, [handleVerticalSwipe]);
+
   const startGesture = useCallback((event: PointerEvent<HTMLElement>) => {
     if (event.pointerType === "mouse") return;
     const target = event.target as HTMLElement | null;
