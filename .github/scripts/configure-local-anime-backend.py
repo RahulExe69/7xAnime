@@ -657,6 +657,33 @@ def copy_python_source() -> None:
 
 
 
+def install_picture_in_picture_lifecycle(main_activity: Path) -> None:
+    """Forward Android PiP transitions to the Web UI."""
+    text = main_activity.read_text(encoding="utf-8")
+    text = add_import(text, "import android.content.res.Configuration;")
+    signature = "onPictureInPictureModeChanged(boolean isInPictureInPictureMode, Configuration newConfig)"
+    if signature not in text:
+        close = text.rfind("}")
+        class_match = re.search(r"class\s+MainActivity\s+extends\s+BridgeActivity\s*\{", text)
+        if not class_match or close < class_match.end():
+            fail("Could not locate MainActivity terminator for PiP lifecycle wiring.")
+        method = """
+    @Override
+    public void onPictureInPictureModeChanged(boolean isInPictureInPictureMode, Configuration newConfig) {
+        super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig);
+        if (getBridge() != null && getBridge().getWebView() != null) {
+            String script = "document.documentElement.classList.toggle('sevenx-pip-mode', "
+                + isInPictureInPictureMode + ");"
+                + "window.dispatchEvent(new CustomEvent('7xanime:pip-mode',{detail:{active:"
+                + isInPictureInPictureMode + "}}));";
+            getBridge().getWebView().evaluateJavascript(script, null);
+        }
+    }
+"""
+        text = text[:close] + method + text[close:]
+    main_activity.write_text(text, encoding="utf-8")
+
+
 def install_update_bridge(main_activity: Path) -> None:
     """Expose a narrowly scoped native bridge for official APK update installation."""
     text = main_activity.read_text(encoding="utf-8")
@@ -745,6 +772,7 @@ def main() -> None:
     install_service_worker_filter(candidates[0])
     install_streaming_chrome_client(candidates[0])
     install_adblock_filter_engine(candidates[0])
+    install_picture_in_picture_lifecycle(candidates[0])
     install_update_bridge(candidates[0])
 
     print("Configured 7xAnime with maintained filter-list blocking, domain fallback, popup protection, and fullscreen support.")
