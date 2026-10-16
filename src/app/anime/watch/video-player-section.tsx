@@ -856,6 +856,42 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
   const cleanParts = activeEpisodeId.replace(/^\//, "").split("/");
   const currentProviderName = cleanParts[1] || providerNames[0] || "auto";
   const activeCategory = cleanParts[3] === "dub" ? "dub" : cleanParts[3] === "sub" ? "sub" : preferredCategory;
+
+
+  const advanceToNextEpisode = useCallback(() => {
+    if (advanceInProgressRef.current || !animeIdParam || !activeEpisodeId) return;
+    const nextNumber = Number(currentEpNumber) + 1;
+    if (!Number.isFinite(nextNumber) || nextNumber < 2) return;
+
+    const currentProviderEpisodes = rawProviders[currentProviderName]?.episodes?.[activeCategory] || [];
+    const nextProviderEpisode = currentProviderEpisodes.find((episode) => Number(episode.number) === nextNumber);
+    const nextAnyProviderEpisode = providerNames
+      .map((providerName) => rawProviders[providerName]?.episodes?.[activeCategory] || [])
+      .flat()
+      .find((episode) => Number(episode.number) === nextNumber);
+    const catalogueEpisode = allEpisodesData?.episodes?.find((episode) => Number(episode.number) === nextNumber);
+    const nextEpisodeId = isLocalBackendEnabled()
+      ? "watch/auto/" + animeIdParam + "/" + activeCategory + "/episode-" + nextNumber
+      : nextProviderEpisode?.id || nextAnyProviderEpisode?.id || catalogueEpisode?.episodeId || "";
+    if (!nextEpisodeId) return;
+
+    advanceInProgressRef.current = true;
+    setUseFallback(false);
+    setIsHindiMode(false);
+    setSelectedEpisode(nextEpisodeId);
+
+    if (isWatchRoute) {
+      updateEpisodeUrl(nextEpisodeId, nextNumber);
+    } else {
+      const nextUrl = new URL("/anime/watch", window.location.origin);
+      nextUrl.searchParams.set("anime", animeIdParam);
+      nextUrl.searchParams.set("ep", String(nextNumber));
+      nextUrl.searchParams.set("episode", nextEpisodeId);
+      window.dispatchEvent(new CustomEvent("7xanime:watch-location", {
+        detail: { href: nextUrl.pathname + nextUrl.search },
+      }));
+    }
+  }, [activeCategory, activeEpisodeId, allEpisodesData?.episodes, animeIdParam, currentEpNumber, currentProviderName, isWatchRoute, providerNames, rawProviders, setSelectedEpisode]);
   const availableProviderNames = providerNames.filter(
     (providerName) => (rawProviders[providerName]?.episodes?.[activeCategory] || []).length > 0,
   );
