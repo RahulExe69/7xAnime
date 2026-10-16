@@ -876,6 +876,13 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
     if (!nextEpisodeId) return;
 
     advanceInProgressRef.current = true;
+    if (!isWatchRoute) {
+      lastWatchParamsRef.current = {
+        animeId: animeIdParam,
+        episode: String(nextNumber),
+        episodeId: nextEpisodeId,
+      };
+    }
     setUseFallback(false);
     setIsHindiMode(false);
     setSelectedEpisode(nextEpisodeId);
