@@ -684,6 +684,40 @@ def install_picture_in_picture_lifecycle(main_activity: Path) -> None:
     main_activity.write_text(text, encoding="utf-8")
 
 
+def install_background_playback_guard(main_activity: Path) -> None:
+    """Stop attached media and detached native fullscreen video when leaving foreground."""
+    text = main_activity.read_text(encoding="utf-8")
+    text = add_import(text, "import android.os.Build;")
+    if "streamingWebChromeClient.stopFullscreenForBackground()" not in text:
+        close = text.rfind("}")
+        class_match = re.search(r"class\s+MainActivity\s+extends\s+BridgeActivity\s*\{", text)
+        if not class_match or close < class_match.end():
+            fail("Could not locate MainActivity terminator for background playback guard.")
+        method = """
+    @Override
+    public void onStop() {
+        // Android PiP is an intentional floating-player session. Every other
+        // background transition must stop both ordinary media and WebChrome's
+        // separately-attached fullscreen surface.
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O || !isInPictureInPictureMode()) {
+            if (streamingWebChromeClient != null) {
+                streamingWebChromeClient.stopFullscreenForBackground();
+            }
+            if (getBridge() != null && getBridge().getWebView() != null) {
+                String stopScript = "(function(){"
+                    + "document.querySelectorAll('video,audio').forEach(function(media){try{media.pause();}catch(e){}});"
+                    + "document.querySelectorAll('[data-player-viewport=\\\\\\"true\\\\\\"] iframe').forEach(function(frame){try{frame.src='about:blank';}catch(e){}});"
+                    + "})();";
+                getBridge().getWebView().evaluateJavascript(stopScript, null);
+            }
+        }
+        super.onStop();
+    }
+"""
+        text = text[:close] + method + text[close:]
+    main_activity.write_text(text, encoding="utf-8")
+
+
 def install_update_bridge(main_activity: Path) -> None:
     """Expose a narrowly scoped native bridge for official APK update installation."""
     text = main_activity.read_text(encoding="utf-8")
@@ -773,9 +807,10 @@ def main() -> None:
     install_streaming_chrome_client(candidates[0])
     install_adblock_filter_engine(candidates[0])
     install_picture_in_picture_lifecycle(candidates[0])
+    install_background_playback_guard(candidates[0])
     install_update_bridge(candidates[0])
 
-    print("Configured 7xAnime with maintained filter-list blocking, domain fallback, popup protection, and fullscreen support.")
+    print("Configured 7xAnime with provider recovery, ad blocking, fullscreen, PiP, and background playback protection.")
 
 
 if __name__ == "__main__":
