@@ -128,3 +128,29 @@ html[data-reduced-motion="true"] *::after {
   scroll-behavior: auto !important;
   transition-duration: 0.01ms !important;
 }
+
+
+/* In Android PiP, show only the active video surface instead of shrinking the entire watch page. */
+html.sevenx-pip-mode,
+html.sevenx-pip-mode body {
+  background: #000 !important;
+  overflow: hidden !important;
+}
+
+html.sevenx-pip-mode [data-player-viewport="true"] {
+  position: fixed !important;
+  inset: 0 !important;
+  display: block !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  min-height: 0 !important;
+  max-width: none !important;
+  max-height: none !important;
+  aspect-ratio: auto !important;
+  margin: 0 !important;
+  overflow: hidden !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  z-index: 2147483647 !important;
+}
