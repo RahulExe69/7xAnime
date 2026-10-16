@@ -145,6 +145,7 @@ jobs:
               "AdblockFilterEngine.initialize(getApplicationContext())",
               "setWebChromeClient(streamingWebChromeClient)",
               "streamingWebChromeClient.handleBackPressed()",
+              "onPictureInPictureModeChanged(boolean isInPictureInPictureMode, Configuration newConfig)",
           )
           missing_wiring = [item for item in expected_wiring if item not in main_activity]
           if missing_wiring:
@@ -197,6 +198,10 @@ jobs:
               ("handleBackPressed", chrome),
               ("reportBlockedPlayerAction", chrome),
               ("reportBlockedNavigation", nav),
+              ("onReceivedError", nav),
+              ("onReceivedHttpError", nav),
+              ("isEmbeddedPlayerDocument", nav),
+              ("enterPictureInPicture", (java_root / "PlayerFullscreenPlugin.java").read_text(encoding="utf-8")),
           ):
               if item not in text:
                   raise SystemExit(f"Native ad/fullscreen feature missing: {item}")
@@ -225,6 +230,12 @@ jobs:
               raise SystemExit("Double-tap ±10-second seeking wiring missing")
           if "SWIPE_THRESHOLD" not in viewport or "enterNativePlayerFullscreen" not in viewport:
               raise SystemExit("Player swipe/fullscreen wiring missing")
+          if "enterNativePictureInPicture" not in viewport or 'data-player-viewport="true"' not in viewport:
+              raise SystemExit("Native PiP player control or viewport marker is missing")
+          if "appStateChange" not in watch_section or "sevenx-pip-mode" not in watch_section:
+              raise SystemExit("Background playback stop / PiP lifecycle handling is missing")
+          if "tryembed", "cinexstream", "nontongo", "animeparadise" not in watch_section:
+              raise SystemExit("Provider stall watchdog does not cover every configured embed")
 
           # The shared WebView interception layer must stay provider-agnostic.
           # Guard against provider-specific comparisons, while allowing the source comments to mention examples.
