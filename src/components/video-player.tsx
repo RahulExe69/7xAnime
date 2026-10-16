@@ -39,6 +39,7 @@ type ArtPlayerProps = Omit<HTMLAttributes<HTMLDivElement>, "onError"> & {
   serversData: IEpisodeServers;
   onError?: (detail?: string) => void;
   onPlaybackReady?: () => void;
+  onEpisodeEnded?: () => void;
 };
 
 // --- Helper to generate highlights ---
@@ -69,6 +70,7 @@ function VideoPlayer({
   serversData,
   onError,
   onPlaybackReady,
+  onEpisodeEnded,
   ...rest // Spread other div attributes like className, id, etc.
 }: ArtPlayerProps): JSX.Element {
   const artContainerRef = useRef<HTMLDivElement>(null); // Ref for the mounting div
@@ -819,6 +821,7 @@ function VideoPlayer({
 
     const handlePlaybackReady = () => onPlaybackReady?.();
     art.on("video:playing", handlePlaybackReady);
+    art.on("video:ended", () => onEpisodeEnded?.());
     art.on("video:timeupdate", handleTimeUpdate);
 
     const handleInteractionUpdate = () => {
