@@ -870,6 +870,15 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
       .flat()
       .find((episode) => Number(episode.number) === nextNumber);
     const catalogueEpisode = allEpisodesData?.episodes?.find((episode) => Number(episode.number) === nextNumber);
+
+    // A complete native catalogue is authoritative. Do not manufacture an
+    // episode-N URL after the final known episode just because the local API
+    // can accept arbitrary episode numbers.
+    if (nativeCatalogueComplete && !catalogueEpisode) {
+      advanceInProgressRef.current = true;
+      return;
+    }
+
     const nextEpisodeId = isLocalBackendEnabled()
       ? "watch/auto/" + animeIdParam + "/" + activeCategory + "/episode-" + nextNumber
       : nextProviderEpisode?.id || nextAnyProviderEpisode?.id || catalogueEpisode?.episodeId || "";
@@ -1156,12 +1165,34 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
       if (hostname !== expectedHost && !hostname.endsWith(`.${expectedHost}`)) return;
 
       const payload = raw as Record<string, unknown>;
-      const eventType = String(payload.event || payload.type || payload.action || "").toLowerCase();
-      const status = String(payload.status || "").toLowerCase();
+      const normalizeEventName = (value: unknown) =>
+        String(value ?? "")
+          .trim()
+          .replace(/([a-z0-9])([A-Z])/g, "$1-$2")
+          .toLowerCase()
+          .replace(/[\\s_]+/g, "-");
+      const eventNames = [payload.event, payload.type, payload.action, payload.name, payload.status]
+        .map(normalizeEventName)
+        .filter(Boolean);
+      const eventType = eventNames[0] || "";
+      const status = normalizeEventName(payload.status);
       const failed = eventType.includes("error") || status === "error";
 
-      const completionType = String(payload.type || "").toLowerCase();
-      if (completionType === "aniembed:ended" || ["ended", "video-ended", "episode-ended", "complete", "completed"].includes(eventType)) {
+      // Providers disagree on which field carries the ended signal and how
+      // they spell it (event/type/action, camelCase, spaces or underscores).
+      // Accept explicit completion aliases only; never infer completion from
+      // a timeout, stalled stream or generic "ready" event.
+      const completionEvents = new Set([
+        "aniembed:ended",
+        "ended",
+        "video-ended",
+        "episode-ended",
+        "media-ended",
+        "onended",
+        "complete",
+        "completed",
+      ]);
+      if (eventNames.some((name) => completionEvents.has(name) || /^(video|episode|media)-ended$/.test(name))) {
         advanceToNextEpisode();
         return;
       }
