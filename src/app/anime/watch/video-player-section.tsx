@@ -112,7 +112,15 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
   const animeIdParam = isWatchRoute ? liveAnimeIdParam : lastWatchParams?.animeId || "";
   const epParam = isWatchRoute ? liveEpParam : lastWatchParams?.episode ?? null;
   const episodeIdParam = isWatchRoute ? liveEpisodeIdParam : lastWatchParams?.episodeId || "";
-  const { selectedEpisode, setSelectedEpisode, anime } = useAnimeStore();
+  const { selectedEpisode, setSelectedEpisode, anime: storeAnime } = useAnimeStore();
+  const watchAnimeRef = useRef(storeAnime);
+  if (isWatchRoute && storeAnime?.anime?.info?.id) {
+    watchAnimeRef.current = storeAnime;
+  }
+  // Detail/explore routes may update the shared anime store while this player
+  // remains mounted. Keep the playing session's metadata frozen until returning
+  // to the watch route, so browsing another title cannot rename/reconfigure it.
+  const anime = isWatchRoute ? storeAnime : watchAnimeRef.current ?? storeAnime;
 
   const { data: allEpisodesData, isLoading: isEpisodesLoading } = useGetAllEpisodes(animeIdParam);
   const [preferredCategory, setPreferredCategory] = useState<"sub" | "dub">("dub");
