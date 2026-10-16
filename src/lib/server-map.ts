@@ -10,7 +10,8 @@ export type ProviderInfo = {
 /** Explicitly selectable manual sources. AnimeParadise is a direct HLS
  * candidate awaiting device verification. Manual embed sources remain outside Auto.
  */
-export const KUHI_PROVIDER_ORDER = ["anixo", "megavid", "animeparadise", "megaflix", "tryembed", "cinexstream", "nontongo"] as const;
+export const DISABLED_PROVIDER_NAMES = new Set(["animeparadise", "megaflix", "nontongo"]);
+export const KUHI_PROVIDER_ORDER = ["anixo", "megavid", "tryembed", "cinexstream"] as const;
 
 /**
  * Explicitly supported manual player/embed routes. These are advertised audio/format
@@ -28,7 +29,9 @@ export const PROVIDER_INFO: Record<string, ProviderInfo> = {
 };
 
 export const isProviderSelectable = (providerName: string, category: ProviderAudio): boolean => {
-  const provider = PROVIDER_INFO[providerName.toLowerCase()];
+  const normalized = providerName.toLowerCase();
+  if (DISABLED_PROVIDER_NAMES.has(normalized)) return false;
+  const provider = PROVIDER_INFO[normalized];
   if (!provider) return true;
   return provider.audio.includes(category) && provider.formats.some((format) => format !== "dash");
 };

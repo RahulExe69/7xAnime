@@ -13,7 +13,7 @@ import { useQuery } from "react-query";
 import { getHindiDubStreams } from "@/lib/hindi-dub";
 import { ArrowLeft, Captions, Mic, AlertCircle } from "lucide-react";
 import Link from "next/link";
-import { getProviderDisplayName, getServerProviderTitle, isProviderSelectable, KUHI_PROVIDER_ORDER } from "@/lib/server-map";
+import { DISABLED_PROVIDER_NAMES, getProviderDisplayName, getServerProviderTitle, isProviderSelectable, KUHI_PROVIDER_ORDER } from "@/lib/server-map";
 import { Switch } from "@/components/ui/switch";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -149,7 +149,10 @@ const VideoPlayerSection = () => {
     () => allEpisodesData?.rawResponse?.providers || {},
     [allEpisodesData?.rawResponse?.providers],
   );
-  const providerNames = useMemo(() => Object.keys(rawProviders), [rawProviders]);
+  const providerNames = useMemo(
+    () => Object.keys(rawProviders).filter((name) => !DISABLED_PROVIDER_NAMES.has(name.toLowerCase())),
+    [rawProviders],
+  );
 
   const targetEpByNumber = allEpisodesData?.episodes
     ? allEpisodesData.episodes.find((episode) => Number(episode.number) === requestedEpisodeNumber)
@@ -824,7 +827,9 @@ const VideoPlayerSection = () => {
   // Each button uses a strict per-provider request; unavailable sources show an
   // honest error instead of silently swapping to another server.
   const serverProviderNames = isLocalBackendEnabled()
-    ? (localProviderStatus?.providers.filter((item) => item.moduleLoaded).map((item) => item.id) || availableProviderNames)
+    ? (localProviderStatus?.providers
+        .filter((item) => item.moduleLoaded && !DISABLED_PROVIDER_NAMES.has(item.id.toLowerCase()))
+        .map((item) => item.id) || availableProviderNames)
     : availableProviderNames;
   // Keep SUB-only servers discoverable while ENGLISH is selected, but hide a
   // provider after its recovery attempts fail. Internal auto-failover still
@@ -1052,11 +1057,8 @@ const VideoPlayerSection = () => {
       megaplay: "megaplay.buzz",
       anixo: "anixo.buzz",
       megavid: "megavid.buzz",
-      megaflix: "megaflix.buzz",
       tryembed: "tryembed.us.cc",
       cinexstream: "cinextream.cc",
-      nontongo: "nontongo.win",
-      animeparadise: "animeparadise.moe",
     };
     const expectedHost = expectedHosts[observedEmbedProvider];
     if (!expectedHost) return;
@@ -1082,17 +1084,26 @@ const VideoPlayerSection = () => {
         return;
       }
 
+      const playerReady = ["ready", "loadedmetadata", "loaded"].includes(eventType) || status === "ready";
+      if (playerReady) requestEmbedResume();
+
+      // Ad/verification interstitials can emit "ready" without actual video.
+      // Only timeline/play signals count as proof that the provider is advancing.
       const playbackObserved =
         ["aniembed:play", "aniembed:ended"].includes(String(payload.type || "").toLowerCase()) ||
-        ["play", "playing", "pause", "paused", "ready", "seek", "buffer", "buffering", "loadedmetadata", "time", "progress", "timeupdate", "watching-log", "complete"].includes(eventType) ||
-        ["playing", "paused", "buffering", "ready"].includes(status);
+        ["play", "playing", "pause", "paused", "seek", "time", "progress", "timeupdate", "watching-log", "complete"].includes(eventType) ||
+        ["playing", "paused"].includes(status);
       if (playbackObserved) {
-        if (["ready", "loadedmetadata", "loaded"].includes(eventType) || status === "ready") {
-          requestEmbedResume();
-        }
         lastEmbedSignalAtRef.current = Date.now();
         playbackRetriesRef.current = { key: `${activeEpisodeId}|${playbackSourceIndex}`, count: 0 };
         setRetryingPlayback(null);
+      }
+
+      const confirmedPlayback =
+        ["aniembed:play"].includes(String(payload.type || "").toLowerCase()) ||
+        ["play", "playing", "time", "progress", "timeupdate", "watching-log", "complete"].includes(eventType) ||
+        status === "playing";
+      if (confirmedPlayback) {
         setProviderPlaybackOutcomes((previous) =>
           previous[observedEmbedProvider] === "playing"
             ? previous
@@ -1120,7 +1131,7 @@ const VideoPlayerSection = () => {
   // get more startup time. We cannot inspect/click inside a cross-origin iframe,
   // so this watchdog relies on documented player events.
   useEffect(() => {
-    const watchedProviders = ["megaplay", "anixo", "megavid", "megaflix", "tryembed", "cinexstream", "nontongo", "animeparadise"];
+    const watchedProviders = ["megaplay", "anixo", "megavid", "tryembed", "cinexstream"];
     if (
       !isLocalBackendEnabled() ||
       (!appIsActive && !nativePipActive) ||
@@ -1132,12 +1143,15 @@ const VideoPlayerSection = () => {
     lastEmbedSignalAtRef.current = 0;
     const interval = window.setInterval(() => {
       const lastSignal = Math.max(embedLoadStartedAtRef.current, lastEmbedSignalAtRef.current);
-      const stallTimeoutMs = observedEmbedProvider === "megaflix" ? 10000 : 18000;
+      const stallTimeoutMs = observedEmbedProvider === "tryembed" ? 8000 : 18000;
       if (Date.now() - lastSignal < stallTimeoutMs) return;
       // Reset the baseline before calling into React so rapid repeated timer
       // ticks cannot consume both retries for the same stalled frame.
       embedLoadStartedAtRef.current = Date.now();
-      handlePlayerError(`${getProviderDisplayName(observedEmbedProvider)} stopped reporting playback; retrying this player.`);
+      const detail = observedEmbedProvider === "tryembed"
+        ? "TryEmbed did not confirm real playback (possible upstream ad or verification interstitial); retrying this server."
+        : `${getProviderDisplayName(observedEmbedProvider)} stopped reporting playback; retrying this player.`;
+      handlePlayerError(detail);
     }, 2500);
 
     return () => window.clearInterval(interval);

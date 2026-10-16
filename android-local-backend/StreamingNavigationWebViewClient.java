@@ -33,11 +33,8 @@ public final class StreamingNavigationWebViewClient extends BridgeWebViewClient 
         "megaplay.buzz",
         "anixo.buzz",
         "megavid.buzz",
-        "megaflix.buzz",
         "tryembed.us.cc",
-        "cinextream.cc",
-        "nontongo.win",
-        "animeparadise.moe"
+        "cinextream.cc"
     ));
 
     private static final Set<String> BLOCKED_AD_DOMAINS = new HashSet<>(Arrays.asList(
@@ -83,7 +80,14 @@ public final class StreamingNavigationWebViewClient extends BridgeWebViewClient 
         "pushalert.co",
         "pushengage.com",
         "webpushr.com",
-        "pushcrew.com"
+        "pushcrew.com",
+        "onclckmn.com",
+        "trafficstars.com",
+        "clickadilla.com",
+        "adskeeper.co.uk",
+        "ad-delivery.net",
+        "serve-sys.com",
+        "trafficfactory.biz"
     ));
 
     public StreamingNavigationWebViewClient(Bridge bridge) {
@@ -238,6 +242,10 @@ public final class StreamingNavigationWebViewClient extends BridgeWebViewClient 
     @Override
     public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
         Uri url = request.getUrl();
+        if (isBlockedAdRequest(url)) {
+            Log.d(TAG, "Blocked navigation to known advertising host: " + url.getHost());
+            return true;
+        }
         if (!request.isForMainFrame()) {
             // Keep normal iframe/player navigation in the current WebView.
             // External top-level navigation and popups are blocked separately.
@@ -254,6 +262,10 @@ public final class StreamingNavigationWebViewClient extends BridgeWebViewClient 
     @Override
     public boolean shouldOverrideUrlLoading(WebView view, String rawUrl) {
         Uri url = Uri.parse(rawUrl == null ? "" : rawUrl);
+        if (isBlockedAdRequest(url)) {
+            Log.d(TAG, "Blocked navigation to known advertising host: " + url.getHost());
+            return true;
+        }
         if (isExternalTopLevel(url)) {
             Log.d(TAG, "Blocked external top-level navigation: " + url.getScheme() + "://" + url.getHost());
             reportBlockedNavigation(view, url);

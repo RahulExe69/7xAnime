@@ -46,15 +46,9 @@ LOCAL_ROUTE_TIMEOUT = 80.0
 # Active provider order drives deterministic server numbering and diagnostics.
 # Newly added sources remain manual-only until real-device playback is verified.
 # Keep unapproved Kuhi adapters parked to avoid unnecessary third-party requests.
-ACTIVE_PROVIDER_ORDER = (
-    "anixo", "megavid", "animeparadise",
-    "megaflix", "tryembed", "cinexstream", "nontongo",
-)
+ACTIVE_PROVIDER_ORDER = ("anixo", "megavid", "tryembed", "cinexstream")
 ACTIVE_PROVIDER_ALLOWLIST = set(ACTIVE_PROVIDER_ORDER)
-MANUAL_EMBED_ONLY_PROVIDERS = {
-    "anixo", "megavid", "megaflix", "tryembed", "cinexstream", "nontongo",
-}
-MANUAL_SELECTION_ONLY_PROVIDERS = {"animeparadise"}
+MANUAL_EMBED_ONLY_PROVIDERS = {"anixo", "megavid", "tryembed", "cinexstream"}
 _LOCAL_CONTEXT_CACHE: dict[int, tuple[float, dict]] = {}
 # Asyncio primitives are event-loop-bound. Keep in-flight work and locks scoped
 # to the current loop so isolated test loops cannot reuse a task from another loop.
@@ -179,7 +173,7 @@ async def _start_episode_provider_discovery(anilist_id: int, state: dict) -> Non
         mods = [
             (name, mod)
             for name, mod in provider_race.providers()
-            if name in ACTIVE_PROVIDER_ALLOWLIST and name != "animeparadise"
+            if name in ACTIVE_PROVIDER_ALLOWLIST
         ]
         state["provider_names"] = [name for name, _ in mods]
         if not mods:
@@ -327,7 +321,7 @@ async def local_provider_status():
         "loadedCount": len(available),
         "providerCount": len(ACTIVE_PROVIDER_ALLOWLIST),
         "providers": providers,
-        "note": "Module-loaded status is not a live guarantee for every anime or episode. Attempt metrics are collected as you select or play providers. AniXo, Megavid, MegaFlix, TryEmbed, CinexStream, NontonGo, and AnimeParadise are manual-only until device playback is verified; AnimeParadise catalogue lookup is triggered only when selected. NontonGo is sub-only. HLS, MP4, and embed URLs are supported; DASH-only results are skipped until a DASH engine is available.",
+        "note": "Module-loaded status is not a live guarantee for every anime or episode. Attempt metrics are collected as you select or play providers. AniXo, Megavid, TryEmbed, and CinexStream remain manual-only until device playback is verified. HLS, MP4, and embed URLs are supported; DASH-only results are skipped until a DASH engine is available.",
     }
 
 
@@ -428,7 +422,6 @@ async def _race_watch_for_player(anilist_id: int, episode: int, audio: str) -> d
         for name, mod in provider_race.providers()
         if name in ACTIVE_PROVIDER_ALLOWLIST
         and name not in MANUAL_EMBED_ONLY_PROVIDERS
-        and name not in MANUAL_SELECTION_ONLY_PROVIDERS
     ]
     if not mods:
         return None
