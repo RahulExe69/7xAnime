@@ -229,7 +229,7 @@ export default function ForceUpdateGate() {
               <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.18em] text-[#ff9fbe]">7xAnime · Official release</p>
               <h1 id="7xanime-update-title" className="text-xl font-black tracking-tight sm:text-2xl">Update available</h1>
               <p className="mt-0.5 text-xs text-white/55 sm:text-sm">
-                {status === "checking" ? "Checking for the latest version…" : "A newer version is ready to install."}
+                A newer version is ready to install.
               </p>
             </div>
           </div>
