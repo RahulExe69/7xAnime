@@ -1075,14 +1075,6 @@ const VideoPlayerSection = () => {
     isFallbackActive, handlePlayerError,
   ]);
 
-  if (isLocalBackendEnabled() && !appIsActive && !nativePipActive) {
-    return (
-      <div className="flex aspect-video w-full items-center justify-center rounded-2xl border border-white/10 bg-black px-6 text-center text-sm text-zinc-300">
-        Playback paused because 7xAnime is in the background. Return to the app to continue, or use Picture-in-picture for floating playback.
-      </div>
-    );
-  }
-
   const playerAnimeInfo = useMemo(
     () => ({
       id: anime?.anime?.info?.id || "0",
@@ -1091,6 +1083,14 @@ const VideoPlayerSection = () => {
     }),
     [anime?.anime?.info?.id, anime?.anime?.info?.name, anime?.anime?.info?.poster],
   );
+
+  if (isLocalBackendEnabled() && !appIsActive && !nativePipActive) {
+    return (
+      <div className="flex aspect-video w-full items-center justify-center rounded-2xl border border-white/10 bg-black px-6 text-center text-sm text-zinc-300">
+        Playback paused because 7xAnime is in the background. Return to the app to continue, or use Picture-in-picture for floating playback.
+      </div>
+    );
+  }
 
   const playerControls = (
     <div className="flex w-full flex-col gap-3 rounded-2xl border border-white/[0.07] bg-[#101018] p-3 sm:p-4">
