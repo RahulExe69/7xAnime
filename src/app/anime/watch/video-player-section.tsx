@@ -90,11 +90,28 @@ const requestExternalPlayerSeek = (frame: HTMLIFrameElement, seconds: number) =>
   }
 };
 
-const VideoPlayerSection = () => {
+const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
   const searchParams = useSearchParams();
-  const animeIdParam = searchParams.get("anime") || "";
-  const epParam = searchParams.get("ep");
-  const episodeIdParam = searchParams.get("episode") || "";
+  const liveAnimeIdParam = searchParams.get("anime") || "";
+  const liveEpParam = searchParams.get("ep");
+  const liveEpisodeIdParam = searchParams.get("episode") || "";
+  const lastWatchParamsRef = useRef<{
+    animeId: string;
+    episode: string | null;
+    episodeId: string;
+  } | null>(null);
+
+  if (isWatchRoute) {
+    lastWatchParamsRef.current = {
+      animeId: liveAnimeIdParam,
+      episode: liveEpParam,
+      episodeId: liveEpisodeIdParam,
+    };
+  }
+  const lastWatchParams = lastWatchParamsRef.current;
+  const animeIdParam = isWatchRoute ? liveAnimeIdParam : lastWatchParams?.animeId || "";
+  const epParam = isWatchRoute ? liveEpParam : lastWatchParams?.episode ?? null;
+  const episodeIdParam = isWatchRoute ? liveEpisodeIdParam : lastWatchParams?.episodeId || "";
   const { selectedEpisode, setSelectedEpisode, anime } = useAnimeStore();
 
   const { data: allEpisodesData, isLoading: isEpisodesLoading } = useGetAllEpisodes(animeIdParam);
@@ -181,6 +198,12 @@ const VideoPlayerSection = () => {
     isLocalBackendEnabled() &&
     !!episodeIdParam &&
     !episodeIdParam.startsWith("watch/auto/");
+
+  useEffect(() => {
+    if (!isWatchRoute || typeof window === "undefined") return;
+    const href = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    window.dispatchEvent(new CustomEvent("7xanime:watch-location", { detail: { href } }));
+  }, [isWatchRoute, animeIdParam, epParam, episodeIdParam, activeEpisodeId]);
 
   // Only mirror an explicit episode ID from the URL into Zustand.
   // When a URL contains only ?ep=N, EpisodePlaylist owns the highlighted
