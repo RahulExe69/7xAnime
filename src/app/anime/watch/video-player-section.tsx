@@ -398,6 +398,12 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
   const activeEpisodeNumberFromSlug = Number(activeEpisodeSlug.match(/(\d+)$/)?.[1]) || 0;
   const currentEpNumber = activeEpisodeNumberFromList || activeEpisodeNumberFromSlug || Math.max(1, Number(epParam) || 1);
 
+  const advanceInProgressRef = useRef(false);
+
+  useEffect(() => {
+    advanceInProgressRef.current = false;
+  }, [activeEpisodeId]);
+
   useEffect(() => {
     setProviderPlaybackOutcomes({});
   }, [animeIdParam, currentEpNumber, preferredCategory]);
