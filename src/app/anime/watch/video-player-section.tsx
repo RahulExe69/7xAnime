@@ -226,10 +226,19 @@ const VideoPlayerSection = () => {
     if (!isLocalBackendEnabled()) return;
     const frame = externalEmbedFrameRef.current;
     if (!frame?.contentWindow) return;
+    const progressAnimeId = animeIdParam || anime?.anime?.info?.id || "0";
     const progress = getLocalWatchProgress(
-      animeIdParam || anime?.anime?.info?.id || "0",
+      progressAnimeId,
       activeEpisodeId,
       requestedEpisodeNumber,
+    ) ?? (
+      anime?.anime?.info?.id && anime.anime.info.id !== progressAnimeId
+        ? getLocalWatchProgress(
+            anime.anime.info.id,
+            activeEpisodeId,
+            requestedEpisodeNumber,
+          )
+        : null
     );
     if (!progress || progress.current < 5 || progress.duration <= 0 ||
         progress.current >= progress.duration - 15) return;
@@ -1140,11 +1149,14 @@ const VideoPlayerSection = () => {
 
   const playerAnimeInfo = useMemo(
     () => ({
-      id: animeIdParam || anime?.anime?.info?.id || "0",
+      id: isLocalBackendEnabled()
+        ? animeIdParam || anime?.anime?.info?.id || "0"
+        : anime?.anime?.info?.id || "0",
+      legacyId: anime?.anime?.info?.id || undefined,
       title: anime?.anime?.info?.name || "Anime",
       image: anime?.anime?.info?.poster || "",
     }),
-    [animeIdParam, anime?.anime?.info?.id, anime?.anime?.info?.name, anime?.anime?.info?.poster],
+    [isLocalBackendEnabled, animeIdParam, anime?.anime?.info?.id, anime?.anime?.info?.name, anime?.anime?.info?.poster],
   );
 
   if (isLocalBackendEnabled() && !appIsActive && !nativePipActive) {

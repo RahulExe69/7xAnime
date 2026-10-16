@@ -31,7 +31,7 @@ const WATCH_PROGRESS_MIN_WATCH_TIME = 10; // Min seconds watched to create recor
 // --- Define Props for the Combined Player ---
 type ArtPlayerProps = Omit<HTMLAttributes<HTMLDivElement>, "onError"> & {
   episodeInfo: IEpisodeSource; // Source info including URLs, tracks, intro/outro
-  animeInfo: { title: string; image: string; id: string }; // Basic anime info for poster etc.
+  animeInfo: { title: string; image: string; id: string; legacyId?: string }; // Stable and legacy progress identities
   subOrDub: "sub" | "dub"; // Use literal type for clarity
   episodes?: IEpisodes; // Optional: If needed for playlist features later
   getInstance?: (art: Artplayer) => void; // Callback to get the instance
@@ -167,14 +167,13 @@ function VideoPlayer({
       bookmarkIdRef.current = null;
       watchedRecordIdRef.current = null;
       watchHistoryIdsRef.current = [];
-      const localProgress =
-        animeInfo.id && serversData.episodeId
-          ? getLocalWatchProgress(
-              animeInfo.id,
-              serversData.episodeId,
-              parseInt(serversData.episodeNo, 10) || 1,
-            )
-          : null;
+      const episodeNumber = parseInt(serversData.episodeNo, 10) || 1;
+      const localProgress = animeInfo.id && serversData.episodeId
+        ? getLocalWatchProgress(animeInfo.id, serversData.episodeId, episodeNumber) ??
+          (animeInfo.legacyId && animeInfo.legacyId !== animeInfo.id
+            ? getLocalWatchProgress(animeInfo.legacyId, serversData.episodeId, episodeNumber)
+            : null)
+        : null;
       initialSeekTimeRef.current = localProgress?.current ?? null;
       hasMetMinWatchTimeRef.current = !!localProgress;
       return;

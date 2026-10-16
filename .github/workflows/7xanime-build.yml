@@ -251,6 +251,10 @@ jobs:
               raise SystemExit("Background playback stop / PiP lifecycle handling is missing")
           if "getLocalWatchProgress" not in watch_section or "requestEmbedResume" not in watch_section:
               raise SystemExit("Cross-server watch-progress resume handling is missing")
+          if "legacyId?: string" not in player_component or "animeInfo.legacyId" not in player_component:
+              raise SystemExit("Legacy local watch-progress keys must remain readable")
+          if "progressAnimeId" not in watch_section:
+              raise SystemExit("Embedded watch-progress stable-key fallback is missing")
           if "onLoad={requestEmbedResume}" not in watch_section:
               raise SystemExit("Embedded players are not asked to resume after loading")
           if 'status === "checking") return null' not in update_gate:
