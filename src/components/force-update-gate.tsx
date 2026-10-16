@@ -149,7 +149,7 @@ export default function ForceUpdateGate() {
   }, []);
 
   useEffect(() => {
-    if (!["checking", "required", "downloading", "installing", "permission", "error"].includes(status)) return;
+    if (!["required", "downloading", "installing", "permission", "error"].includes(status)) return;
     const preventDismiss = (event: Event) => event.preventDefault();
     window.addEventListener("7xanime:back", preventDismiss);
     return () => window.removeEventListener("7xanime:back", preventDismiss);
@@ -206,7 +206,7 @@ export default function ForceUpdateGate() {
     }
     startDownload();
   };
-  if (status === "none") return null;
+  if (status === "none" || status === "checking") return null;
   const displayDate = publishedAt
     ? new Date(publishedAt).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })
     : "Latest release";

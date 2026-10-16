@@ -765,6 +765,57 @@ def install_update_bridge(main_activity: Path) -> None:
 
     main_activity.write_text(text, encoding="utf-8")
 
+def install_system_bar_theme(main_activity: Path) -> None:
+    """Apply 7xAnime's dark theme to Android status/navigation system bars."""
+    text = main_activity.read_text(encoding="utf-8")
+    text = add_import(text, "import android.graphics.Color;")
+    text = add_import(text, "import android.os.Build;")
+    text = add_import(text, "import android.view.View;")
+
+    method_signature = "private void applySevenXSystemBarTheme()"
+    if method_signature not in text:
+        close = text.rfind("}")
+        class_match = re.search(r"class\s+MainActivity\s+extends\s+BridgeActivity\s*\{", text)
+        if not class_match or close < class_match.end():
+            fail("Could not locate MainActivity terminator for system-bar theme wiring.")
+        method = """
+    private void applySevenXSystemBarTheme() {
+        final int barColor = Color.parseColor("#0b0307");
+        getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
+        getWindow().setStatusBarColor(barColor);
+        getWindow().setNavigationBarColor(barColor);
+        View decor = getWindow().getDecorView();
+        int flags = decor.getSystemUiVisibility();
+        // Keep the status and navigation icons light against the app's dark surface.
+        flags &= ~(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
+        decor.setSystemUiVisibility(flags);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            getWindow().setStatusBarContrastEnforced(false);
+            getWindow().setNavigationBarContrastEnforced(false);
+        }
+    }
+"""
+        text = text[:close] + method + text[close:]
+
+    if "applySevenXSystemBarTheme();" not in text:
+        on_create = re.search(r"super\.onCreate\s*\(\s*savedInstanceState\s*\)\s*;", text)
+        if not on_create:
+            fail("Could not find MainActivity.onCreate for system-bar theme wiring.")
+        text = text[:on_create.end()] + "\n        applySevenXSystemBarTheme();" + text[on_create.end():]
+
+    resume_match = re.search(r"void\s+onResume\s*\([^)]*\)\s*\{", text)
+    if not resume_match:
+        fail("Could not find MainActivity.onResume for system-bar theme refresh.")
+    resume_open = text.find("{", resume_match.start())
+    resume_close = matching_brace(text, resume_open)
+    resume_body = text[resume_open + 1:resume_close]
+    if "applySevenXSystemBarTheme();" not in resume_body:
+        super_resume = re.search(r"super\.onResume\s*\(\s*\)\s*;", resume_body)
+        insert_at = resume_open + 1 + super_resume.end() if super_resume else resume_open + 1
+        text = text[:insert_at] + "\n        applySevenXSystemBarTheme();\n" + text[insert_at:resume_close + (len(text) - resume_close)]
+    main_activity.write_text(text, encoding="utf-8")
+
+
 def main() -> None:
     if not ANDROID.is_dir():
         fail("The generated android/ directory is missing; generate Android with Capacitor first.")
@@ -809,8 +860,9 @@ def main() -> None:
     install_picture_in_picture_lifecycle(candidates[0])
     install_background_playback_guard(candidates[0])
     install_update_bridge(candidates[0])
+    install_system_bar_theme(candidates[0])
 
-    print("Configured 7xAnime with provider recovery, ad blocking, fullscreen, PiP, and background playback protection.")
+    print("Configured 7xAnime with provider recovery, ad blocking, fullscreen, PiP, background playback protection, and themed system bars.")
 
 
 if __name__ == "__main__":

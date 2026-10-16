@@ -24,7 +24,7 @@ import { useGetAllEpisodes } from "@/query/get-all-episodes";
 
 import useBookMarks from "@/hooks/use-get-bookmark";
 import { api, isLocalBackendEnabled } from "@/lib/api";
-import { saveLocalWatchProgress } from "@/lib/local-watch-progress";
+import { getLocalWatchProgress, saveLocalWatchProgress } from "@/lib/local-watch-progress";
 
 type LocalProviderDiagnostic = {
   id: string;
@@ -68,6 +68,26 @@ const updateEpisodeUrl = (episodeId: string, episodeNumber: number) => {
   url.searchParams.set("episode", episodeId);
   url.searchParams.set("ep", String(episodeNumber));
   window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+};
+
+// Cross-origin providers differ in the seek API they expose. Ask the common
+// player-message protocols for a seek, without reading or modifying their page.
+// Providers with no remote seek API ignore these messages; direct media playback
+// uses ArtPlayer's native seek/resume path instead.
+const requestExternalPlayerSeek = (frame: HTMLIFrameElement, seconds: number) => {
+  const target = frame.contentWindow;
+  if (!target || !Number.isFinite(seconds) || seconds < 1) return;
+  const time = Math.max(0, Math.floor(seconds));
+  const commands = [
+    { event: "seek", time, currentTime: time },
+    { type: "seek", time, currentTime: time },
+    { action: "seek", time, currentTime: time },
+    { event: "command", func: "seekTo", args: [time, true] },
+    { method: "seekTo", value: time },
+  ];
+  for (const command of commands) {
+    try { target.postMessage(command, "*"); } catch { /* provider ignored */ }
+  }
 };
 
 const VideoPlayerSection = () => {
@@ -200,6 +220,40 @@ const VideoPlayerSection = () => {
   const embedLoadStartedAtRef = useRef(0);
   const lastEmbedSignalAtRef = useRef(0);
   const externalEmbedFrameRef = useRef<HTMLIFrameElement | null>(null);
+  const embedResumeTimersRef = useRef<number[]>([]);
+
+  const requestEmbedResume = useCallback(() => {
+    if (!isLocalBackendEnabled()) return;
+    const frame = externalEmbedFrameRef.current;
+    if (!frame?.contentWindow) return;
+    const progress = getLocalWatchProgress(
+      animeIdParam || anime?.anime?.info?.id || "0",
+      activeEpisodeId,
+      Number(currentEpNumber) || 1,
+    );
+    if (!progress || progress.current < 5 || progress.duration <= 0 ||
+        progress.current >= progress.duration - 15) return;
+
+    // Try after the document load and again as the cross-origin player finishes
+    // initializing. A provider can accept seek messages only after its API is ready.
+    embedResumeTimersRef.current.forEach((timer) => window.clearTimeout(timer));
+    embedResumeTimersRef.current = [];
+    const frameAtSchedule = frame;
+    const sourceAtSchedule = frame.src;
+    for (const delay of [0, 500, 1300, 2800]) {
+      const timer = window.setTimeout(() => {
+        if (externalEmbedFrameRef.current !== frameAtSchedule ||
+            frameAtSchedule.src !== sourceAtSchedule) return;
+        requestExternalPlayerSeek(frameAtSchedule, progress.current);
+      }, delay);
+      embedResumeTimersRef.current.push(timer);
+    }
+  }, [animeIdParam, anime?.anime?.info?.id, activeEpisodeId, currentEpNumber]);
+
+  useEffect(() => () => {
+    embedResumeTimersRef.current.forEach((timer) => window.clearTimeout(timer));
+    embedResumeTimersRef.current = [];
+  }, []);
 
   const flushLatestEmbedProgress = useCallback(() => {
     const latest = lastEmbedProgressRef.current;
@@ -664,10 +718,9 @@ const VideoPlayerSection = () => {
         // Throttle updates every 10 seconds or on complete
         if (isComplete || Math.abs(now - lastSyncedTimeRef.current) >= 10) {
           lastSyncedTimeRef.current = now;
+          saveLocalWatchProgress(progress);
 
-          if (isLocalBackendEnabled()) {
-            saveLocalWatchProgress(progress);
-          } else if (fallbackBookmarkIdRef.current) {
+          if (!isLocalBackendEnabled() && fallbackBookmarkIdRef.current) {
             const recordId = await syncWatchProgress(
               fallbackBookmarkIdRef.current,
               fallbackWatchedRecordIdRef.current,
@@ -1025,6 +1078,9 @@ const VideoPlayerSection = () => {
         ["play", "playing", "pause", "paused", "ready", "seek", "buffer", "buffering", "loadedmetadata", "time", "progress", "timeupdate", "watching-log", "complete"].includes(eventType) ||
         ["playing", "paused", "buffering", "ready"].includes(status);
       if (playbackObserved) {
+        if (["ready", "loadedmetadata", "loaded"].includes(eventType) || status === "ready") {
+          requestEmbedResume();
+        }
         lastEmbedSignalAtRef.current = Date.now();
         playbackRetriesRef.current = { key: `${activeEpisodeId}|${playbackSourceIndex}`, count: 0 };
         setRetryingPlayback(null);
@@ -1044,6 +1100,7 @@ const VideoPlayerSection = () => {
     observedEmbedSource?.url,
     handlePlayerError,
     isFallbackActive,
+    requestEmbedResume,
   ]);
 
   // Known event-reporting iframe players (MegaPlay, AniXo, Megavid, MegaFlix)
@@ -1083,11 +1140,11 @@ const VideoPlayerSection = () => {
 
   const playerAnimeInfo = useMemo(
     () => ({
-      id: anime?.anime?.info?.id || "0",
+      id: animeIdParam || anime?.anime?.info?.id || "0",
       title: anime?.anime?.info?.name || "Anime",
       image: anime?.anime?.info?.poster || "",
     }),
-    [anime?.anime?.info?.id, anime?.anime?.info?.name, anime?.anime?.info?.poster],
+    [animeIdParam, anime?.anime?.info?.id, anime?.anime?.info?.name, anime?.anime?.info?.poster],
   );
 
   if (isLocalBackendEnabled() && !appIsActive && !nativePipActive) {
@@ -1286,8 +1343,10 @@ const VideoPlayerSection = () => {
         {selectedHindi ? (
           <PlayerViewport title="Hindi video player">
             <iframe
+              ref={externalEmbedFrameRef}
               key={selectedHindi.embed}
               src={selectedHindi.embed}
+              onLoad={requestEmbedResume}
               title={`${hindiDubData?.matchedTitle || anime?.anime?.info?.name || "Anime"} episode ${currentEpNumber} Hindi dub via ${selectedHindi.host}`}
               width="100%"
               height="100%"
@@ -1422,6 +1481,7 @@ const VideoPlayerSection = () => {
             ref={externalEmbedFrameRef}
             key={`${fallbackAnimeId}-${fallbackEpId}-${activeCategory}:${playerRetryKey}`}
             src={fallbackSrc}
+            onLoad={requestEmbedResume}
             title={`${anime?.anime?.info?.name || "Anime"} episode ${currentEpNumber} via MegaPlay`}
             width="100%"
             height="100%"
@@ -1449,6 +1509,7 @@ const VideoPlayerSection = () => {
             ref={externalEmbedFrameRef}
             key={`${firstResolvedSource.url}:${playerRetryKey}`}
             src={firstResolvedSource.url}
+            onLoad={requestEmbedResume}
             title={`${anime?.anime?.info?.name || "Anime"} episode ${currentEpNumber} via ${getProviderDisplayName(embedProvider)}`}
             width="100%"
             height="100%"

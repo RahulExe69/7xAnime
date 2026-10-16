@@ -146,6 +146,10 @@ jobs:
               "setWebChromeClient(streamingWebChromeClient)",
               "streamingWebChromeClient.handleBackPressed()",
               "streamingWebChromeClient.stopFullscreenForBackground()",
+              "applySevenXSystemBarTheme();",
+              "setStatusBarColor",
+              "setNavigationBarColor",
+              "setNavigationBarContrastEnforced",
               "onPictureInPictureModeChanged(boolean isInPictureInPictureMode, Configuration newConfig)",
           )
           missing_wiring = [item for item in expected_wiring if item not in main_activity]
@@ -231,6 +235,7 @@ jobs:
 
           watch_section = Path("src/app/anime/watch/video-player-section.tsx").read_text(encoding="utf-8")
           player_component = Path("src/components/video-player.tsx").read_text(encoding="utf-8")
+          update_gate = Path("src/components/force-update-gate.tsx").read_text(encoding="utf-8")
           viewport = Path("src/components/player-viewport.tsx").read_text(encoding="utf-8")
           if "7xanime:blocked-player-action" not in watch_section:
               raise SystemExit("Player page is not wired to blocked-ad auto-switch events")
@@ -244,6 +249,12 @@ jobs:
               raise SystemExit("Native PiP player control or viewport marker is missing")
           if "appStateChange" not in watch_section or "sevenx-pip-mode" not in watch_section:
               raise SystemExit("Background playback stop / PiP lifecycle handling is missing")
+          if "getLocalWatchProgress" not in watch_section or "requestEmbedResume" not in watch_section:
+              raise SystemExit("Cross-server watch-progress resume handling is missing")
+          if "onLoad={requestEmbedResume}" not in watch_section:
+              raise SystemExit("Embedded players are not asked to resume after loading")
+          if 'status === "checking") return null' not in update_gate:
+              raise SystemExit("The update gate must remain invisible while checking for an update")
           if any(provider not in watch_section for provider in ("tryembed", "cinexstream", "nontongo", "animeparadise")):
               raise SystemExit("Provider stall watchdog does not cover every configured embed")
 
