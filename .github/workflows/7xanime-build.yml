@@ -273,6 +273,12 @@ jobs:
               raise SystemExit("Background playback stop / PiP lifecycle handling is missing")
           if "getLocalWatchProgress" not in watch_section or "requestEmbedResume" not in watch_section:
               raise SystemExit("Cross-server watch-progress resume handling is missing")
+          if "onEpisodeEnded?: () => void" not in player_component or 'art.on("video:ended"' not in player_component:
+              raise SystemExit("Native video-ended callback is missing")
+          if "advanceToNextEpisode" not in watch_section or "episode-" not in watch_section:
+              raise SystemExit("Automatic next-episode routing is missing")
+          if "aniembed:ended" not in watch_section or "lastWatchParamsRef.current = {" not in watch_section:
+              raise SystemExit("Embedded ended events or mini-player episode state sync is missing")
           if "legacyId?: string" not in player_component or "animeInfo.legacyId" not in player_component:
               raise SystemExit("Legacy local watch-progress keys must remain readable")
           if "progressAnimeId" not in watch_section:
