@@ -810,7 +810,7 @@ def install_player_swipe_observer(main_activity: Path) -> None:
                 final float cssDeltaY = deltaY / density;
                 String script = "(function(){"
                     + "var target=document.elementFromPoint(" + cssX + "," + cssY + ");"
-                    + "if(target&&target.tagName==='IFRAME'&&target.closest('[data-player-viewport=\\\"true\\\"]')){"
+                    + "if(target&&target.tagName==='IFRAME'&&target.closest('[data-player-viewport=true]')){"
                     + "window.dispatchEvent(new CustomEvent('7xanime:native-player-swipe',{detail:{deltaY:"
                     + cssDeltaY + "}}));"
                     + "}"
