@@ -184,7 +184,7 @@ export function PlayerViewport({
           event.preventDefault();
           event.stopPropagation();
           toggleFullscreen();
-        }
+        }}
         title={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
         aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
         className="absolute right-2 top-2 z-[10002] flex h-10 w-10 items-center justify-center rounded-xl border border-white/15 bg-black/65 text-white shadow-lg backdrop-blur-sm transition hover:bg-black/85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-400"
