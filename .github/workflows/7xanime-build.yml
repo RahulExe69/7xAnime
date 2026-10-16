@@ -234,7 +234,7 @@ jobs:
               raise SystemExit("Native PiP player control or viewport marker is missing")
           if "appStateChange" not in watch_section or "sevenx-pip-mode" not in watch_section:
               raise SystemExit("Background playback stop / PiP lifecycle handling is missing")
-          if "tryembed", "cinexstream", "nontongo", "animeparadise" not in watch_section:
+          if any(provider not in watch_section for provider in ("tryembed", "cinexstream", "nontongo", "animeparadise")):
               raise SystemExit("Provider stall watchdog does not cover every configured embed")
 
           # The shared WebView interception layer must stay provider-agnostic.
