@@ -873,6 +873,10 @@ const VideoPlayerSection = () => {
   };
 
   const handlePlayerError = useCallback((detail?: string) => {
+    // Do not resolve/retry/switch providers while the app is hidden. Explicit
+    // PiP is a visible playback session and may continue using normal recovery.
+    if (isLocalBackendEnabled() && !appIsActive && !nativePipActive) return;
+
     const retryKey = `${activeEpisodeId}|${playbackSourceIndex}`;
     if (playbackRetriesRef.current.key !== retryKey) {
       playbackRetriesRef.current = { key: retryKey, count: 0 };
@@ -921,6 +925,7 @@ const VideoPlayerSection = () => {
     activeEpisodeId, advanceAfterSourceFailure, currentProviderName,
     episodeData?.provider, episodeData?.sources, flushLatestEmbedProgress,
     hasManualProviderSelection, playbackSourceIndex, retryEpisodeData, isFallbackActive,
+    appIsActive, nativePipActive,
   ]);
 
   const handlePlayerPlaybackReady = useCallback(() => {
@@ -1052,6 +1057,7 @@ const VideoPlayerSection = () => {
     const watchedProviders = ["megaplay", "anixo", "megavid", "megaflix", "tryembed", "cinexstream", "nontongo", "animeparadise"];
     if (
       !isLocalBackendEnabled() ||
+      (!appIsActive && !nativePipActive) ||
       (!isFallbackActive && observedEmbedSource?.type !== "embed") ||
       !watchedProviders.includes(observedEmbedProvider)
     ) return;
@@ -1072,7 +1078,7 @@ const VideoPlayerSection = () => {
   }, [
     activeEpisodeId, playbackSourceIndex, playerRetryKey,
     observedEmbedProvider, observedEmbedSource?.type, observedEmbedSource?.url,
-    isFallbackActive, handlePlayerError,
+    isFallbackActive, handlePlayerError, appIsActive, nativePipActive,
   ]);
 
   const playerAnimeInfo = useMemo(
