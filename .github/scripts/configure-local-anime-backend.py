@@ -773,7 +773,7 @@ def install_player_swipe_observer(main_activity: Path) -> None:
 
     if "private void installPlayerSwipeObserver()" not in text:
         close = text.rfind("}")
-        class_match = re.search(r"class\\s+MainActivity\\s+extends\\s+BridgeActivity\\s*\\{", text)
+        class_match = re.search(r"class\s+MainActivity\s+extends\s+BridgeActivity\s*\{", text)
         if not class_match or close < class_match.end():
             fail("Could not locate MainActivity for embedded-player swipe observation.")
         method = r"""
@@ -824,17 +824,17 @@ def install_player_swipe_observer(main_activity: Path) -> None:
         text = text[:close] + method + text[close:]
 
     if "installPlayerSwipeObserver();" not in text:
-        on_create = re.search(r"(?s)void\\s+onCreate\\s*\\([^)]*\\)\\s*\\{", text)
+        on_create = re.search(r"(?s)void\s+onCreate\s*\([^)]*\)\s*\{", text)
         if not on_create:
             fail("Could not find MainActivity.onCreate for embedded-player swipe observation.")
         open_brace = text.find("{", on_create.start())
         close_brace = matching_brace(text, open_brace)
         body = text[open_brace + 1:close_brace]
-        super_call = re.search(r"super\\.onCreate\\s*\\(\\s*savedInstanceState\\s*\\)\\s*;", body)
+        super_call = re.search(r"super\.onCreate\s*\(\s*savedInstanceState\s*\)\s*;", body)
         if not super_call:
             fail("Could not find the MainActivity.onCreate super call for swipe observation.")
         insert_at = open_brace + 1 + super_call.end()
-        text = text[:insert_at] + "\\n        installPlayerSwipeObserver();\\n" + text[insert_at:]
+        text = text[:insert_at] + "\n        installPlayerSwipeObserver();\n" + text[insert_at:]
 
     main_activity.write_text(text, encoding="utf-8")
 
