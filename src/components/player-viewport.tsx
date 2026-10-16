@@ -3,7 +3,8 @@
 import React, { PointerEvent, ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { App } from "@capacitor/app";
 import { Capacitor } from "@capacitor/core";
-import { Maximize2, Minimize2, PictureInPicture } from "lucide-react";
+import { usePathname } from "next/navigation";
+import { Maximize2, Minimize2, PictureInPicture, X } from "lucide-react";
 import { enterNativePictureInPicture, enterNativePlayerFullscreen, exitNativePlayerFullscreen } from "@/lib/native-player-fullscreen";
 
 type PlayerViewportProps = {
@@ -24,6 +25,9 @@ export function PlayerViewport({
 }: PlayerViewportProps) {
   const rootRef = useRef<HTMLDivElement>(null);
   const gestureStartRef = useRef<GestureStart | null>(null);
+  const pathname = usePathname() || "/";
+  const isWatchRoute = pathname === "/anime/watch" || pathname.startsWith("/anime/watch/");
+  const isMiniPlayer = !isWatchRoute;
   const [isFullscreen, setIsFullscreen] = useState(false);
   const isFullscreenRef = useRef(false);
   isFullscreenRef.current = isFullscreen;
@@ -49,6 +53,21 @@ export function PlayerViewport({
     void enterNativePictureInPicture();
   }, []);
 
+  const dispatchPlayerAction = useCallback((action: "expand-mini-player" | "minimize-player" | "close-mini-player") => {
+    if (typeof window !== "undefined") window.dispatchEvent(new Event(`7xanime:${action}`));
+  }, []);
+
+  const handleVerticalSwipe = useCallback((deltaY: number) => {
+    if (deltaY < 0) {
+      if (isMiniPlayer) dispatchPlayerAction("expand-mini-player");
+      else if (!isFullscreen) void enterFullscreen();
+      return;
+    }
+    if (isFullscreen) void exitFullscreen();
+    else if (isMiniPlayer) dispatchPlayerAction("close-mini-player");
+    else dispatchPlayerAction("minimize-player");
+  }, [dispatchPlayerAction, enterFullscreen, exitFullscreen, isFullscreen, isMiniPlayer]);
+
   const startGesture = useCallback((event: PointerEvent<HTMLElement>) => {
     if (event.pointerType === "mouse") return;
     const target = event.target as HTMLElement | null;
@@ -67,12 +86,10 @@ export function PlayerViewport({
     const deltaY = event.clientY - start.y;
     if (Math.abs(deltaX) > SWIPE_MAX_X_DRIFT || Math.abs(deltaY) < SWIPE_THRESHOLD) return;
 
-    // Swipe up enters landscape fullscreen; swipe down exits. Touch starts
-    // inside a cross-origin iframe cannot bubble to this wrapper, so the
-    // narrow gesture rail below handles the same gestures for embedded servers.
-    if (deltaY < 0 && !isFullscreen) void enterFullscreen();
-    if (deltaY > 0 && isFullscreen) void exitFullscreen();
-  }, [enterFullscreen, exitFullscreen, isFullscreen]);
+    // In portrait, swipe up expands. Down exits fullscreen, then a second
+    // down collapses the same mounted player into the mini-player.
+    handleVerticalSwipe(deltaY);
+  }, [handleVerticalSwipe]);
 
   const onRailPointerDown = (event: PointerEvent<HTMLDivElement>) => {
     event.stopPropagation();
@@ -92,8 +109,7 @@ export function PlayerViewport({
     const deltaX = event.clientX - start.x;
     const deltaY = event.clientY - start.y;
     if (Math.abs(deltaX) > SWIPE_MAX_X_DRIFT || Math.abs(deltaY) < SWIPE_THRESHOLD) return;
-    if (deltaY < 0 && !isFullscreen) void enterFullscreen();
-    if (deltaY > 0 && isFullscreen) void exitFullscreen();
+    handleVerticalSwipe(deltaY);
   };
 
   useEffect(() => {
@@ -153,6 +169,7 @@ export function PlayerViewport({
       onPointerUp={finishGesture}
       onPointerCancel={() => { gestureStartRef.current = null; }}
       data-player-fullscreen={isFullscreen ? "true" : "false"}
+      data-player-mini={isMiniPlayer ? "true" : "false"}
       data-player-viewport="true"
       aria-label={title}
     >
@@ -171,7 +188,7 @@ export function PlayerViewport({
           }}
           title="Picture-in-picture"
           aria-label="Picture-in-picture"
-          className="absolute right-14 top-2 z-[10002] flex h-10 w-10 items-center justify-center rounded-xl border border-white/15 bg-black/65 text-white shadow-lg backdrop-blur-sm transition hover:bg-black/85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-400"
+          className={`absolute right-14 top-2 z-[10002] flex h-10 w-10 items-center justify-center rounded-xl border border-white/15 bg-black/65 text-white shadow-lg backdrop-blur-sm transition hover:bg-black/85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-400 ${isMiniPlayer ? "hidden" : ""}`}
         >
           <PictureInPicture size={18} />
         </button>
@@ -187,16 +204,52 @@ export function PlayerViewport({
         }}
         title={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
         aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
-        className="absolute right-2 top-2 z-[10002] flex h-10 w-10 items-center justify-center rounded-xl border border-white/15 bg-black/65 text-white shadow-lg backdrop-blur-sm transition hover:bg-black/85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-400"
+        className={`absolute right-2 top-2 z-[10002] flex h-10 w-10 items-center justify-center rounded-xl border border-white/15 bg-black/65 text-white shadow-lg backdrop-blur-sm transition hover:bg-black/85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-400 ${isMiniPlayer ? "hidden" : ""}`}
       >
         {isFullscreen ? <Minimize2 size={19} /> : <Maximize2 size={19} />}
       </button>
 
-      {/* Cross-origin iframe gestures do not bubble to React. A slim edge rail
-          preserves normal player controls while still making vertical swipes work. */}
+      {isMiniPlayer && (
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-[10003] flex items-start justify-between gap-2 rounded-t-2xl bg-gradient-to-b from-black/90 via-black/35 to-transparent p-2 pb-5">
+          <span className="min-w-0 flex-1 truncate pt-1 text-xs font-semibold text-white drop-shadow">{title.replace(/ video player$/i, "")}</span>
+          <div className="pointer-events-auto flex shrink-0 items-center gap-1">
+            <button
+              type="button"
+              onPointerDown={(event) => event.stopPropagation()}
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                dispatchPlayerAction("expand-mini-player");
+              }}
+              aria-label="Return to full player"
+              title="Return to full player"
+              className="grid h-8 w-8 place-items-center rounded-lg border border-white/15 bg-black/65 text-white shadow-md backdrop-blur-sm"
+            >
+              <Maximize2 size={16} />
+            </button>
+            <button
+              type="button"
+              onPointerDown={(event) => event.stopPropagation()}
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                dispatchPlayerAction("close-mini-player");
+              }}
+              aria-label="Close mini-player"
+              title="Close mini-player"
+              className="grid h-8 w-8 place-items-center rounded-lg border border-white/15 bg-black/65 text-white shadow-md backdrop-blur-sm"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Cross-origin iframe gestures do not bubble to React. The edge rail
+          observes swipes without covering the provider's playback controls. */}
       <div
         aria-hidden="true"
-        className="absolute inset-y-0 right-0 z-[10001] w-3 touch-none bg-transparent"
+        className="absolute inset-y-0 right-0 z-[10001] w-4 touch-none bg-transparent"
         onPointerDown={onRailPointerDown}
         onPointerUp={onRailPointerUp}
         onPointerCancel={() => { gestureStartRef.current = null; }}

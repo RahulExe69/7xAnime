@@ -154,3 +154,46 @@ html.sevenx-pip-mode [data-player-viewport="true"] {
   box-shadow: none !important;
   z-index: 2147483647 !important;
 }
+
+
+/* Persistent YouTube-style mini-player.
+   Promote only the player branch through its existing watch-page wrappers so
+   ArtPlayer or the provider iframe is not unmounted during route navigation. */
+[data-persistent-watch-player][data-player-mode="watch"],
+[data-persistent-watch-player][data-player-mode="mini"] {
+  display: contents !important;
+}
+[data-persistent-watch-player][data-player-mode="mini"] :has([data-player-viewport="true"]) {
+  display: contents !important;
+}
+[data-persistent-watch-player][data-player-mode="mini"] *:not(:has([data-player-viewport="true"])):not([data-player-viewport="true"]):not([data-player-viewport="true"] *) {
+  display: none !important;
+}
+[data-persistent-watch-player][data-player-mode="mini"] [data-player-viewport="true"] {
+  position: fixed !important;
+  inset: auto 12px calc(88px + env(safe-area-inset-bottom)) auto !important;
+  width: min(58vw, 360px) !important;
+  min-width: 190px !important;
+  max-width: calc(100vw - 24px) !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  aspect-ratio: 16 / 9 !important;
+  margin: 0 !important;
+  overflow: hidden !important;
+  border: 1px solid rgba(255, 159, 190, 0.35) !important;
+  border-radius: 14px !important;
+  background: #0b0307 !important;
+  box-shadow: 0 10px 36px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 59, 114, 0.08) !important;
+  z-index: 95 !important;
+}
+[data-persistent-watch-player][data-player-mode="mini"] [data-player-viewport="true"] > div:first-child {
+  border-radius: inherit;
+  overflow: hidden;
+}
+@media (min-width: 768px) {
+  [data-persistent-watch-player][data-player-mode="mini"] [data-player-viewport="true"] {
+    inset: auto 24px 24px auto !important;
+    width: min(360px, calc(100vw - 48px)) !important;
+  }
+}

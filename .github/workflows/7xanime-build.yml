@@ -249,6 +249,21 @@ jobs:
               raise SystemExit("Player swipe/fullscreen wiring missing")
           if "enterNativePictureInPicture" not in viewport or 'data-player-viewport="true"' not in viewport:
               raise SystemExit("Native PiP player control or viewport marker is missing")
+          persistent_host = Path("src/components/persistent-watch-experience.tsx").read_text(encoding="utf-8")
+          watch_page = Path("src/app/anime/watch/page.tsx").read_text(encoding="utf-8")
+          layout = Path("src/app/layout.tsx").read_text(encoding="utf-8")
+          css = Path("src/app/globals.css").read_text(encoding="utf-8")
+          if "PersistentWatchExperience" not in layout:
+              raise SystemExit("Persistent player host is not mounted from the root layout")
+          if 'data-persistent-watch-player="true"' not in persistent_host or "lastWatchHrefRef" not in persistent_host:
+              raise SystemExit("Persistent player session/restore routing is missing")
+          for action in ("expand-mini-player", "minimize-player", "close-mini-player"):
+              if f"7xanime:{action}" not in viewport:
+                  raise SystemExit(f"Player action is missing: {action}")
+          if '[data-persistent-watch-player][data-player-mode="mini"]' not in css:
+              raise SystemExit("Mini-player browse-mode styling is missing")
+          if "return null" not in watch_page:
+              raise SystemExit("Watch route must not mount a duplicate player")
           if "appStateChange" not in watch_section or "sevenx-pip-mode" not in watch_section:
               raise SystemExit("Background playback stop / PiP lifecycle handling is missing")
           if "getLocalWatchProgress" not in watch_section or "requestEmbedResume" not in watch_section:
