@@ -321,8 +321,18 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
         if (externalEmbedFrameRef.current !== frameAtSchedule ||
             frameAtSchedule.src !== sourceAtSchedule) return;
         if (shouldRemainPaused) {
-          requestExternalPlayerPause(frameAtSchedule);
-        } else if (resumeTime !== null) {
+          // A user can resume playback while delayed pause retries are queued.
+          // Respect that newer explicit playing state rather than pausing again.
+          if (pauseAfterEmbedRecoveryRef.current || embedPlaybackStateRef.current === "paused") {
+            requestExternalPlayerPause(frameAtSchedule);
+          }
+          return;
+        }
+        if (
+          embedPlaybackStateRef.current !== "paused" &&
+          !pauseAfterEmbedRecoveryRef.current &&
+          resumeTime !== null
+        ) {
           requestExternalPlayerSeek(frameAtSchedule, resumeTime);
         }
       }, delay);
