@@ -24,6 +24,11 @@ on:
         required: false
         type: string
         default: ""
+      compare_apk_sizes:
+        description: Run the slower three-variant release APK size audit after the debug build
+        required: true
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -145,6 +150,13 @@ jobs:
               "AdblockFilterEngine.initialize(getApplicationContext())",
               "setWebChromeClient(streamingWebChromeClient)",
               "streamingWebChromeClient.handleBackPressed()",
+              "streamingWebChromeClient.stopFullscreenForBackground()",
+              "applySevenXSystemBarTheme();",
+              "installPlayerSwipeObserver();",
+              "setStatusBarColor",
+              "setNavigationBarColor",
+              "setNavigationBarContrastEnforced",
+              "onPictureInPictureModeChanged(boolean isInPictureInPictureMode, Configuration newConfig)",
           )
           missing_wiring = [item for item in expected_wiring if item not in main_activity]
           if missing_wiring:
@@ -158,6 +170,7 @@ jobs:
           variables = Path("android/variables.gradle").read_text(encoding="utf-8")
           root_gradle = Path("android/build.gradle").read_text(encoding="utf-8")
           wrapper = Path("android/gradle/wrapper/gradle-wrapper.properties").read_text(encoding="utf-8")
+          android_manifest_text = Path("android/app/src/main/AndroidManifest.xml").read_text(encoding="utf-8")
           if "io.github.mlm-games:adblock:0.1.3" not in app_gradle:
               raise SystemExit("Maintained adblock-rust Android dependency is missing")
           if "getDefaultProguardFile('proguard-android-optimize.txt')" not in app_gradle and 'getDefaultProguardFile("proguard-android-optimize.txt")' not in app_gradle:
@@ -197,6 +210,12 @@ jobs:
               ("handleBackPressed", chrome),
               ("reportBlockedPlayerAction", chrome),
               ("reportBlockedNavigation", nav),
+              ("stopFullscreenForBackground", chrome),
+              ("onStop()", main_activity),
+              ("onReceivedError", nav),
+              ("onReceivedHttpError", nav),
+              ("isEmbeddedPlayerDocument", nav),
+              ("enterPictureInPicture", (java_root / "PlayerFullscreenPlugin.java").read_text(encoding="utf-8")),
           ):
               if item not in text:
                   raise SystemExit(f"Native ad/fullscreen feature missing: {item}")
@@ -213,9 +232,18 @@ jobs:
                   raise SystemExit(f"{callback} must not delegate to the default WebChromeClient dialog")
           if "onJsBeforeUnload" not in chrome or "result.confirm()" not in chrome:
               raise SystemExit("Native before-unload dialog suppression is missing")
+          if 'android:supportsPictureInPicture="true"' not in android_manifest_text:
+              raise SystemExit("Android manifest is not PiP-capable")
+          if 'android:resizeableActivity="true"' not in android_manifest_text:
+              raise SystemExit("Android Activity is not resizeable for PiP")
+          if "screenSize" not in android_manifest_text or "smallestScreenSize" not in android_manifest_text:
+              raise SystemExit("Android Activity configuration does not retain PiP resize changes")
 
           watch_section = Path("src/app/anime/watch/video-player-section.tsx").read_text(encoding="utf-8")
+          local_api_text = Path("android-local-backend/local_api.py").read_text(encoding="utf-8")
+          server_map = Path("src/lib/server-map.ts").read_text(encoding="utf-8")
           player_component = Path("src/components/video-player.tsx").read_text(encoding="utf-8")
+          update_gate = Path("src/components/force-update-gate.tsx").read_text(encoding="utf-8")
           viewport = Path("src/components/player-viewport.tsx").read_text(encoding="utf-8")
           if "7xanime:blocked-player-action" not in watch_section:
               raise SystemExit("Player page is not wired to blocked-ad auto-switch events")
@@ -225,6 +253,63 @@ jobs:
               raise SystemExit("Double-tap ±10-second seeking wiring missing")
           if "SWIPE_THRESHOLD" not in viewport or "enterNativePlayerFullscreen" not in viewport:
               raise SystemExit("Player swipe/fullscreen wiring missing")
+          if "enterNativePictureInPicture" not in viewport or 'data-player-viewport="true"' not in viewport:
+              raise SystemExit("Native PiP player control or viewport marker is missing")
+          persistent_host = Path("src/components/persistent-watch-experience.tsx").read_text(encoding="utf-8")
+          watch_page = Path("src/app/anime/watch/page.tsx").read_text(encoding="utf-8")
+          layout = Path("src/app/layout.tsx").read_text(encoding="utf-8")
+          css = Path("src/app/globals.css").read_text(encoding="utf-8")
+          if "PersistentWatchExperience" not in layout:
+              raise SystemExit("Persistent player host is not mounted from the root layout")
+          if "MotionEvent.ACTION_UP" not in main_activity:
+              raise SystemExit("Native embedded-player swipe observation is not installed")
+          if "7xanime:native-player-swipe" not in viewport:
+              raise SystemExit("Embedded-player swipe events are not handled in the viewport")
+          if 'data-persistent-watch-player="true"' not in persistent_host or "lastWatchHrefRef" not in persistent_host:
+              raise SystemExit("Persistent player session/restore routing is missing")
+          for action in ("expand-mini-player", "minimize-player", "close-mini-player"):
+              if f'dispatchPlayerAction("{action}")' not in viewport:
+                  raise SystemExit(f"Player action is missing: {action}")
+          if '[data-persistent-watch-player][data-player-mode="mini"]' not in css:
+              raise SystemExit("Mini-player browse-mode styling is missing")
+          if "return null" not in watch_page:
+              raise SystemExit("Watch route must not mount a duplicate player")
+          if "appStateChange" not in watch_section or "sevenx-pip-mode" not in watch_section:
+              raise SystemExit("Background playback stop / PiP lifecycle handling is missing")
+          if "getLocalWatchProgress" not in watch_section or "requestEmbedResume" not in watch_section:
+              raise SystemExit("Cross-server watch-progress resume handling is missing")
+          if "onEpisodeEnded?: () => void" not in player_component or 'art.on("video:ended"' not in player_component:
+              raise SystemExit("Native video-ended callback is missing")
+          if "advanceToNextEpisode" not in watch_section or "episode-" not in watch_section:
+              raise SystemExit("Automatic next-episode routing is missing")
+          if 'useState<boolean>(() => isLocalBackendEnabled())' not in watch_section:
+              raise SystemExit("Android must start on Server 1 without requiring a manual server tap")
+          if "aniembed:ended" not in watch_section or "lastWatchParamsRef.current = {" not in watch_section:
+              raise SystemExit("Embedded ended events or mini-player episode state sync is missing")
+          if "if (nativeCatalogueComplete && !catalogueEpisode)" not in watch_section:
+              raise SystemExit("Auto-next must stop at the end of a complete native episode catalogue")
+          if "normalizeEventName" not in watch_section or "eventNames.some((name)" not in watch_section:
+              raise SystemExit("Embedded completion events must normalize provider-specific end signals")
+          if "legacyId?: string" not in player_component or "animeInfo.legacyId" not in player_component:
+              raise SystemExit("Legacy local watch-progress keys must remain readable")
+          if "progressAnimeId" not in watch_section:
+              raise SystemExit("Embedded watch-progress stable-key fallback is missing")
+          if "onLoad={requestEmbedResume}" not in watch_section:
+              raise SystemExit("Embedded players are not asked to resume after loading")
+          if 'status === "checking") return null' not in update_gate:
+              raise SystemExit("The update gate must remain invisible while checking for an update")
+          if 'ACTIVE_PROVIDER_ORDER = ("anixo", "megavid", "tryembed", "cinexstream")' not in local_api_text:
+              raise SystemExit("Android active provider allowlist has unexpected servers")
+          if "DISABLED_PROVIDER_NAMES" not in server_map:
+              raise SystemExit("Disabled providers must be excluded from the selectable catalogue")
+          if any(provider not in watch_section for provider in ("tryembed", "cinexstream")):
+              raise SystemExit("Provider stall watchdog does not cover every enabled embed")
+          if "const playerReady =" not in watch_section:
+              raise SystemExit("Ready-page events must be distinguished from actual playback")
+          if 'observedEmbedProvider === "tryembed" ? 8000 : 18000' not in watch_section:
+              raise SystemExit("TryEmbed interstitial timeout is missing")
+          if "Blocked navigation to known advertising host" not in nav:
+              raise SystemExit("Known ad-network document navigation is not blocked")
 
           # The shared WebView interception layer must stay provider-agnostic.
           # Guard against provider-specific comparisons, while allowing the source comments to mention examples.
@@ -348,8 +433,7 @@ jobs:
               assert status.status_code == 200, status.text
               reported = {item["id"] for item in status.json()["providers"] if item["moduleLoaded"]}
               active_manual = {
-                  "anixo", "megavid", "animeparadise",
-                  "megaflix", "tryembed", "cinexstream", "nontongo",
+                  "anixo", "megavid", "tryembed", "cinexstream",
               }
               assert active_manual <= reported, (
                   "Diagnostics do not list all approved manual providers: "
@@ -360,7 +444,7 @@ jobs:
                   f"{sorted(reported - active_manual)}"
               )
           print(
-              "Packaged API: all 18 adapter modules imported; only the seven approved "
+              "Packaged API: all 18 adapter modules imported; only four approved "
               "manual choices are exposed; health, auth, diagnostics and CORS passed."
           )
           PY
@@ -436,7 +520,7 @@ jobs:
       # Build unoptimized universal, optimized universal, and optimized ARM64
       # variants from the same sources to measure each size reduction.
       - name: Compare release APK size variants
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'workflow_dispatch' && inputs.build_type == 'debug' && inputs.compare_apk_sizes
         shell: bash
         run: |
           set -euo pipefail
@@ -520,7 +604,7 @@ jobs:
           PY
 
       - name: Upload APK size comparison
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'workflow_dispatch' && inputs.build_type == 'debug' && inputs.compare_apk_sizes
         uses: actions/upload-artifact@v4
         with:
           name: 7xAnime-v${{ env.VERSION_NAME }}-apk-size-audit

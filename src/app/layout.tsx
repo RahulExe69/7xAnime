@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import localFont from "next/font/local";
 
 import NavBar from "@/components/navbar";
+import { PersistentWatchExperience } from "@/components/persistent-watch-experience";
 import AccessibilityPreferences from "@/components/accessibility-preferences";
 import ForceUpdateGate from "@/components/force-update-gate";
 import Footer from "@/components/footer";
@@ -99,7 +100,7 @@ export default function RootLayout({
             </Suspense>
             <AccessibilityPreferences />
             <NavBar />
-            {children}
+            <PersistentWatchExperience>{children}</PersistentWatchExperience>
             <Footer />
           </QueryProvider>
         </ThemeProvider>

@@ -1,7 +1,11 @@
 package com.sevenx.anime;
 
 import android.app.Activity;
+import android.app.PictureInPictureParams;
 import android.content.pm.ActivityInfo;
+import android.content.pm.PackageManager;
+import android.os.Build;
+import android.util.Rational;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
@@ -79,6 +83,38 @@ public final class PlayerFullscreenPlugin extends Plugin {
                 decor.setSystemUiVisibility(View.SYSTEM_UI_FLAG_VISIBLE);
             }
             call.resolve();
+        });
+    }
+    @PluginMethod
+    public void enterPictureInPicture(PluginCall call) {
+        Activity activity = getActivity();
+        if (activity == null) {
+            call.reject("Picture-in-picture is unavailable");
+            return;
+        }
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+            call.reject("Picture-in-picture requires Android 8.0 or newer");
+            return;
+        }
+        if (!activity.getPackageManager().hasSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE)) {
+            call.reject("This device does not support picture-in-picture");
+            return;
+        }
+
+        activity.runOnUiThread(() -> {
+            try {
+                PictureInPictureParams params = new PictureInPictureParams.Builder()
+                    .setAspectRatio(new Rational(16, 9))
+                    .build();
+                boolean entered = activity.enterPictureInPictureMode(params);
+                if (entered) {
+                    call.resolve();
+                } else {
+                    call.reject("Android could not enter picture-in-picture mode");
+                }
+            } catch (RuntimeException error) {
+                call.reject("Could not enter picture-in-picture mode", error);
+            }
         });
     }
 }

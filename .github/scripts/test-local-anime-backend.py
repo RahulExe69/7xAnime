@@ -42,69 +42,24 @@ class LocalAnimeApiTests(unittest.TestCase):
             "https://localhost",
         )
 
-    def test_watch_route_uses_only_the_selected_provider_and_normalizes_subtitles(self) -> None:
-        selected_module = object()
-        other_module = object()
+    def test_disabled_providers_are_rejected_without_stream_resolution(self) -> None:
+        for provider in ("animeparadise", "megaflix", "nontongo"):
+            with patch.object(
+                local_api,
+                "_watch_one_for_player",
+                new=AsyncMock(side_effect=AssertionError("disabled provider must never be called")),
+            ) as watch:
+                response = self.client.get(
+                    f"/watch/{provider}/12345/sub/{provider}-1",
+                    headers=self.auth,
+                )
 
-        async def fake_watch_one(mod, name, anilist_id, episode, audio, ctx):
-            self.assertIs(mod, selected_module)
-            self.assertEqual(name, "animeparadise")
-            self.assertEqual(anilist_id, 12345)
-            self.assertEqual(episode, 12)
-            self.assertEqual(audio, "sub")
-            self.assertEqual(ctx, {"media": {"id": 12345, "title": {"english": "Test"}}, "anizip": None})
-            return "animeparadise", [{
-                "url": "https://cdn.example/master.m3u8",
-                "type": "hls",
-                "subtitles": [{"url": "https://cdn.example/sub.vtt", "lang": "en"}],
-            }], 0.25, True
-
-        with (
-            patch.object(local_api.provider_race, "providers", return_value=[
-                ("animeparadise", selected_module), ("megaflix", other_module),
-            ]),
-            patch.object(local_api.provider_race, "build_ctx", new=AsyncMock(return_value={"media": {"id": 12345, "title": {"english": "Test"}}, "anizip": None})),
-            patch.object(local_api, "_watch_one_for_player", new=AsyncMock(side_effect=fake_watch_one)),
-            patch.object(local_api.provider_race, "race_watch", new=AsyncMock(side_effect=AssertionError("manual pick must not race other providers"))),
-        ):
-            response = self.client.get(
-                "/watch/animeparadise/12345/sub/animeparadise-12",
-                headers=self.auth,
-            )
-
-        self.assertEqual(response.status_code, 200, response.text)
-        payload = response.json()
-        self.assertEqual(payload["streams"][0]["url"], "https://cdn.example/master.m3u8")
-        self.assertEqual(payload["subtitles"][0]["file"], "https://cdn.example/sub.vtt")
-        self.assertEqual(payload["subtitles"][0]["label"], "en")
-        self.assertEqual(payload["provider"], "animeparadise")
-        self.assertEqual(payload["requestedProvider"], "animeparadise")
-        self.assertEqual(payload["providerStatus"], "ok")
-
-    def test_selected_provider_failure_does_not_silently_return_another_provider(self) -> None:
-        selected_module = object()
-        other_module = object()
-
-        with (
-            patch.object(local_api.provider_race, "providers", return_value=[
-                ("animeparadise", selected_module), ("megaflix", other_module),
-            ]),
-            patch.object(local_api.provider_race, "build_ctx", new=AsyncMock(return_value={"media": {"id": 12345, "title": {"english": "Test"}}, "anizip": None})),
-            patch.object(local_api, "_watch_one_for_player", new=AsyncMock(return_value=("animeparadise", [], 8.0, False))),
-            patch.object(local_api.provider_race, "record_latency"),
-            patch.object(local_api.provider_race, "race_watch", new=AsyncMock(side_effect=AssertionError("must not silently switch providers"))),
-        ):
-            response = self.client.get(
-                "/watch/animeparadise/12345/sub/animeparadise-12",
-                headers=self.auth,
-            )
-
-        self.assertEqual(response.status_code, 200, response.text)
-        payload = response.json()
-        self.assertEqual(payload["provider"], "animeparadise")
-        self.assertEqual(payload["requestedProvider"], "animeparadise")
-        self.assertEqual(payload["providerStatus"], "no_stream")
-        self.assertEqual(payload["streams"], [])
+            self.assertEqual(response.status_code, 200, response.text)
+            payload = response.json()
+            self.assertEqual(payload["requestedProvider"], provider)
+            self.assertEqual(payload["providerStatus"], "unsupported_provider")
+            self.assertEqual(payload["streams"], [])
+            watch.assert_not_awaited()
 
     def test_unknown_provider_does_not_fall_back_to_the_auto_race(self) -> None:
         with patch.object(
@@ -237,7 +192,7 @@ class LocalAnimeApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200, response.text)
         payload = response.json()
         self.assertEqual(payload["loadedCount"], 1)
-        self.assertEqual(payload["providerCount"], 7)
+        self.assertEqual(payload["providerCount"], 4)
         self.assertEqual(payload["providers"][0]["status"], "recent_attempt_succeeded")
         self.assertEqual(payload["providers"][1]["status"], "module_unavailable")
         self.assertIn("not a live guarantee", payload["note"])
@@ -598,10 +553,10 @@ class LocalAnimeApiTests(unittest.TestCase):
 
         asyncio.run(exercise())
 
-    def test_manual_yomi_embed_route_skips_slow_metadata_context(self) -> None:
+    def test_manual_tryembed_route_skips_slow_metadata_context(self) -> None:
         async def exercise() -> None:
             with (
-                patch.object(local_api.provider_race, "providers", return_value=[("megaflix", megaflix)]),
+                patch.object(local_api.provider_race, "providers", return_value=[("tryembed", tryembed)]),
                 patch.object(
                     local_api, "_get_local_provider_context",
                     new=AsyncMock(side_effect=AssertionError("manual embeds must not wait on metadata")),
@@ -609,14 +564,14 @@ class LocalAnimeApiTests(unittest.TestCase):
                 patch.object(local_api.provider_race, "record_latency"),
             ):
                 response = self.client.get(
-                    "/watch/megaflix/21/dub/megaflix-43",
+                    "/watch/tryembed/21/sub/tryembed-43",
                     headers=self.auth,
                 )
 
             self.assertEqual(response.status_code, 200, response.text)
             payload = response.json()
             self.assertEqual(payload["providerStatus"], "ok")
-            self.assertEqual(payload["streams"][0]["url"], "https://www.megaflix.buzz/stream/ani/21/43/dub?color=%23ff3b72&autoplay=true")
+            self.assertEqual(payload["streams"][0]["url"], "https://tryembed.us.cc/embed/anime/21/43/sub")
             context_lookup.assert_not_awaited()
 
         asyncio.run(exercise())

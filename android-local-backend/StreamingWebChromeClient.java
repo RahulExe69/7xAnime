@@ -292,4 +292,9 @@ public final class StreamingWebChromeClient extends BridgeWebChromeClient {
         return bridgeRef;
     }
 
+    /** Close Android's detached HTML5 fullscreen surface when the Activity backgrounds. */
+    public void stopFullscreenForBackground() {
+        if (customView != null) onHideCustomView();
+    }
+
 }

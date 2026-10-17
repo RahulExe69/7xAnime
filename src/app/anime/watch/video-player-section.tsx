@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { App } from "@capacitor/app";
 import { useAnimeStore } from "@/store/anime-store";
 import dynamic from "next/dynamic";
 
@@ -12,7 +13,7 @@ import { useQuery } from "react-query";
 import { getHindiDubStreams } from "@/lib/hindi-dub";
 import { ArrowLeft, Captions, Mic, AlertCircle } from "lucide-react";
 import Link from "next/link";
-import { getProviderDisplayName, getServerProviderTitle, isProviderSelectable, KUHI_PROVIDER_ORDER } from "@/lib/server-map";
+import { DISABLED_PROVIDER_NAMES, getProviderDisplayName, getServerProviderTitle, isProviderSelectable, KUHI_PROVIDER_ORDER } from "@/lib/server-map";
 import { Switch } from "@/components/ui/switch";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -23,7 +24,7 @@ import { useGetAllEpisodes } from "@/query/get-all-episodes";
 
 import useBookMarks from "@/hooks/use-get-bookmark";
 import { api, isLocalBackendEnabled } from "@/lib/api";
-import { saveLocalWatchProgress } from "@/lib/local-watch-progress";
+import { getLocalWatchProgress, saveLocalWatchProgress } from "@/lib/local-watch-progress";
 
 type LocalProviderDiagnostic = {
   id: string;
@@ -69,12 +70,57 @@ const updateEpisodeUrl = (episodeId: string, episodeNumber: number) => {
   window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
 };
 
-const VideoPlayerSection = () => {
+// Cross-origin providers differ in the seek API they expose. Ask the common
+// player-message protocols for a seek, without reading or modifying their page.
+// Providers with no remote seek API ignore these messages; direct media playback
+// uses ArtPlayer's native seek/resume path instead.
+const requestExternalPlayerSeek = (frame: HTMLIFrameElement, seconds: number) => {
+  const target = frame.contentWindow;
+  if (!target || !Number.isFinite(seconds) || seconds < 1) return;
+  const time = Math.max(0, Math.floor(seconds));
+  const commands = [
+    { event: "seek", time, currentTime: time },
+    { type: "seek", time, currentTime: time },
+    { action: "seek", time, currentTime: time },
+    { event: "command", func: "seekTo", args: [time, true] },
+    { method: "seekTo", value: time },
+  ];
+  for (const command of commands) {
+    try { target.postMessage(command, "*"); } catch { /* provider ignored */ }
+  }
+};
+
+const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
   const searchParams = useSearchParams();
-  const animeIdParam = searchParams.get("anime") || "";
-  const epParam = searchParams.get("ep");
-  const episodeIdParam = searchParams.get("episode") || "";
-  const { selectedEpisode, setSelectedEpisode, anime } = useAnimeStore();
+  const liveAnimeIdParam = searchParams.get("anime") || "";
+  const liveEpParam = searchParams.get("ep");
+  const liveEpisodeIdParam = searchParams.get("episode") || "";
+  const lastWatchParamsRef = useRef<{
+    animeId: string;
+    episode: string | null;
+    episodeId: string;
+  } | null>(null);
+
+  if (isWatchRoute) {
+    lastWatchParamsRef.current = {
+      animeId: liveAnimeIdParam,
+      episode: liveEpParam,
+      episodeId: liveEpisodeIdParam,
+    };
+  }
+  const lastWatchParams = lastWatchParamsRef.current;
+  const animeIdParam = isWatchRoute ? liveAnimeIdParam : lastWatchParams?.animeId || "";
+  const epParam = isWatchRoute ? liveEpParam : lastWatchParams?.episode ?? null;
+  const episodeIdParam = isWatchRoute ? liveEpisodeIdParam : lastWatchParams?.episodeId || "";
+  const { selectedEpisode, setSelectedEpisode, anime: storeAnime } = useAnimeStore();
+  const watchAnimeRef = useRef(storeAnime);
+  if (isWatchRoute && storeAnime?.anime?.info?.id) {
+    watchAnimeRef.current = storeAnime;
+  }
+  // Detail/explore routes may update the shared anime store while this player
+  // remains mounted. Keep the playing session's metadata frozen until returning
+  // to the watch route, so browsing another title cannot rename/reconfigure it.
+  const anime = isWatchRoute ? storeAnime : watchAnimeRef.current ?? storeAnime;
 
   const { data: allEpisodesData, isLoading: isEpisodesLoading } = useGetAllEpisodes(animeIdParam);
   const [preferredCategory, setPreferredCategory] = useState<"sub" | "dub">("dub");
@@ -85,13 +131,53 @@ const VideoPlayerSection = () => {
       setPreferredCategory(savedAudio);
     }
   }, []);
+
+  useEffect(() => {
+    if (!isLocalBackendEnabled()) return;
+
+    let disposed = false;
+    let appListener: { remove: () => Promise<void> } | null = null;
+
+    const onPipMode = (event: Event) => {
+      const detail = (event as CustomEvent<{ active?: boolean }>).detail;
+      setNativePipActive(detail?.active === true);
+    };
+    window.addEventListener("7xanime:pip-mode", onPipMode);
+
+    void App.addListener("appStateChange", ({ isActive }) => {
+      if (isActive) {
+        setAppIsActive(true);
+        return;
+      }
+
+      // PiP mode is marked before Android backgrounds the Activity. Keep the
+      // player mounted only when the app really entered its floating-player mode.
+      const pipActive = document.documentElement.classList.contains("sevenx-pip-mode");
+      setNativePipActive(pipActive);
+      setAppIsActive(false);
+    }).then((listener) => {
+      if (disposed) void listener.remove();
+      else appListener = listener;
+    }).catch(() => {
+      // The browser preview has no native App lifecycle listener.
+    });
+
+    return () => {
+      disposed = true;
+      window.removeEventListener("7xanime:pip-mode", onPipMode);
+      if (appListener) void appListener.remove();
+    };
+  }, []);
   const requestedEpisodeNumber = Math.max(1, Number(epParam) || 1);
 
   const rawProviders = useMemo(
     () => allEpisodesData?.rawResponse?.providers || {},
     [allEpisodesData?.rawResponse?.providers],
   );
-  const providerNames = useMemo(() => Object.keys(rawProviders), [rawProviders]);
+  const providerNames = useMemo(
+    () => Object.keys(rawProviders).filter((name) => !DISABLED_PROVIDER_NAMES.has(name.toLowerCase())),
+    [rawProviders],
+  );
 
   const targetEpByNumber = allEpisodesData?.episodes
     ? allEpisodesData.episodes.find((episode) => Number(episode.number) === requestedEpisodeNumber)
@@ -121,6 +207,12 @@ const VideoPlayerSection = () => {
     !!episodeIdParam &&
     !episodeIdParam.startsWith("watch/auto/");
 
+  useEffect(() => {
+    if (!isWatchRoute || typeof window === "undefined") return;
+    const href = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    window.dispatchEvent(new CustomEvent("7xanime:watch-location", { detail: { href } }));
+  }, [isWatchRoute, animeIdParam, epParam, episodeIdParam, activeEpisodeId]);
+
   // Only mirror an explicit episode ID from the URL into Zustand.
   // When a URL contains only ?ep=N, EpisodePlaylist owns the highlighted
   // selection while the player may use a temporary watch/auto URL. Syncing
@@ -133,9 +225,16 @@ const VideoPlayerSection = () => {
     setSelectedEpisode(episodeIdParam);
   }, [episodeIdParam, selectedEpisode, setSelectedEpisode]);
 
-  const [useFallback, setUseFallback] = useState<boolean>(false);
+  // On native Android, begin with Server 1 (MegaPlay) immediately. The previous
+  // first-run path waited for the Auto provider race to initialize and could sit
+  // on "reconnecting to Auto" until the viewer manually tapped a server. Users
+  // can still choose Auto or any provider explicitly; this is only the initial
+  // playback default for the bundled local-backend APK.
+  const [useFallback, setUseFallback] = useState<boolean>(() => isLocalBackendEnabled());
   const [isHindiMode, setIsHindiMode] = useState<boolean>(false);
   const [selectedHindiServer, setSelectedHindiServer] = useState<number>(0);
+  const [appIsActive, setAppIsActive] = useState(true);
+  const [nativePipActive, setNativePipActive] = useState(false);
   const [manualProviderPlaybackFailed, setManualProviderPlaybackFailed] = useState(false);
   const [fallbackPlaybackFailed, setFallbackPlaybackFailed] = useState(false);
   const [playbackSourceIndex, setPlaybackSourceIndex] = useState(0);
@@ -160,6 +259,49 @@ const VideoPlayerSection = () => {
   const embedLoadStartedAtRef = useRef(0);
   const lastEmbedSignalAtRef = useRef(0);
   const externalEmbedFrameRef = useRef<HTMLIFrameElement | null>(null);
+  const embedResumeTimersRef = useRef<number[]>([]);
+
+  const requestEmbedResume = useCallback(() => {
+    if (!isLocalBackendEnabled()) return;
+    const frame = externalEmbedFrameRef.current;
+    if (!frame?.contentWindow) return;
+    const progressAnimeId = animeIdParam || anime?.anime?.info?.id || "0";
+    const progress = getLocalWatchProgress(
+      progressAnimeId,
+      activeEpisodeId,
+      requestedEpisodeNumber,
+    ) ?? (
+      anime?.anime?.info?.id && anime.anime.info.id !== progressAnimeId
+        ? getLocalWatchProgress(
+            anime.anime.info.id,
+            activeEpisodeId,
+            requestedEpisodeNumber,
+          )
+        : null
+    );
+    if (!progress || progress.current < 5 || progress.duration <= 0 ||
+        progress.current >= progress.duration - 15) return;
+
+    // Try after the document load and again as the cross-origin player finishes
+    // initializing. A provider can accept seek messages only after its API is ready.
+    embedResumeTimersRef.current.forEach((timer) => window.clearTimeout(timer));
+    embedResumeTimersRef.current = [];
+    const frameAtSchedule = frame;
+    const sourceAtSchedule = frame.src;
+    for (const delay of [0, 500, 1300, 2800]) {
+      const timer = window.setTimeout(() => {
+        if (externalEmbedFrameRef.current !== frameAtSchedule ||
+            frameAtSchedule.src !== sourceAtSchedule) return;
+        requestExternalPlayerSeek(frameAtSchedule, progress.current);
+      }, delay);
+      embedResumeTimersRef.current.push(timer);
+    }
+  }, [animeIdParam, anime?.anime?.info?.id, activeEpisodeId, requestedEpisodeNumber]);
+
+  useEffect(() => () => {
+    embedResumeTimersRef.current.forEach((timer) => window.clearTimeout(timer));
+    embedResumeTimersRef.current = [];
+  }, []);
 
   const flushLatestEmbedProgress = useCallback(() => {
     const latest = lastEmbedProgressRef.current;
@@ -260,6 +402,12 @@ const VideoPlayerSection = () => {
   const activeEpisodeSlug = activeEpisodeId.split("/").pop() || "";
   const activeEpisodeNumberFromSlug = Number(activeEpisodeSlug.match(/(\d+)$/)?.[1]) || 0;
   const currentEpNumber = activeEpisodeNumberFromList || activeEpisodeNumberFromSlug || Math.max(1, Number(epParam) || 1);
+
+  const advanceInProgressRef = useRef(false);
+
+  useEffect(() => {
+    advanceInProgressRef.current = false;
+  }, [activeEpisodeId]);
 
   useEffect(() => {
     setProviderPlaybackOutcomes({});
@@ -624,10 +772,9 @@ const VideoPlayerSection = () => {
         // Throttle updates every 10 seconds or on complete
         if (isComplete || Math.abs(now - lastSyncedTimeRef.current) >= 10) {
           lastSyncedTimeRef.current = now;
+          saveLocalWatchProgress(progress);
 
-          if (isLocalBackendEnabled()) {
-            saveLocalWatchProgress(progress);
-          } else if (fallbackBookmarkIdRef.current) {
+          if (!isLocalBackendEnabled() && fallbackBookmarkIdRef.current) {
             const recordId = await syncWatchProgress(
               fallbackBookmarkIdRef.current,
               fallbackWatchedRecordIdRef.current,
@@ -714,6 +861,58 @@ const VideoPlayerSection = () => {
   const cleanParts = activeEpisodeId.replace(/^\//, "").split("/");
   const currentProviderName = cleanParts[1] || providerNames[0] || "auto";
   const activeCategory = cleanParts[3] === "dub" ? "dub" : cleanParts[3] === "sub" ? "sub" : preferredCategory;
+
+
+  const advanceToNextEpisode = useCallback(() => {
+    if (advanceInProgressRef.current || !animeIdParam || !activeEpisodeId) return;
+    const nextNumber = Number(currentEpNumber) + 1;
+    if (!Number.isFinite(nextNumber) || nextNumber < 2) return;
+
+    const currentProviderEpisodes = rawProviders[currentProviderName]?.episodes?.[activeCategory] || [];
+    const nextProviderEpisode = currentProviderEpisodes.find((episode) => Number(episode.number) === nextNumber);
+    const nextAnyProviderEpisode = providerNames
+      .map((providerName) => rawProviders[providerName]?.episodes?.[activeCategory] || [])
+      .flat()
+      .find((episode) => Number(episode.number) === nextNumber);
+    const catalogueEpisode = allEpisodesData?.episodes?.find((episode) => Number(episode.number) === nextNumber);
+
+    // A complete native catalogue is authoritative. Do not manufacture an
+    // episode-N URL after the final known episode just because the local API
+    // can accept arbitrary episode numbers.
+    if (nativeCatalogueComplete && !catalogueEpisode) {
+      advanceInProgressRef.current = true;
+      return;
+    }
+
+    const nextEpisodeId = isLocalBackendEnabled()
+      ? "watch/auto/" + animeIdParam + "/" + activeCategory + "/episode-" + nextNumber
+      : nextProviderEpisode?.id || nextAnyProviderEpisode?.id || catalogueEpisode?.episodeId || "";
+    if (!nextEpisodeId) return;
+
+    advanceInProgressRef.current = true;
+    if (!isWatchRoute) {
+      lastWatchParamsRef.current = {
+        animeId: animeIdParam,
+        episode: String(nextNumber),
+        episodeId: nextEpisodeId,
+      };
+    }
+    setUseFallback(false);
+    setIsHindiMode(false);
+    setSelectedEpisode(nextEpisodeId);
+
+    if (isWatchRoute) {
+      updateEpisodeUrl(nextEpisodeId, nextNumber);
+    } else {
+      const nextUrl = new URL("/anime/watch", window.location.origin);
+      nextUrl.searchParams.set("anime", animeIdParam);
+      nextUrl.searchParams.set("ep", String(nextNumber));
+      nextUrl.searchParams.set("episode", nextEpisodeId);
+      window.dispatchEvent(new CustomEvent("7xanime:watch-location", {
+        detail: { href: nextUrl.pathname + nextUrl.search },
+      }));
+    }
+  }, [activeCategory, activeEpisodeId, allEpisodesData?.episodes, animeIdParam, currentEpNumber, currentProviderName, isWatchRoute, nativeCatalogueComplete, providerNames, rawProviders, setSelectedEpisode]);
   const availableProviderNames = providerNames.filter(
     (providerName) => (rawProviders[providerName]?.episodes?.[activeCategory] || []).length > 0,
   );
@@ -722,7 +921,9 @@ const VideoPlayerSection = () => {
   // Each button uses a strict per-provider request; unavailable sources show an
   // honest error instead of silently swapping to another server.
   const serverProviderNames = isLocalBackendEnabled()
-    ? (localProviderStatus?.providers.filter((item) => item.moduleLoaded).map((item) => item.id) || availableProviderNames)
+    ? (localProviderStatus?.providers
+        .filter((item) => item.moduleLoaded && !DISABLED_PROVIDER_NAMES.has(item.id.toLowerCase()))
+        .map((item) => item.id) || availableProviderNames)
     : availableProviderNames;
   // Keep SUB-only servers discoverable while ENGLISH is selected, but hide a
   // provider after its recovery attempts fail. Internal auto-failover still
@@ -833,6 +1034,10 @@ const VideoPlayerSection = () => {
   };
 
   const handlePlayerError = useCallback((detail?: string) => {
+    // Do not resolve/retry/switch providers while the app is hidden. Explicit
+    // PiP is a visible playback session and may continue using normal recovery.
+    if (isLocalBackendEnabled() && !appIsActive && !nativePipActive) return;
+
     const retryKey = `${activeEpisodeId}|${playbackSourceIndex}`;
     if (playbackRetriesRef.current.key !== retryKey) {
       playbackRetriesRef.current = { key: retryKey, count: 0 };
@@ -881,6 +1086,7 @@ const VideoPlayerSection = () => {
     activeEpisodeId, advanceAfterSourceFailure, currentProviderName,
     episodeData?.provider, episodeData?.sources, flushLatestEmbedProgress,
     hasManualProviderSelection, playbackSourceIndex, retryEpisodeData, isFallbackActive,
+    appIsActive, nativePipActive,
   ]);
 
   const handlePlayerPlaybackReady = useCallback(() => {
@@ -945,10 +1151,8 @@ const VideoPlayerSection = () => {
       megaplay: "megaplay.buzz",
       anixo: "anixo.buzz",
       megavid: "megavid.buzz",
-      megaflix: "megaflix.buzz",
       tryembed: "tryembed.us.cc",
       cinexstream: "cinextream.cc",
-      nontongo: "nontongo.win",
     };
     const expectedHost = expectedHosts[observedEmbedProvider];
     if (!expectedHost) return;
@@ -966,22 +1170,62 @@ const VideoPlayerSection = () => {
       if (hostname !== expectedHost && !hostname.endsWith(`.${expectedHost}`)) return;
 
       const payload = raw as Record<string, unknown>;
-      const eventType = String(payload.event || payload.type || payload.action || "").toLowerCase();
-      const status = String(payload.status || "").toLowerCase();
+      const normalizeEventName = (value: unknown) =>
+        String(value ?? "")
+          .trim()
+          .replace(/([a-z0-9])([A-Z])/g, "$1-$2")
+          .toLowerCase()
+          .replace(/[\s_]+/g, "-");
+      const eventNames = [payload.event, payload.type, payload.action, payload.name, payload.status]
+        .map(normalizeEventName)
+        .filter(Boolean);
+      const eventType = eventNames[0] || "";
+      const status = normalizeEventName(payload.status);
       const failed = eventType.includes("error") || status === "error";
+
+      // Providers disagree on which field carries the ended signal and how
+      // they spell it (event/type/action, camelCase, spaces or underscores).
+      // Accept explicit completion aliases only; never infer completion from
+      // a timeout, stalled stream or generic "ready" event.
+      const completionEvents = new Set([
+        "aniembed:ended",
+        "ended",
+        "video-ended",
+        "episode-ended",
+        "media-ended",
+        "onended",
+        "complete",
+        "completed",
+      ]);
+      if (eventNames.some((name) => completionEvents.has(name) || /^(video|episode|media)-ended$/.test(name))) {
+        advanceToNextEpisode();
+        return;
+      }
       if (failed) {
         handlePlayerError(`${getProviderDisplayName(observedEmbedProvider)} reported a playback error.`);
         return;
       }
 
+      const playerReady = ["ready", "loadedmetadata", "loaded"].includes(eventType) || status === "ready";
+      if (playerReady) requestEmbedResume();
+
+      // Ad/verification interstitials can emit "ready" without actual video.
+      // Only timeline/play signals count as proof that the provider is advancing.
       const playbackObserved =
         ["aniembed:play", "aniembed:ended"].includes(String(payload.type || "").toLowerCase()) ||
-        ["play", "playing", "pause", "paused", "ready", "seek", "buffer", "buffering", "loadedmetadata", "time", "progress", "timeupdate", "watching-log", "complete"].includes(eventType) ||
-        ["playing", "paused", "buffering", "ready"].includes(status);
+        ["play", "playing", "pause", "paused", "seek", "time", "progress", "timeupdate", "watching-log", "complete"].includes(eventType) ||
+        ["playing", "paused"].includes(status);
       if (playbackObserved) {
         lastEmbedSignalAtRef.current = Date.now();
         playbackRetriesRef.current = { key: `${activeEpisodeId}|${playbackSourceIndex}`, count: 0 };
         setRetryingPlayback(null);
+      }
+
+      const confirmedPlayback =
+        ["aniembed:play"].includes(String(payload.type || "").toLowerCase()) ||
+        ["play", "playing", "time", "progress", "timeupdate", "watching-log", "complete"].includes(eventType) ||
+        status === "playing";
+      if (confirmedPlayback) {
         setProviderPlaybackOutcomes((previous) =>
           previous[observedEmbedProvider] === "playing"
             ? previous
@@ -998,6 +1242,8 @@ const VideoPlayerSection = () => {
     observedEmbedSource?.url,
     handlePlayerError,
     isFallbackActive,
+    requestEmbedResume,
+    advanceToNextEpisode,
   ]);
 
   // Known event-reporting iframe players (MegaPlay, AniXo, Megavid, MegaFlix)
@@ -1008,9 +1254,10 @@ const VideoPlayerSection = () => {
   // get more startup time. We cannot inspect/click inside a cross-origin iframe,
   // so this watchdog relies on documented player events.
   useEffect(() => {
-    const watchedProviders = ["megaplay", "anixo", "megavid", "megaflix"];
+    const watchedProviders = ["megaplay", "anixo", "megavid", "tryembed", "cinexstream"];
     if (
       !isLocalBackendEnabled() ||
+      (!appIsActive && !nativePipActive) ||
       (!isFallbackActive && observedEmbedSource?.type !== "embed") ||
       !watchedProviders.includes(observedEmbedProvider)
     ) return;
@@ -1019,29 +1266,43 @@ const VideoPlayerSection = () => {
     lastEmbedSignalAtRef.current = 0;
     const interval = window.setInterval(() => {
       const lastSignal = Math.max(embedLoadStartedAtRef.current, lastEmbedSignalAtRef.current);
-      const stallTimeoutMs = observedEmbedProvider === "megaflix" ? 10000 : 18000;
+      const stallTimeoutMs = observedEmbedProvider === "tryembed" ? 8000 : 18000;
       if (Date.now() - lastSignal < stallTimeoutMs) return;
       // Reset the baseline before calling into React so rapid repeated timer
       // ticks cannot consume both retries for the same stalled frame.
       embedLoadStartedAtRef.current = Date.now();
-      handlePlayerError(`${getProviderDisplayName(observedEmbedProvider)} stopped reporting playback; retrying this player.`);
+      const detail = observedEmbedProvider === "tryembed"
+        ? "TryEmbed did not confirm real playback (possible upstream ad or verification interstitial); retrying this server."
+        : `${getProviderDisplayName(observedEmbedProvider)} stopped reporting playback; retrying this player.`;
+      handlePlayerError(detail);
     }, 2500);
 
     return () => window.clearInterval(interval);
   }, [
     activeEpisodeId, playbackSourceIndex, playerRetryKey,
     observedEmbedProvider, observedEmbedSource?.type, observedEmbedSource?.url,
-    isFallbackActive, handlePlayerError,
+    isFallbackActive, handlePlayerError, appIsActive, nativePipActive,
   ]);
 
   const playerAnimeInfo = useMemo(
     () => ({
-      id: anime?.anime?.info?.id || "0",
+      id: isLocalBackendEnabled()
+        ? animeIdParam || anime?.anime?.info?.id || "0"
+        : anime?.anime?.info?.id || "0",
+      legacyId: anime?.anime?.info?.id || undefined,
       title: anime?.anime?.info?.name || "Anime",
       image: anime?.anime?.info?.poster || "",
     }),
-    [anime?.anime?.info?.id, anime?.anime?.info?.name, anime?.anime?.info?.poster],
+    [isLocalBackendEnabled, animeIdParam, anime?.anime?.info?.id, anime?.anime?.info?.name, anime?.anime?.info?.poster],
   );
+
+  if (isLocalBackendEnabled() && !appIsActive && !nativePipActive) {
+    return (
+      <div className="flex aspect-video w-full items-center justify-center rounded-2xl border border-white/10 bg-black px-6 text-center text-sm text-zinc-300">
+        Playback paused because 7xAnime is in the background. Return to the app to continue, or use Picture-in-picture for floating playback.
+      </div>
+    );
+  }
 
   const playerControls = (
     <div className="flex w-full flex-col gap-3 rounded-2xl border border-white/[0.07] bg-[#101018] p-3 sm:p-4">
@@ -1231,8 +1492,10 @@ const VideoPlayerSection = () => {
         {selectedHindi ? (
           <PlayerViewport title="Hindi video player">
             <iframe
+              ref={externalEmbedFrameRef}
               key={selectedHindi.embed}
               src={selectedHindi.embed}
+              onLoad={requestEmbedResume}
               title={`${hindiDubData?.matchedTitle || anime?.anime?.info?.name || "Anime"} episode ${currentEpNumber} Hindi dub via ${selectedHindi.host}`}
               width="100%"
               height="100%"
@@ -1367,6 +1630,7 @@ const VideoPlayerSection = () => {
             ref={externalEmbedFrameRef}
             key={`${fallbackAnimeId}-${fallbackEpId}-${activeCategory}:${playerRetryKey}`}
             src={fallbackSrc}
+            onLoad={requestEmbedResume}
             title={`${anime?.anime?.info?.name || "Anime"} episode ${currentEpNumber} via MegaPlay`}
             width="100%"
             height="100%"
@@ -1394,6 +1658,7 @@ const VideoPlayerSection = () => {
             ref={externalEmbedFrameRef}
             key={`${firstResolvedSource.url}:${playerRetryKey}`}
             src={firstResolvedSource.url}
+            onLoad={requestEmbedResume}
             title={`${anime?.anime?.info?.name || "Anime"} episode ${currentEpNumber} via ${getProviderDisplayName(embedProvider)}`}
             width="100%"
             height="100%"
@@ -1467,6 +1732,7 @@ const VideoPlayerSection = () => {
           autoSkip={autoSkip}
           onError={handlePlayerError}
           onPlaybackReady={handlePlayerPlaybackReady}
+          onEpisodeEnded={advanceToNextEpisode}
         />
       </PlayerViewport>
       {playerControls}

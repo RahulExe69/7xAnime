@@ -317,6 +317,43 @@ def patch_manifest() -> None:
         fail("Could not add Android REQUEST_INSTALL_PACKAGES permission.")
     if provider_authority not in text or "@xml/file_paths" not in text:
         fail("Could not configure Android FileProvider for update installation.")
+    # Enable Android PiP for the Activity that hosts embedded streams.
+    # Merge configChanges rather than replacing existing Capacitor entries.
+    activity_match = re.search(
+        r"<activity\b(?=[^>]*android:name=[\"'][^\"']*MainActivity[^\"']*[\"'])[^>]*>",
+        text,
+        re.DOTALL,
+    )
+    if not activity_match:
+        fail("Could not locate MainActivity in AndroidManifest.xml for PiP support.")
+    activity_tag = activity_match.group(0)
+
+    def ensure_attribute(tag: str, name: str, value: str) -> str:
+        pattern = re.compile(r"\s" + re.escape(name) + r"=[\"']([^\"']*)[\"']")
+        existing = pattern.search(tag)
+        if existing:
+            if name == "android:configChanges":
+                values = [item for item in existing.group(1).split("|") if item]
+                for required in value.split("|"):
+                    if required not in values:
+                        values.append(required)
+                updated = "|".join(values)
+            else:
+                updated = value
+            return tag[:existing.start(1)] + updated + tag[existing.end(1):]
+        attribute = " " + name + '="' + value + '"'
+        if tag.endswith("/>"):
+            return tag[:-2] + attribute + "/>"
+        return tag[:-1] + attribute + ">"
+
+    activity_tag = ensure_attribute(activity_tag, "android:supportsPictureInPicture", "true")
+    activity_tag = ensure_attribute(activity_tag, "android:resizeableActivity", "true")
+    activity_tag = ensure_attribute(
+        activity_tag,
+        "android:configChanges",
+        "screenSize|smallestScreenSize|screenLayout|orientation",
+    )
+    text = text[:activity_match.start()] + activity_tag + text[activity_match.end():]
     path.write_text(text, encoding="utf-8")
 
 def add_import(text: str, import_statement: str) -> str:
@@ -620,6 +657,67 @@ def copy_python_source() -> None:
 
 
 
+def install_picture_in_picture_lifecycle(main_activity: Path) -> None:
+    """Forward Android PiP transitions to the Web UI."""
+    text = main_activity.read_text(encoding="utf-8")
+    text = add_import(text, "import android.content.res.Configuration;")
+    signature = "onPictureInPictureModeChanged(boolean isInPictureInPictureMode, Configuration newConfig)"
+    if signature not in text:
+        close = text.rfind("}")
+        class_match = re.search(r"class\s+MainActivity\s+extends\s+BridgeActivity\s*\{", text)
+        if not class_match or close < class_match.end():
+            fail("Could not locate MainActivity terminator for PiP lifecycle wiring.")
+        method = """
+    @Override
+    public void onPictureInPictureModeChanged(boolean isInPictureInPictureMode, Configuration newConfig) {
+        super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig);
+        if (getBridge() != null && getBridge().getWebView() != null) {
+            String script = "document.documentElement.classList.toggle('sevenx-pip-mode', "
+                + isInPictureInPictureMode + ");"
+                + "window.dispatchEvent(new CustomEvent('7xanime:pip-mode',{detail:{active:"
+                + isInPictureInPictureMode + "}}));";
+            getBridge().getWebView().evaluateJavascript(script, null);
+        }
+    }
+"""
+        text = text[:close] + method + text[close:]
+    main_activity.write_text(text, encoding="utf-8")
+
+
+def install_background_playback_guard(main_activity: Path) -> None:
+    """Stop attached media and detached native fullscreen video when leaving foreground."""
+    text = main_activity.read_text(encoding="utf-8")
+    text = add_import(text, "import android.os.Build;")
+    if "streamingWebChromeClient.stopFullscreenForBackground()" not in text:
+        close = text.rfind("}")
+        class_match = re.search(r"class\s+MainActivity\s+extends\s+BridgeActivity\s*\{", text)
+        if not class_match or close < class_match.end():
+            fail("Could not locate MainActivity terminator for background playback guard.")
+        method = """
+    @Override
+    public void onStop() {
+        // Android PiP is an intentional floating-player session. Every other
+        // background transition must stop both ordinary media and WebChrome's
+        // separately-attached fullscreen surface.
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O || !isInPictureInPictureMode()) {
+            if (streamingWebChromeClient != null) {
+                streamingWebChromeClient.stopFullscreenForBackground();
+            }
+            if (getBridge() != null && getBridge().getWebView() != null) {
+                String stopScript = "(function(){"
+                    + "document.querySelectorAll('video,audio').forEach(function(media){try{media.pause();}catch(e){}});"
+                    + "document.querySelectorAll('[data-player-viewport=true] iframe').forEach(function(frame){try{frame.src='about:blank';}catch(e){}});"
+                    + "})();";
+                getBridge().getWebView().evaluateJavascript(stopScript, null);
+            }
+        }
+        super.onStop();
+    }
+"""
+        text = text[:close] + method + text[close:]
+    main_activity.write_text(text, encoding="utf-8")
+
+
 def install_update_bridge(main_activity: Path) -> None:
     """Expose a narrowly scoped native bridge for official APK update installation."""
     text = main_activity.read_text(encoding="utf-8")
@@ -667,6 +765,131 @@ def install_update_bridge(main_activity: Path) -> None:
 
     main_activity.write_text(text, encoding="utf-8")
 
+def install_player_swipe_observer(main_activity: Path) -> None:
+    """Observe embedded-player swipes without consuming their touch events."""
+    text = main_activity.read_text(encoding="utf-8")
+    text = add_import(text, "import android.view.MotionEvent;")
+    text = add_import(text, "import android.webkit.WebView;")
+
+    if "private void installPlayerSwipeObserver()" not in text:
+        close = text.rfind("}")
+        class_match = re.search(r"class\s+MainActivity\s+extends\s+BridgeActivity\s*\{", text)
+        if not class_match or close < class_match.end():
+            fail("Could not locate MainActivity for embedded-player swipe observation.")
+        method = r"""
+    private void installPlayerSwipeObserver() {
+        if (getBridge() == null || getBridge().getWebView() == null) return;
+        final WebView webView = getBridge().getWebView();
+        webView.setOnTouchListener(new View.OnTouchListener() {
+            private float startX;
+            private float startY;
+            private long startAt;
+
+            @Override
+            public boolean onTouch(View view, MotionEvent event) {
+                if (event.getActionMasked() == MotionEvent.ACTION_DOWN) {
+                    startX = event.getX();
+                    startY = event.getY();
+                    startAt = event.getEventTime();
+                    return false;
+                }
+                if (event.getActionMasked() != MotionEvent.ACTION_UP) return false;
+
+                float deltaX = event.getX() - startX;
+                float deltaY = event.getY() - startY;
+                long elapsed = event.getEventTime() - startAt;
+                float density = view.getResources().getDisplayMetrics().density;
+                if (Math.abs(deltaY) < 72f * density
+                    || Math.abs(deltaX) > 120f * density
+                    || elapsed > 900L) {
+                    return false;
+                }
+
+                final float cssX = startX / density;
+                final float cssY = startY / density;
+                final float cssDeltaY = deltaY / density;
+                String script = "(function(){"
+                    + "var target=document.elementFromPoint(" + cssX + "," + cssY + ");"
+                    + "if(target&&target.tagName==='IFRAME'&&target.closest('[data-player-viewport=true]')){"
+                    + "window.dispatchEvent(new CustomEvent('7xanime:native-player-swipe',{detail:{deltaY:"
+                    + cssDeltaY + "}}));"
+                    + "}"
+                    + "})();";
+                webView.post(() -> webView.evaluateJavascript(script, null));
+                return false;
+            }
+        });
+    }
+"""
+        text = text[:close] + method + text[close:]
+
+    if "installPlayerSwipeObserver();" not in text:
+        on_create = re.search(r"(?s)void\s+onCreate\s*\([^)]*\)\s*\{", text)
+        if not on_create:
+            fail("Could not find MainActivity.onCreate for embedded-player swipe observation.")
+        open_brace = text.find("{", on_create.start())
+        close_brace = matching_brace(text, open_brace)
+        body = text[open_brace + 1:close_brace]
+        super_call = re.search(r"super\.onCreate\s*\(\s*savedInstanceState\s*\)\s*;", body)
+        if not super_call:
+            fail("Could not find the MainActivity.onCreate super call for swipe observation.")
+        insert_at = open_brace + 1 + super_call.end()
+        text = text[:insert_at] + "\n        installPlayerSwipeObserver();\n" + text[insert_at:]
+
+    main_activity.write_text(text, encoding="utf-8")
+
+
+def install_system_bar_theme(main_activity: Path) -> None:
+    """Apply 7xAnime's dark theme to Android status/navigation system bars."""
+    text = main_activity.read_text(encoding="utf-8")
+    text = add_import(text, "import android.graphics.Color;")
+    text = add_import(text, "import android.os.Build;")
+    text = add_import(text, "import android.view.View;")
+
+    method_signature = "private void applySevenXSystemBarTheme()"
+    if method_signature not in text:
+        close = text.rfind("}")
+        class_match = re.search(r"class\s+MainActivity\s+extends\s+BridgeActivity\s*\{", text)
+        if not class_match or close < class_match.end():
+            fail("Could not locate MainActivity terminator for system-bar theme wiring.")
+        method = """
+    private void applySevenXSystemBarTheme() {
+        final int barColor = Color.parseColor("#0b0307");
+        getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
+        getWindow().setStatusBarColor(barColor);
+        getWindow().setNavigationBarColor(barColor);
+        View decor = getWindow().getDecorView();
+        int flags = decor.getSystemUiVisibility();
+        // Keep the status and navigation icons light against the app's dark surface.
+        flags &= ~(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
+        decor.setSystemUiVisibility(flags);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            getWindow().setStatusBarContrastEnforced(false);
+            getWindow().setNavigationBarContrastEnforced(false);
+        }
+    }
+"""
+        text = text[:close] + method + text[close:]
+
+    if "applySevenXSystemBarTheme();" not in text:
+        on_create = re.search(r"super\.onCreate\s*\(\s*savedInstanceState\s*\)\s*;", text)
+        if not on_create:
+            fail("Could not find MainActivity.onCreate for system-bar theme wiring.")
+        text = text[:on_create.end()] + "\n        applySevenXSystemBarTheme();" + text[on_create.end():]
+
+    resume_match = re.search(r"void\s+onResume\s*\([^)]*\)\s*\{", text)
+    if not resume_match:
+        fail("Could not find MainActivity.onResume for system-bar theme refresh.")
+    resume_open = text.find("{", resume_match.start())
+    resume_close = matching_brace(text, resume_open)
+    resume_body = text[resume_open + 1:resume_close]
+    if "applySevenXSystemBarTheme();" not in resume_body:
+        super_resume = re.search(r"super\.onResume\s*\(\s*\)\s*;", resume_body)
+        insert_at = resume_open + 1 + super_resume.end() if super_resume else resume_open + 1
+        text = text[:insert_at] + "\n        applySevenXSystemBarTheme();\n" + text[insert_at:resume_close + (len(text) - resume_close)]
+    main_activity.write_text(text, encoding="utf-8")
+
+
 def main() -> None:
     if not ANDROID.is_dir():
         fail("The generated android/ directory is missing; generate Android with Capacitor first.")
@@ -708,9 +931,13 @@ def main() -> None:
     install_service_worker_filter(candidates[0])
     install_streaming_chrome_client(candidates[0])
     install_adblock_filter_engine(candidates[0])
+    install_picture_in_picture_lifecycle(candidates[0])
+    install_background_playback_guard(candidates[0])
     install_update_bridge(candidates[0])
+    install_system_bar_theme(candidates[0])
+    install_player_swipe_observer(candidates[0])
 
-    print("Configured 7xAnime with maintained filter-list blocking, domain fallback, popup protection, and fullscreen support.")
+    print("Configured 7xAnime with provider recovery, ad blocking, fullscreen, PiP, background playback protection, and themed system bars.")
 
 
 if __name__ == "__main__":

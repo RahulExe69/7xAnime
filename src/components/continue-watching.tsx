@@ -3,66 +3,143 @@
 import React, { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowLeft, ArrowRight, Clock3, Play } from "lucide-react";
+import { ArrowLeft, ArrowRight, Clock3, Film, Play } from "lucide-react";
 import { ROUTES } from "@/constants/routes";
 import { IAnime } from "@/types/anime";
 import { WatchHistory } from "@/hooks/use-get-bookmark";
 import SectionHeading from "./section-heading";
 import useBookMarks from "@/hooks/use-get-bookmark";
 import { useAuthStore } from "@/store/auth-store";
-import { isLocalBackendEnabled } from "@/lib/api";
+import { api, isLocalBackendEnabled } from "@/lib/api";
 import { getRecentLocalWatchProgress } from "@/lib/local-watch-progress";
 import { Button } from "./ui/button";
 
 type WatchedAnime = IAnime & { episode: WatchHistory | string };
 
+const isGenericTitle = (value?: string | null) =>
+  !value?.trim() || /^(anime|untitled|continue watching|unknown anime|loading anime details…|anime details unavailable)$/i.test(value.trim());
+
+const isBrandArtwork = (value?: string | null) => {
+  if (!value?.trim()) return true;
+  const source = value.trim().toLowerCase();
+  return source.includes("7xanime-mark.svg")
+    || source.includes("7xanime-icon.png")
+    || source.includes("/products/7xanime/assets/icon.png")
+    || source.endsWith("/logo.png");
+};
+
+type AnimeInfoResponse = {
+  title?: { english?: string | null; romaji?: string | null; native?: string | null } | null;
+  coverImage?: { extraLarge?: string | null; large?: string | null } | null;
+};
+
+async function resolveAnimeMetadata(id: string): Promise<{ title: string; poster: string } | null> {
+  if (!id) return null;
+  try {
+    const response = await api.get<AnimeInfoResponse>(`/info/${encodeURIComponent(id)}`);
+    const media = response.data;
+    const title = media.title?.english?.trim()
+      || media.title?.romaji?.trim()
+      || media.title?.native?.trim()
+      || "";
+    const poster = media.coverImage?.extraLarge?.trim()
+      || media.coverImage?.large?.trim()
+      || "";
+    if (!title && !poster) return null;
+    return { title, poster };
+  } catch {
+    // Metadata is best-effort; saved progress must remain usable offline.
+    return null;
+  }
+}
+
 export default function ContinueWatching({ loading = false }: { loading: boolean }) {
   const [anime, setAnime] = useState<WatchedAnime[] | null>(null);
+  const [brokenPosters, setBrokenPosters] = useState<Set<string>>(() => new Set());
+  const [metadataRepairAttempts, setMetadataRepairAttempts] = useState<Set<string>>(() => new Set());
   const scrollRef = useRef<HTMLDivElement>(null);
   const { auth } = useAuthStore();
   const { bookmarks } = useBookMarks({ page: 1, per_page: 14, status: "watching" });
+  const localBackend = isLocalBackendEnabled();
 
   useEffect(() => {
-    if (isLocalBackendEnabled()) {
+    let active = true;
+    setBrokenPosters(new Set());
+
+    if (localBackend) {
       const localEntries = getRecentLocalWatchProgress(14);
       const localAnime = localEntries
-        .filter((entry) => !!entry.animeId && !!(entry.poster || entry.animeTitle))
+        .filter((entry) => !!entry.animeId)
         .map((entry) => ({
-          id: entry.animeId, name: entry.animeTitle || "Continue Watching",
-          jname: entry.animeTitle || "", poster: entry.poster || "/brand/7xanime-mark.svg",
+          id: entry.animeId,
+          name: isGenericTitle(entry.animeTitle) ? "Loading anime details…" : entry.animeTitle!,
+          jname: isGenericTitle(entry.animeTitle) ? "" : entry.animeTitle!,
+          poster: isBrandArtwork(entry.poster) ? "" : entry.poster!,
           episodes: { sub: entry.episodeNumber, dub: null },
           episode: {
             id: "local", episodeNumber: entry.episodeNumber, current: entry.current,
             timestamp: entry.duration, created: new Date(entry.updatedAt).toISOString(),
           } as WatchHistory,
-        }));
-      setAnime(localAnime.length ? localAnime as WatchedAnime[] : null);
-      return;
+        })) as WatchedAnime[];
+
+      setAnime(localAnime.length ? localAnime : null);
+
+      // Older progress records can contain a generic title or the old app mark
+      // in place of anime artwork. Repair only incomplete records and keep the
+      // existing watch history immediately available while metadata loads.
+      const incomplete = localEntries.filter((entry) =>
+        isGenericTitle(entry.animeTitle) || isBrandArtwork(entry.poster),
+      );
+      void Promise.all(incomplete.map(async (entry) => ({
+        id: entry.animeId,
+        metadata: await resolveAnimeMetadata(entry.animeId),
+      }))).then((resolved) => {
+        if (!active) return;
+        const byId = new Map(resolved.filter((row) => row.metadata).map((row) => [row.id, row.metadata!]));
+        if (!byId.size) {
+          setAnime((current) => current?.map((item) =>
+            isGenericTitle(item.name) ? { ...item, name: "Anime details unavailable" } : item,
+          ) ?? null);
+          return;
+        }
+        setAnime((current) => current?.map((item) => {
+          const metadata = byId.get(String(item.id));
+          if (!metadata) return isGenericTitle(item.name) ? { ...item, name: "Anime details unavailable" } : item;
+          const title = !isGenericTitle(item.name) ? item.name : metadata.title || "Anime details unavailable";
+          const poster = !isBrandArtwork(item.poster) ? item.poster : metadata.poster;
+          return { ...item, name: title, jname: title, poster: poster || "" };
+        }) ?? null);
+      });
+      return () => { active = false; };
     }
 
     if (!auth) {
       try {
         const stored = typeof window !== "undefined" ? localStorage.getItem("watched") : null;
         const watched = stored ? JSON.parse(stored) : [];
-        if (!Array.isArray(watched)) { setAnime(null); return; }
+        if (!Array.isArray(watched)) { setAnime(null); return () => { active = false; }; }
         const rows = watched.slice().reverse().map((item: any) => ({
-          id: String(item.anime?.id || ""), name: item.anime?.title || "Continue Watching",
-          jname: item.anime?.title || "", poster: item.anime?.poster || "/brand/7xanime-mark.svg",
+          id: String(item.anime?.id || ""),
+          name: item.anime?.title || "Anime details unavailable",
+          jname: item.anime?.title || "",
+          poster: isBrandArtwork(item.anime?.poster) ? "" : item.anime?.poster || "",
           episodes: { sub: item.episodes?.length || 0, dub: null },
           episode: String(item.episodes?.[item.episodes.length - 1] || "1"),
         })).filter((item: WatchedAnime) => !!item.id);
         setAnime(rows.length ? rows as WatchedAnime[] : null);
       } catch { setAnime(null); }
-      return;
+      return () => { active = false; };
     }
 
     const rows = (bookmarks || []).map((item) => ({
-      id: item.animeId, name: item.animeTitle, jname: item.animeTitle, poster: item.thumbnail,
+      id: item.animeId, name: item.animeTitle || "Anime details unavailable", jname: item.animeTitle || "",
+      poster: isBrandArtwork(item.thumbnail) ? "" : item.thumbnail || "",
       episodes: { sub: item.expand?.watchHistory?.[0]?.episodeNumber || 0, dub: null },
       episode: item.expand?.watchHistory?.slice().sort((a, b) => b.episodeNumber - a.episodeNumber)[0] || null,
     })).filter((item) => !!item.episode) as WatchedAnime[];
     setAnime(rows.length ? rows : null);
-  }, [auth, bookmarks]);
+    return () => { active = false; };
+  }, [auth, bookmarks, localBackend]);
 
   const scroll = (direction: -1 | 1) =>
     scrollRef.current?.scrollBy({
@@ -101,10 +178,30 @@ export default function ContinueWatching({ loading = false }: { loading: boolean
           const current = typeof episode === "string" ? 0 : episode.current || 0;
           const total = typeof episode === "string" ? 0 : episode.timestamp || 0;
           const percent = total > 0 ? Math.min(100, (current / total) * 100) : 0;
+          const poster = item.poster && !isBrandArtwork(item.poster) && !brokenPosters.has(String(item.id));
           return (
             <Link key={`${item.id}-${index}`} href={ROUTES.watchAnime(item.id, episodeNumber)} className="group flex w-[68%] max-w-[360px] shrink-0 snap-start items-center gap-3 rounded-2xl border border-white/[0.07] bg-[#19070d] p-2.5 transition-colors duration-150 hover:border-[#ff3b72]/65 dark:border-white/[0.07] dark:bg-[#19070d] dark:hover:border-[#ff3b72] sm:w-[48%] md:w-[38%] lg:w-[30%]">
-              <div className="relative h-[70px] w-[50px] shrink-0 overflow-hidden rounded-xl bg-[#ebe9f4] dark:bg-[#3b1020]">
-                <Image src={item.poster || "/brand/7xanime-mark.svg"} alt={item.name} fill sizes="72px" className="object-cover" />
+              <div className="relative grid h-[70px] w-[50px] shrink-0 place-items-center overflow-hidden rounded-xl bg-gradient-to-br from-[#351021] via-[#1b0a17] to-[#100b18]">
+                {poster ? <Image src={item.poster} alt={item.name} fill sizes="72px" className="object-cover" onError={() => {
+                  const id = String(item.id);
+                  setBrokenPosters((previous) => new Set(previous).add(id));
+                  if (metadataRepairAttempts.has(id)) return;
+                  setMetadataRepairAttempts((previous) => new Set(previous).add(id));
+                  void resolveAnimeMetadata(id).then((metadata) => {
+                    if (!metadata) return;
+                    setAnime((current) => current?.map((entry) => String(entry.id) === id ? {
+                      ...entry,
+                      name: isGenericTitle(entry.name) ? metadata.title || "Anime details unavailable" : entry.name,
+                      jname: isGenericTitle(entry.jname) ? metadata.title || entry.jname : entry.jname,
+                      poster: metadata.poster || entry.poster,
+                    } : entry) ?? null);
+                    if (metadata.poster) setBrokenPosters((previous) => {
+                      const next = new Set(previous);
+                      next.delete(id);
+                      return next;
+                    });
+                  });
+                }} /> : <Film className="h-6 w-6 text-[#ff7398]" aria-hidden="true" />}
                 <span className="absolute inset-0 grid place-items-center bg-black/0 text-white transition group-hover:bg-black/25"><Play className="h-6 w-6 opacity-0 drop-shadow group-hover:opacity-100" /></span>
               </div>
               <div className="min-w-0 flex-1">

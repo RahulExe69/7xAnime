@@ -149,7 +149,7 @@ export default function ForceUpdateGate() {
   }, []);
 
   useEffect(() => {
-    if (!["checking", "required", "downloading", "installing", "permission", "error"].includes(status)) return;
+    if (!["required", "downloading", "installing", "permission", "error"].includes(status)) return;
     const preventDismiss = (event: Event) => event.preventDefault();
     window.addEventListener("7xanime:back", preventDismiss);
     return () => window.removeEventListener("7xanime:back", preventDismiss);
@@ -206,7 +206,7 @@ export default function ForceUpdateGate() {
     }
     startDownload();
   };
-  if (status === "none") return null;
+  if (status === "none" || status === "checking") return null;
   const displayDate = publishedAt
     ? new Date(publishedAt).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })
     : "Latest release";
@@ -229,11 +229,11 @@ export default function ForceUpdateGate() {
               <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.18em] text-[#ff9fbe]">7xAnime · Official release</p>
               <h1 id="7xanime-update-title" className="text-xl font-black tracking-tight sm:text-2xl">Update available</h1>
               <p className="mt-0.5 text-xs text-white/55 sm:text-sm">
-                {status === "checking" ? "Checking for the latest version…" : "A newer version is ready to install."}
+                A newer version is ready to install.
               </p>
             </div>
           </div>
-          {status !== "checking" && (
+          <>
             <div className="mt-4 flex items-center justify-between gap-3 rounded-xl border border-white/[0.08] bg-white/[0.035] px-3 py-2.5">
               <div className="min-w-0">
                 <p className="truncate text-sm font-bold text-white">7xAnime v{latestVersion}</p>
@@ -244,17 +244,10 @@ export default function ForceUpdateGate() {
                 <p className="mt-0.5 text-[10px] text-white/40">APK update</p>
               </div>
             </div>
-          )}
+          </>
         </header>
 
-        {status === "checking" ? (
-          <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4 px-6 text-center">
-            <LoaderCircle className="h-9 w-9 animate-spin text-[#ff9fbe]" />
-            <p className="font-semibold">Checking the latest release…</p>
-            <p className="text-sm text-white/45">This usually takes only a moment.</p>
-          </div>
-        ) : (
-          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:px-6">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:px-6">
             <div className="mb-4 flex items-center justify-between gap-3 text-xs">
               <span className="text-white/45">Installed version</span>
               <span className="rounded-lg bg-white/[0.05] px-2.5 py-1 font-mono text-white/80">v{currentVersion}</span>
@@ -308,10 +301,9 @@ export default function ForceUpdateGate() {
                 <TriangleAlert className="mt-0.5 h-5 w-5 shrink-0" /><span>{errorMessage}</span>
               </div>
             )}
-          </div>
-        )}
+        </div>
 
-        {status !== "checking" && (
+        <>
           <footer className="shrink-0 border-t border-white/[0.08] bg-[#10070e]/98 px-4 pt-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] sm:px-6">
             <button type="button" onClick={retry} disabled={status === "downloading"}
               className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-fuchsia-500 to-violet-500 px-4 py-3 text-sm font-extrabold text-white shadow-lg shadow-fuchsia-950/25 disabled:cursor-wait disabled:opacity-60">
@@ -329,7 +321,7 @@ export default function ForceUpdateGate() {
             )}
             <p className="mt-2 text-center text-[10px] leading-4 text-white/30">Official signed APK · 7xAnime Releases</p>
           </footer>
-        )}
+        </>
       </section>
     </div>
   );
