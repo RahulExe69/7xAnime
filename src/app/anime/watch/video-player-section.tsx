@@ -232,7 +232,7 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
 
   // Only mirror an explicit episode ID from the URL into Zustand.
   // When a URL contains only ?ep=N, EpisodePlaylist owns the highlighted
-  // selection while the player may use a temporary watch/auto URL. Syncing
+  // selection while the player may use a temporary watch/megaplay URL. Syncing
   // that temporary URL back into the same store creates a feedback loop:
   // the player writes watch/megaplay/.../dub/episode-N, the playlist writes its
   // provider episode ID, and the two effects keep triggering each other
@@ -591,7 +591,7 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
       current?.episodeId === activeEpisodeId ? null : current,
     );
 
-    // After two attempts, leave the disabled Auto route on MegaPlay or advance
+    // After two attempts, keep the MegaPlay episode route on Server 1 or advance
     // a failed manual selection to the next configured embed provider.
     if (isLocalBackendEnabled() && activeEpisodeId.startsWith("watch/megaplay/")) {
       setUseFallback(true);
@@ -898,7 +898,7 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
   };
 
   const cleanParts = activeEpisodeId.replace(/^\//, "").split("/");
-  const currentProviderName = cleanParts[1] || providerNames[0] || "auto";
+  const currentProviderName = cleanParts[1] || providerNames[0] || "megaplay";
   const activeCategory = cleanParts[3] === "dub" ? "dub" : cleanParts[3] === "sub" ? "sub" : preferredCategory;
 
 
