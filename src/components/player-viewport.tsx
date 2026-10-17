@@ -39,6 +39,7 @@ type NativeSwipeProgress = {
 };
 type NativeSwipeSession = {
   isMiniPlayer: boolean;
+  isFullscreen: boolean;
   startX: number;
   startY: number;
   startedAt: number;
@@ -472,7 +473,7 @@ export function PlayerViewport({
         }
         const rect = node.getBoundingClientRect();
         let target: RectSnapshot | null = null;
-        if (!isMiniPlayer) {
+        if (!isMiniPlayer && !isFullscreen) {
           const viewportWidth = document.documentElement.clientWidth || window.innerWidth;
           const viewportHeight = document.documentElement.clientHeight || window.innerHeight;
           // Read the bottom safe-area inset once at gesture start, never inside
@@ -493,6 +494,7 @@ export function PlayerViewport({
         }
         nativeSwipeRef.current = {
           isMiniPlayer,
+          isFullscreen,
           startX: detail.startX,
           startY: detail.startY,
           startedAt: detail.elapsed,
@@ -513,7 +515,7 @@ export function PlayerViewport({
         // Only the downward, full-player gesture gets the live YouTube-style
         // shrink-to-corner preview. Native iframe touches now update the same
         // element the finger is moving over, rather than waiting for ACTION_UP.
-        if (!session.isMiniPlayer && session.target && deltaY > 4 && Math.abs(deltaX) <= SWIPE_MAX_X_DRIFT) {
+        if (!session.isMiniPlayer && !session.isFullscreen && session.target && deltaY > 4 && Math.abs(deltaX) <= SWIPE_MAX_X_DRIFT) {
           const target = session.target;
           const progress = Math.min(1, Math.max(0, deltaY / 240));
           const left = session.origin.left + (target.left - session.origin.left) * progress;
@@ -541,7 +543,7 @@ export function PlayerViewport({
 
       nativeSwipeRef.current = null;
       if (detail.phase === "end" && validVertical) {
-        if (!session.isMiniPlayer && deltaY > 0) {
+        if (!session.isMiniPlayer && deltaY > 0 && !session.isFullscreen) {
           // Keep the final finger-following frame as the FLIP start rectangle.
           swipePreviewActiveRef.current = session.previewing;
           if (session.previewing) dispatchPlayerAction("minimize-player");
