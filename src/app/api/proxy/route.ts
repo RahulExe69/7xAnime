@@ -76,7 +76,7 @@ async function validateRemoteTarget(value: string): Promise<URL> {
     return target;
   }
 
-  let addresses: Awaited<ReturnType<typeof lookup>>;
+  let addresses;
   try {
     addresses = await lookup(host, { all: true, verbatim: true });
   } catch {
@@ -189,8 +189,14 @@ export async function GET(request: NextRequest) {
     // Forward byte-range requests so media elements can seek without downloading the full file.
     const range = request.headers.get("range");
     const ifRange = request.headers.get("if-range");
-    if (range) baseHeaders.Range = range;
-    if (ifRange) baseHeaders["If-Range"] = ifRange;
+    if (range) {
+      baseHeaders.Range = range;
+      fetchHeaders.Range = range;
+    }
+    if (ifRange) {
+      baseHeaders["If-Range"] = ifRange;
+      fetchHeaders["If-Range"] = ifRange;
+    }
 
     let fetched = await fetchRemoteTarget(targetUri, fetchHeaders);
     let response = fetched.response;
@@ -209,6 +215,11 @@ export async function GET(request: NextRequest) {
     }
 
     if (!response.ok) {
+      try {
+        await response.body?.cancel();
+      } catch {
+        // Release the upstream connection when possible.
+      }
       return new NextResponse(`Proxy target returned status: ${response.status} ${response.statusText}`, {
         status: response.status,
       });
@@ -228,8 +239,6 @@ export async function GET(request: NextRequest) {
       const manifestText = await response.text();
 
       if (manifestText.includes("#EXTM3U") || isM3u8Candidate) {
-        const baseUrl = new URL(".", finalTarget).toString();
-        const finalOrigin = finalTarget.origin;
 
         // Rewrite relative and absolute URL lines in m3u8 playlist to route back through this proxy
         const rewrittenManifest = manifestText
