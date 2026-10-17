@@ -774,22 +774,24 @@ def install_player_swipe_observer(main_activity: Path) -> None:
                         });
                     return false;
                 }
-                if (!trackingPlayerGesture) return false;
                 if (event.getActionMasked() == MotionEvent.ACTION_MOVE) {
-                    if (event.getEventTime() - lastDispatchAt >= 16L) {
+                    if (trackingPlayerGesture && event.getEventTime() - lastDispatchAt >= 16L) {
                         lastDispatchAt = event.getEventTime();
                         dispatch("move", event, density);
                     }
                     return false;
                 }
                 if (event.getActionMasked() == MotionEvent.ACTION_UP) {
-                    dispatch("end", event, density);
+                    if (trackingPlayerGesture) dispatch("end", event, density);
                     trackingPlayerGesture = false;
+                    gestureToken++; // Invalidate a late ACTION_DOWN hit-test callback.
                     return false;
                 }
                 if (event.getActionMasked() == MotionEvent.ACTION_CANCEL) {
-                    dispatch("cancel", event, density);
+                    if (trackingPlayerGesture) dispatch("cancel", event, density);
                     trackingPlayerGesture = false;
+                    gestureToken++;
+                    return false;
                 }
                 return false;
             }
