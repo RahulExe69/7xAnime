@@ -234,12 +234,6 @@ export function PlayerViewport({
       { method: "setControls", value: false },
       { event: "command", func: "setControls", args: [false] },
       { controls: false },
-      { event: "picture-in-picture", enabled: false },
-      { type: "picture-in-picture", enabled: false },
-      { action: "disable-picture-in-picture" },
-      { method: "setPictureInPicture", value: false },
-      { pictureInPicture: false },
-      { pip: false },
     ];
     for (const command of commands) {
       try { target.postMessage(command, "*"); } catch { /* provider ignored */ }
@@ -257,6 +251,26 @@ export function PlayerViewport({
       { method: "setControls", value: true },
       { event: "command", func: "setControls", args: [true] },
       { controls: true },
+    ];
+    for (const command of commands) {
+      try { target.postMessage(command, "*"); } catch { /* provider ignored */ }
+    }
+  }, []);
+
+  const requestEmbeddedPictureInPictureDisabled = useCallback(() => {
+    const frame = rootRef.current?.querySelector("iframe");
+    const target = frame?.contentWindow;
+    if (!target) return;
+    // There is no cross-provider standard for hiding the PiP button, but send
+    // the common opt-out messages as a best effort. The iframe's Permissions
+    // Policy also denies PiP, even when a provider ignores these messages.
+    const commands = [
+      { event: "picture-in-picture", enabled: false },
+      { type: "picture-in-picture", enabled: false },
+      { action: "disable-picture-in-picture" },
+      { method: "setPictureInPicture", value: false },
+      { pictureInPicture: false },
+      { pip: false },
     ];
     for (const command of commands) {
       try { target.postMessage(command, "*"); } catch { /* provider ignored */ }
@@ -376,12 +390,14 @@ export function PlayerViewport({
   }, [isMiniPlayer, requestEmbeddedControlsVisible]);
 
   useEffect(() => {
-    if (!isMiniPlayer) return;
     const root = rootRef.current;
     if (!root) return;
 
     let activeFrame: HTMLIFrameElement | null = null;
-    const handleFrameLoad = () => requestEmbeddedControlsHidden();
+    const handleFrameLoad = () => {
+      requestEmbeddedPictureInPictureDisabled();
+      if (isMiniPlayer) requestEmbeddedControlsHidden();
+    };
     const attachFrame = () => {
       const nextFrame = root.querySelector("iframe");
       if (nextFrame === activeFrame) return;
@@ -389,7 +405,8 @@ export function PlayerViewport({
       activeFrame = nextFrame;
       if (activeFrame) {
         activeFrame.addEventListener("load", handleFrameLoad);
-        requestEmbeddedControlsHidden();
+        requestEmbeddedPictureInPictureDisabled();
+        if (isMiniPlayer) requestEmbeddedControlsHidden();
       }
     };
 
@@ -400,7 +417,7 @@ export function PlayerViewport({
       observer.disconnect();
       activeFrame?.removeEventListener("load", handleFrameLoad);
     };
-  }, [isMiniPlayer, requestEmbeddedControlsHidden]);
+  }, [isMiniPlayer, requestEmbeddedControlsHidden, requestEmbeddedPictureInPictureDisabled]);
 
   // HTML5 videos rendered in our own document can be explicitly denied native
   // Picture-in-Picture. Cross-origin providers are constrained separately by
