@@ -560,6 +560,14 @@ def copy_python_source() -> None:
             fail(f"The extra {provider_name} provider adapter is missing.")
         shutil.copy2(extra_provider, destination_src / "providers" / f"{provider_name}.py")
 
+    # Restrict the copied Kuhi registry to the four maintained embed adapters.
+    race_file = destination_src / "providers" / "_race.py"
+    race_text = race_file.read_text(encoding="utf-8")
+    ranking_match = re.search(r"(?s)RANKING\\s*=\\s*\\[(.*?)\\]", race_text)
+    if not ranking_match:
+        fail("Could not locate the provider registry in the pinned backend.")
+    ranking_block = '"anixo", "megavid", "tryembed", "cinexstream"'
+    race_text = race_text[:ranking_match.start(1)] + ranking_block + race_text[ranking_match.end(1):]
     race_file.write_text(race_text, encoding="utf-8")
 
     # Keep the Kuhi API's catalogue/context helpers, but do not package its
