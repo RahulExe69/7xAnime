@@ -13,7 +13,7 @@ import { useQuery } from "react-query";
 import { getHindiDubStreams } from "@/lib/hindi-dub";
 import { ArrowLeft, Captions, Mic, AlertCircle } from "lucide-react";
 import Link from "next/link";
-import { DISABLED_PROVIDER_NAMES, getProviderDisplayName, getServerProviderTitle, isProviderSelectable, KUHI_PROVIDER_ORDER } from "@/lib/server-map";
+import { getProviderDisplayName, getServerProviderTitle, isProviderSelectable, KUHI_PROVIDER_ORDER } from "@/lib/server-map";
 import { Switch } from "@/components/ui/switch";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -194,7 +194,7 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
     [allEpisodesData?.rawResponse?.providers],
   );
   const providerNames = useMemo(
-    () => Object.keys(rawProviders).filter((name) => !DISABLED_PROVIDER_NAMES.has(name.toLowerCase())),
+    () => Object.keys(rawProviders).filter((name) => isProviderSelectable(name, preferredCategory)),
     [rawProviders],
   );
 
@@ -212,10 +212,8 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
     return "";
   }, [episodeIdParam, epParam, preferredCategory, providerNames, rawProviders]);
 
-  // In the Android build, start with Kuhi's automatic route immediately. The
-  // local API races providers for a working stream while the full provider
-  // catalogue continues loading; waiting for every episode scraper first made
-  // the watch screen look frozen for far too long.
+  // Android starts with the dedicated MegaPlay iframe. The four retained embed
+  // providers are explicit alternatives, not an automatic extraction race.
   const localAutoEpisodeId = isLocalBackendEnabled() && animeIdParam
     ? `watch/auto/${animeIdParam}/${preferredCategory}/episode-${requestedEpisodeNumber}`
     : "";
@@ -963,7 +961,7 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
   // honest error instead of silently swapping to another server.
   const serverProviderNames = isLocalBackendEnabled()
     ? (localProviderStatus?.providers
-        .filter((item) => item.moduleLoaded && !DISABLED_PROVIDER_NAMES.has(item.id.toLowerCase()))
+        .filter((item) => item.moduleLoaded)
         .map((item) => item.id) || availableProviderNames)
     : availableProviderNames;
   // Keep SUB-only servers discoverable while ENGLISH is selected, but hide a
@@ -1455,7 +1453,7 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
             Provider diagnostics {localProviderStatus ? `· ${localProviderStatus.loadedCount}/${localProviderStatus.providerCount} modules loaded` : isLoadingProviderStatus ? "· checking…" : ""}
           </summary>
           <p className="mt-2 leading-5 text-zinc-500">
-            Loaded means the provider module is present, not that every anime has a playable stream. “URL returned” is not playback proof; AniXo and Megavid need trusted player events, while AnimeParadise needs successful HLS playback.
+            Loaded means the provider module is present, not that every anime has a playable stream. “URL returned” is not playback proof; embedded providers need successful playback on the actual device.
           </p>
           <div className="mt-2 max-h-52 space-y-1.5 overflow-y-auto pr-1">
             {(localProviderStatus?.providers || []).map((item) => (
