@@ -59,8 +59,29 @@ export function PlayerViewport({
     if (typeof window !== "undefined") window.dispatchEvent(new Event(`7xanime:${action}`));
   }, []);
 
+  const requestEmbeddedControlsHidden = useCallback(() => {
+    const frame = rootRef.current?.querySelector("iframe");
+    const target = frame?.contentWindow;
+    if (!target) return;
+    // Cross-origin providers expose different control APIs. Send harmless,
+    // common "disable/hide controls" messages where supported; the touch shield
+    // remains the reliable fallback for providers that ignore these requests.
+    const commands = [
+      { event: "controls", enabled: false, visible: false, value: false },
+      { type: "controls", enabled: false, visible: false, value: false },
+      { action: "hide-controls" },
+      { method: "setControls", value: false },
+      { event: "command", func: "setControls", args: [false] },
+      { controls: false },
+    ];
+    for (const command of commands) {
+      try { target.postMessage(command, "*"); } catch { /* provider ignored */ }
+    }
+  }, []);
+
   const revealMiniControls = useCallback(() => {
     if (!isMiniPlayer) return;
+    requestEmbeddedControlsHidden();
     if (miniControlsTimerRef.current !== null) {
       window.clearTimeout(miniControlsTimerRef.current);
     }
@@ -69,7 +90,7 @@ export function PlayerViewport({
       setMiniControlsVisible(false);
       miniControlsTimerRef.current = null;
     }, 3500);
-  }, [isMiniPlayer]);
+  }, [isMiniPlayer, requestEmbeddedControlsHidden]);
 
   useEffect(() => {
     if (!isMiniPlayer) {
@@ -86,6 +107,33 @@ export function PlayerViewport({
       }
     };
   }, [isMiniPlayer]);
+
+  useEffect(() => {
+    if (!isMiniPlayer) return;
+    const root = rootRef.current;
+    if (!root) return;
+
+    let activeFrame: HTMLIFrameElement | null = null;
+    const handleFrameLoad = () => requestEmbeddedControlsHidden();
+    const attachFrame = () => {
+      const nextFrame = root.querySelector("iframe");
+      if (nextFrame === activeFrame) return;
+      activeFrame?.removeEventListener("load", handleFrameLoad);
+      activeFrame = nextFrame;
+      if (activeFrame) {
+        activeFrame.addEventListener("load", handleFrameLoad);
+        requestEmbeddedControlsHidden();
+      }
+    };
+
+    const observer = new MutationObserver(attachFrame);
+    observer.observe(root, { childList: true, subtree: true });
+    attachFrame();
+    return () => {
+      observer.disconnect();
+      activeFrame?.removeEventListener("load", handleFrameLoad);
+    };
+  }, [isMiniPlayer, requestEmbeddedControlsHidden]);
 
   const handleVerticalSwipe = useCallback((deltaY: number) => {
     if (deltaY < 0) {
