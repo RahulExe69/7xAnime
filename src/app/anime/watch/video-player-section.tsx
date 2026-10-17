@@ -275,7 +275,6 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
   const lastEmbedSignalAtRef = useRef(0);
   const embedPlaybackStateRef = useRef<"unknown" | "playing" | "paused">("unknown");
   const pauseAfterEmbedRecoveryRef = useRef(false);
-  const lastExplicitPauseAtRef = useRef(0);
   const externalEmbedFrameRef = useRef<HTMLIFrameElement | null>(null);
   const embedResumeTimersRef = useRef<number[]>([]);
 
@@ -1200,7 +1199,6 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
       ) || status === "playing";
       if (reportedPaused) {
         embedPlaybackStateRef.current = "paused";
-        lastExplicitPauseAtRef.current = Date.now();
         pauseAfterEmbedRecoveryRef.current = true;
         lastEmbedSignalAtRef.current = Date.now();
         const pausedFrame = externalEmbedFrameRef.current;
