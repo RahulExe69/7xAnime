@@ -15,7 +15,7 @@ export type ProviderInfo = {
  * and the four adapters copied by .github/scripts/configure-local-anime-backend.py.
  * Retired provider names intentionally do not appear here; see docs/SERVERS.md.
  */
-export const KUHI_PROVIDER_ORDER = ["anixo", "megavid", "tryembed", "cinexstream"] as const;
+export const ACTIVE_EMBED_PROVIDER_ORDER = ["anixo", "megavid", "tryembed", "cinexstream"] as const;
 
 export const PROVIDER_INFO: Record<string, ProviderInfo> = {
   anixo: { name: "AniXo", site: "https://anixo.buzz", audio: ["sub", "dub"], formats: ["embed"] },
