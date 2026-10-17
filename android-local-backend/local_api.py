@@ -417,57 +417,6 @@ async def _watch_one_for_player(mod, name, anilist_id, ep, audio, ctx):
     return name, playable, seconds, True
 
 
-async def _race_watch_for_player(anilist_id: int, episode: int, audio: str) -> dict | None:
-    """Fastest-wins race that only accepts formats the Android player can use."""
-    mods = [
-        (name, mod)
-        for name, mod in provider_race.providers()
-        if name in ACTIVE_PROVIDER_ALLOWLIST
-        and name not in MANUAL_EMBED_ONLY_PROVIDERS
-    ]
-    if not mods:
-        return None
-    ctx = await _get_local_provider_context(anilist_id)
-    pending = {
-        asyncio.create_task(_watch_one_for_player(mod, name, anilist_id, episode, audio, ctx))
-        for name, mod in mods
-    }
-    timings: dict = {}
-    winner = None
-    try:
-        while pending:
-            done, pending = await asyncio.wait(pending, return_when=asyncio.FIRST_COMPLETED)
-            for task in done:
-                try:
-                    name, streams, seconds, ok = task.result()
-                except Exception as error:
-                    print(f"[7XAnime] provider race task failed: {str(error)[:120]}")
-                    continue
-                timings[name] = {"seconds": seconds, "ok": ok}
-                provider_race.record_latency(name, seconds, ok)
-                if ok and winner is None:
-                    winner = {"provider": name, "streams": streams}
-            if winner is not None:
-                break
-    finally:
-        for task in pending:
-            task.cancel()
-        if pending:
-            await asyncio.gather(*pending, return_exceptions=True)
-    if winner is None:
-        # Preserve all attempted-provider outcomes when Auto has no winner so
-        # the client can hide only sources that failed for this selection.
-        return {
-            "provider": "auto",
-            "streams": [],
-            "timings": timings,
-            "defaultProvider": provider_race.default_provider(),
-        }
-    winner["timings"] = timings
-    winner["defaultProvider"] = provider_race.default_provider()
-    return winner
-
-
 def _episode_number_from_slug(episode_slug: str) -> int:
     # Kuhi emits ids such as "watch/anineko/12345/sub/anineko-12".
     # Extract the final number regardless of the provider-specific slug prefix.
@@ -491,25 +440,16 @@ async def legacy_watch_route(provider: str, anilist_id: int, audio: str, episode
         # Auto is the only mode allowed to race across providers. A manually
         # selected server must never silently return another provider's stream.
         if is_auto:
-            raced = await _race_watch_for_player(
-                anilist_id,
-                episode_number,
-                audio,
-            )
-            result = raced or {}
-            streams = result.get("streams") or []
             return {
                 "anilistId": anilist_id,
                 "episode": episode_number,
                 "type": audio,
-                "provider": result.get("provider") or "auto",
+                "provider": "auto",
                 "requestedProvider": "auto",
-                "defaultProvider": result.get("defaultProvider") or provider_race.default_provider(),
-                "providerStatus": "ok" if streams else "no_stream",
-                "providerError": None if streams else "No supported stream was returned. See per-provider diagnostics for timeout, HTTP, empty-result, or unsupported-format details.",
-                "timings": result.get("timings") or {},
-                "streams": streams,
-                "subtitles": provider_race.merge_subtitles(streams),
+                "providerStatus": "auto_disabled",
+                "providerError": "The legacy Kuhi Auto race is disabled. Use MegaPlay Server 1 or choose one of the four supported embed servers.",
+                "streams": [],
+                "subtitles": [],
             }
 
         if preferred is None:
