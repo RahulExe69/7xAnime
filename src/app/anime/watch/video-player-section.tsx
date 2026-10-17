@@ -492,7 +492,11 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
 
   useEffect(() => {
     attemptedSourceIdsRef.current.clear();
-    setUseFallback(false);
+    // Android should start with the dedicated MegaPlay iframe (Server 1).
+    // Resetting this to false sends every newly opened anime into the local
+    // Auto/Kuhi route before the user has selected Auto, which can loop on
+    // resolution retries when no automatic candidates are eligible.
+    setUseFallback(isLocalBackendEnabled());
     setIsHindiMode(false);
     setSelectedHindiServer(0);
     setPreferredCategory(localStorage.getItem("preferredAudio") === "sub" ? "sub" : "dub");
