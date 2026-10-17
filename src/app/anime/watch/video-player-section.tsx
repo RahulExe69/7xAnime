@@ -242,11 +242,9 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
     setSelectedEpisode(episodeIdParam);
   }, [episodeIdParam, selectedEpisode, setSelectedEpisode]);
 
-  // On native Android, begin with Server 1 (MegaPlay) immediately. The previous
-  // first-run path waited for the Auto provider race to initialize and could sit
-  // on "reconnecting to Auto" until the viewer manually tapped a server. Users
-  // can still choose Auto or any provider explicitly; this is only the initial
-  // playback default for the bundled local-backend APK.
+  // On native Android, begin with Server 1 (MegaPlay) immediately. The legacy
+  // Kuhi Auto race is retired; the four supported embed providers are explicit
+  // alternatives selected from the server chooser.
   const [useFallback, setUseFallback] = useState<boolean>(() => isLocalBackendEnabled());
   const [isHindiMode, setIsHindiMode] = useState<boolean>(false);
   const [selectedHindiServer, setSelectedHindiServer] = useState<number>(0);
