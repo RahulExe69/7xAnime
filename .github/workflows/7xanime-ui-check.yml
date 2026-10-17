@@ -13,42 +13,6 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  sync-generated-lockfile:
-    # One-time lockfile reconciliation for this trusted maintenance branch only.
-    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'codex/7xanime-perf-reliability'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - name: Checkout the source branch
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.ref }}
-          fetch-depth: 1
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-
-      - name: Generate the lockfile from the declared dependency graph
-        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
-
-      - name: Commit synchronized lockfile
-        env:
-          BRANCH_NAME: ${{ github.event.pull_request.head.ref }}
-        run: |
-          set -euo pipefail
-          if git diff --quiet -- package-lock.json; then
-            echo "package-lock.json is already synchronized."
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add package-lock.json
-          git commit -m "chore: sync npm lockfile with Capacitor dependencies"
-          git push origin "HEAD:${BRANCH_NAME}"
-
   static-web-build:
     name: Validate UI and static export
     runs-on: ubuntu-latest
@@ -104,19 +68,8 @@ jobs:
           print("Web media proxy validation, redirect and streaming contracts passed.")
           PY
 
-      - name: Reconcile lockfile with declared Capacitor dependencies
-        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
-
-      - name: Upload reconciled lockfile for verification
-        uses: actions/upload-artifact@v4
-        with:
-          name: 7xanime-lockfile-sync
-          path: package-lock.json
-          if-no-files-found: error
-          retention-days: 2
-
       - name: Install dependencies
-        run: npm ci --prefer-offline --no-audit
+        run: npm ci --prefer-offline --no-audit --no-fund
 
       - name: Build static web bundle
         run: npm run build:android-web
