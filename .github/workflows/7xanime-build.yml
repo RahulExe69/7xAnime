@@ -262,8 +262,10 @@ jobs:
               raise SystemExit("Double-tap ±10-second seeking wiring missing")
           if "SWIPE_THRESHOLD" not in viewport or "enterNativePlayerFullscreen" not in viewport:
               raise SystemExit("Player swipe/fullscreen wiring missing")
-          if "enterNativePictureInPicture" not in viewport or 'data-player-viewport="true"' not in viewport:
-              raise SystemExit("Native PiP player control or viewport marker is missing")
+          if 'data-player-viewport="true"' not in viewport:
+              raise SystemExit("Player viewport marker is missing")
+          if 'picture-in-picture' not in watch_section:
+              raise SystemExit("Embedded providers must be granted PiP permission")
           persistent_host = Path("src/components/persistent-watch-experience.tsx").read_text(encoding="utf-8")
           watch_page = Path("src/app/anime/watch/page.tsx").read_text(encoding="utf-8")
           layout = Path("src/app/layout.tsx").read_text(encoding="utf-8")
