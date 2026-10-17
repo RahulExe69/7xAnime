@@ -9,14 +9,16 @@ import asyncio
 import ipaddress
 import re
 import secrets
+import socket
 import threading
+import weakref
 import time
 from urllib.parse import urlencode, urljoin, urlsplit
 
 import httpx
 import uvicorn
 from fastapi import Request
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import JSONResponse, Response, StreamingResponse
 
 from src.config import HEADERS
 from src.endpoints import router
@@ -666,15 +668,85 @@ def _validated_remote_url(value: str) -> str:
     if parts.scheme not in {"http", "https"} or not parts.hostname:
         raise ValueError("Only absolute HTTP(S) media URLs are supported")
     host = parts.hostname.lower().rstrip(".")
-    if host in {"localhost", "localhost.localdomain"} or host.endswith(".local"):
+    if (
+        host in {"localhost", "localhost.localdomain"}
+        or host.endswith((".localhost", ".local", ".internal", ".home.arpa"))
+    ):
         raise ValueError("Local network targets are not allowed")
     try:
-        address = ipaddress.ip_address(host)
+        address = ipaddress.ip_address(host.split("%", 1)[0])
     except ValueError:
         address = None  # Domain name rather than a literal IP address.
     if address is not None and not address.is_global:
-        raise ValueError("Local or private IP targets are not allowed")
+        raise ValueError("Local or reserved IP targets are not allowed")
+    if parts.username or parts.password:
+        raise ValueError("Credential-bearing media URLs are not allowed")
     return value
+
+
+async def _validated_public_remote_url(value: str) -> str:
+    """Reject private DNS answers as well as private IP literals before every request."""
+    target = _validated_remote_url(value)
+    host = urlsplit(target).hostname
+    if not host:
+        raise ValueError("Media URL is missing a hostname")
+    try:
+        ipaddress.ip_address(host.split("%", 1)[0])
+        return target  # _validated_remote_url has already checked literal IP addresses.
+    except ValueError:
+        pass
+
+    loop = asyncio.get_running_loop()
+    port = urlsplit(target).port or (443 if urlsplit(target).scheme == "https" else 80)
+    try:
+        records = await asyncio.wait_for(
+            loop.getaddrinfo(host, port, type=socket.SOCK_STREAM),
+            timeout=5.0,
+        )
+    except Exception as error:
+        raise ValueError("Media hostname could not be resolved safely") from error
+
+    addresses = {record[4][0].split("%", 1)[0] for record in records}
+    if not addresses:
+        raise ValueError("Media hostname has no usable public addresses")
+    try:
+        if any(not ipaddress.ip_address(address).is_global for address in addresses):
+            raise ValueError("Media hostname resolves to a private or reserved IP address")
+    except ValueError as error:
+        if str(error) == "Media hostname resolves to a private or reserved IP address":
+            raise
+        raise ValueError("Media hostname resolved to an invalid IP address") from error
+    return target
+
+
+# Clients are scoped to an event loop because the API also runs inside isolated test loops.
+# Keeping them alive between requests enables HTTP connection reuse for HLS playlists/segments.
+_MEDIA_CLIENTS = weakref.WeakKeyDictionary()
+
+
+def _get_media_http_client() -> httpx.AsyncClient:
+    loop = asyncio.get_running_loop()
+    client = _MEDIA_CLIENTS.get(loop)
+    if client is None:
+        client = httpx.AsyncClient(
+            timeout=httpx.Timeout(connect=8.0, read=35.0, write=10.0, pool=5.0),
+            follow_redirects=False,
+            limits=httpx.Limits(
+                max_connections=24,
+                max_keepalive_connections=12,
+                keepalive_expiry=25.0,
+            ),
+        )
+        _MEDIA_CLIENTS[loop] = client
+    return client
+
+
+@app.on_event("shutdown")
+async def _close_media_http_client() -> None:
+    loop = asyncio.get_running_loop()
+    client = _MEDIA_CLIENTS.pop(loop, None)
+    if client is not None:
+        await client.aclose()
 
 
 def _proxied_url(target: str, referer: str) -> str:
@@ -685,84 +757,146 @@ def _proxied_url(target: str, referer: str) -> str:
     })
 
 
+def _media_proxy_headers(upstream: httpx.Response) -> dict[str, str]:
+    headers = {"Cache-Control": "no-store"}
+    for name in (
+        "content-range",
+        "accept-ranges",
+        "content-length",
+        "content-encoding",
+        "last-modified",
+        "etag",
+        "content-disposition",
+    ):
+        value = upstream.headers.get(name)
+        if value:
+            headers[name] = value
+    return headers
+
+
 @app.get("/api/proxy")
 async def local_media_proxy(request: Request, url: str, referer: str = ""):
-    """Proxy HLS manifests and segments, preserving byte ranges for MP4/media playback."""
+    """Stream media with range support, validated redirects, and pooled upstream connections."""
+    upstream: httpx.Response | None = None
     try:
-        target = _validated_remote_url(url)
+        target = await _validated_public_remote_url(url)
         effective_referer = referer.strip() or f"{urlsplit(target).scheme}://{urlsplit(target).netloc}/"
         headers = dict(HEADERS)
         headers["Referer"] = effective_referer
-        # Media elements use Range requests for video metadata, seeking and
-        # segmented delivery. Forward the range headers rather than turning
-        # every MP4/server response into an unseekable full-file download.
+        # Preserve Range/If-Range so MP4 seeking does not force a full-file download.
         for name in ("range", "if-range"):
             value = request.headers.get(name)
             if value:
                 headers[name.title()] = value
 
-        async with httpx.AsyncClient(timeout=35.0, follow_redirects=True) as client:
-            upstream = await client.get(target, headers=headers)
+        client = _get_media_http_client()
+        for redirect_count in range(6):
+            target = await _validated_public_remote_url(target)
+            outbound = client.build_request("GET", target, headers=headers)
+            upstream = await client.send(outbound, stream=True, follow_redirects=False)
+            location = upstream.headers.get("location")
+            if upstream.status_code not in {301, 302, 303, 307, 308} or not location:
+                break
 
+            await upstream.aclose()
+            upstream = None
+            if redirect_count == 5:
+                raise ValueError("Media source exceeded the redirect limit")
+            target = urljoin(target, location)
+        else:
+            raise ValueError("Media source exceeded the redirect limit")
+
+        assert upstream is not None
         content_type = upstream.headers.get("content-type", "application/octet-stream")
+        iterator = upstream.aiter_raw().__aiter__()
+        prefix_chunks: list[bytes] = []
+        prefix = bytearray()
+        while len(prefix) < 128:
+            try:
+                chunk = await anext(iterator)
+            except StopAsyncIteration:
+                break
+            if not chunk:
+                continue
+            prefix_chunks.append(chunk)
+            prefix.extend(chunk)
+            if b"\\n" in prefix and prefix.lstrip().startswith(b"#EXTM3U"):
+                break
+
         is_manifest = (
             ".m3u8" in urlsplit(target).path.lower()
             or "mpegurl" in content_type.lower()
-            or upstream.content[:128].lstrip().startswith(b"#EXTM3U")
+            or bytes(prefix).lstrip().startswith(b"#EXTM3U")
         )
+        forwarded_headers = _media_proxy_headers(upstream)
+
+        async def stream_remaining():
+            try:
+                for chunk in prefix_chunks:
+                    yield chunk
+                async for chunk in iterator:
+                    yield chunk
+            finally:
+                if upstream is not None:
+                    await upstream.aclose()
+
         if not upstream.is_success:
-            forwarded_headers = {"Cache-Control": "no-store"}
-            for header in ("content-range", "accept-ranges", "content-length", "last-modified", "etag"):
-                value = upstream.headers.get(header)
-                if value:
-                    forwarded_headers[header] = value
-            return Response(
-                content=upstream.content,
+            # Keep error responses streamable too; providers sometimes return sizeable HTML pages.
+            return StreamingResponse(
+                stream_remaining(),
                 status_code=upstream.status_code,
                 media_type=content_type,
                 headers=forwarded_headers,
             )
 
         if is_manifest:
+            chunks = list(prefix_chunks)
+            async for chunk in iterator:
+                chunks.append(chunk)
+            await upstream.aclose()
+            body = b"".join(chunks).decode(upstream.encoding or "utf-8", errors="replace")
             rewritten = []
-            for line in upstream.text.splitlines():
+            for line in body.splitlines():
                 stripped = line.strip()
                 if stripped.startswith("#"):
-                    # HLS encryption keys and initialization maps use URI attributes.
+                    # HLS encryption keys and initialization maps may use URI attributes.
                     if 'URI="' in line:
-                        line = re.sub(
-                            r'URI="([^"]+)"',
-                            lambda found: 'URI="' + _proxied_url(
-                                urljoin(target, found.group(1)), effective_referer
-                            ) + '"',
-                            line,
-                        )
+                        def rewrite_uri(found):
+                            absolute = urljoin(target, found.group(1))
+                            if urlsplit(absolute).scheme not in {"http", "https"}:
+                                return found.group(0)
+                            return 'URI="' + _proxied_url(absolute, effective_referer) + '"'
+
+                        line = re.sub(r'URI="([^"]+)"', rewrite_uri, line)
                     rewritten.append(line)
                 elif stripped:
-                    rewritten.append(_proxied_url(urljoin(target, stripped), effective_referer))
+                    absolute = urljoin(target, stripped)
+                    if urlsplit(absolute).scheme in {"http", "https"}:
+                        rewritten.append(_proxied_url(absolute, effective_referer))
+                    else:
+                        rewritten.append(line)
                 else:
                     rewritten.append(line)
             return Response(
-                content="\n".join(rewritten),
+                content="\\n".join(rewritten),
                 media_type="application/vnd.apple.mpegurl",
                 headers={"Cache-Control": "no-store"},
             )
 
-        forwarded_headers = {"Cache-Control": "no-store"}
-        for header in ("content-range", "accept-ranges", "content-length", "last-modified", "etag"):
-            value = upstream.headers.get(header)
-            if value:
-                forwarded_headers[header] = value
-        return Response(
-            content=upstream.content,
+        return StreamingResponse(
+            stream_remaining(),
             status_code=upstream.status_code,
             media_type=content_type,
             headers=forwarded_headers,
         )
     except ValueError as error:
+        if upstream is not None:
+            await upstream.aclose()
         return JSONResponse({"detail": str(error)}, status_code=400)
-    except Exception as error:
-        return JSONResponse({"detail": f"Media proxy failed: {error}"}, status_code=502)
+    except Exception:
+        if upstream is not None:
+            await upstream.aclose()
+        return JSONResponse({"detail": "Media proxy is temporarily unavailable"}, status_code=502)
 
 
 def get_token() -> str:
