@@ -495,7 +495,7 @@ export function PlayerViewport({
               suppressMiniClickRef.current = false;
               return;
             }
-            revealMiniControls();
+            dispatchPlayerAction("expand-mini-player");
           }}
         />
       )}
@@ -533,41 +533,26 @@ export function PlayerViewport({
       </button>
 
       {isMiniPlayer && (
-        <div className={`pointer-events-none absolute inset-x-0 top-0 z-[10003] flex items-start justify-between gap-2 rounded-t-2xl bg-gradient-to-b from-black/90 via-black/35 to-transparent p-2 pb-5 transition-opacity duration-200 ${miniControlsVisible ? "opacity-100" : "opacity-0"}`}>
-          <span className="min-w-0 flex-1 truncate pt-1 text-xs font-semibold text-white drop-shadow">{title.replace(/ video player$/i, "")}</span>
-          <div className={`flex shrink-0 items-center gap-1 ${miniControlsVisible ? "pointer-events-auto" : "pointer-events-none"}`}>
-            <button
-              type="button"
-              onPointerDown={(event) => event.stopPropagation()}
-              onClick={(event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                revealMiniControls();
-                dispatchPlayerAction("expand-mini-player");
-              }}
-              aria-label="Return to full player"
-              title="Return to full player"
-              className={`grid h-8 w-8 place-items-center rounded-lg border border-white/15 bg-black/65 text-white shadow-md backdrop-blur-sm transition-opacity ${miniControlsVisible ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"}`}
-            >
-              <Maximize2 size={16} />
-            </button>
-            <button
-              type="button"
-              onPointerDown={(event) => event.stopPropagation()}
-              onClick={(event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                revealMiniControls();
-                dispatchPlayerAction("close-mini-player");
-              }}
-              aria-label="Close mini-player"
-              title="Close mini-player"
-              className={`grid h-8 w-8 place-items-center rounded-lg border border-white/15 bg-black/65 text-white shadow-md backdrop-blur-sm transition-opacity ${miniControlsVisible ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"}`}
-            >
-              <X size={16} />
-            </button>
+        <>
+          <div className={`pointer-events-none absolute inset-x-0 top-0 z-[10003] flex items-start justify-between gap-2 rounded-t-2xl bg-gradient-to-b from-black/90 via-black/35 to-transparent p-2 pb-5 transition-opacity duration-200 ${miniControlsVisible ? "opacity-100" : "opacity-0"}`}>
+            <span className="min-w-0 flex-1 truncate pt-1 text-xs font-semibold text-white drop-shadow">{title.replace(/ video player$/i, "")}</span>
           </div>
-        </div>
+          <button
+            type="button"
+            data-mini-player-close="true"
+            onPointerDown={(event) => event.stopPropagation()}
+            onClick={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              dispatchPlayerAction("close-mini-player");
+            }}
+            aria-label="Close mini-player"
+            title="Close mini-player"
+            className="absolute right-1 top-1 z-[10004] grid h-8 w-8 place-items-center rounded-full border-0 bg-transparent p-0 text-white shadow-none drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)] transition-transform hover:scale-110 hover:bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80"
+          >
+            <X size={19} strokeWidth={2.5} />
+          </button>
+        </>
       )}
 
       {/* Cross-origin iframe gestures do not bubble to React. The edge rail
