@@ -795,6 +795,7 @@ def install_player_swipe_observer(main_activity: Path) -> None:
             }
         });
     }
+"""
         text = text[:close] + method + text[close:]
 
     if "installPlayerSwipeObserver();" not in text:
