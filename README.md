@@ -80,18 +80,17 @@ The Android APK retains only the small shared Kuhi API/catalogue infrastructure 
 
 The Android player work applies a shared, provider-agnostic best-effort ad/redirect filter to embedded player requests, blocks pop-up windows and remote JavaScript prompt dialogs, a native landscape fullscreen bridge with swipe/Back support, and double-tap ±10-second seeking in the app-owned ArtPlayer player. See [the player marathon notes](docs/PLAYER-MARATHON.md) for exact coverage and cross-origin iframe limitations. Known ad-domain filtering can never remove every in-page ad, especially content served by the player itself.
 
-When playback is detected as failed, 7xAnime saves the latest available timestamp, retries the current player twice, then tries another configured server before returning to MegaPlay at the end. Servers are hidden from the chooser after their retry budget is exhausted; **Try Auto again** clears that per-session failure list so the pool can be tested afresh. A visual ad overlay inside a cross-origin iframe is not reliably detectable or dismissible by the parent app; blocked network requests/pop-ups and stalled event-reporting embeds can trigger recovery, but this cannot guarantee removal of every in-page ad.
+When playback is detected as failed, 7xAnime saves the latest available timestamp, retries the current player twice, then tries the other four supported embed servers before returning to MegaPlay. Failed servers are hidden from the chooser for the current session. A visual ad overlay inside a cross-origin iframe is not reliably detectable or dismissible by the parent app; blocked network requests/pop-ups and stalled event-reporting embeds can trigger recovery, but this cannot guarantee removal of every in-page ad.
 
 ## Android APK with an on-device API
 
 The Android debug build has an experimental **local-backend** path: the APK bundles
-a Python runtime and a pinned Kuhi API snapshot plus independently authored adapters,
-starts the API on `127.0.0.1:8000`, and routes provider requests and media proxy traffic
-through that loopback service. The provider map offers MegaPlay as Server 1, followed by
-AniXo, Megavid, AnimeParadise, MegaFlix, TryEmbed, CinexStream, and NontonGo. The other Kuhi adapters remain parked.
-AnimeParadise is a direct HLS candidate exposed only after manual selection. AniXo,
-Megavid, AnimeParadise, MegaFlix, TryEmbed, CinexStream, and NontonGo remain
-manual-only until tested on a physical Android device; a returned URL is not proof that the selected episode actually plays. This path does **not** require the three hosted API/proxy/PocketBase Actions
+a Python runtime and the shared catalogue/context portion of a pinned Kuhi API snapshot,
+starts the API on `127.0.0.1:8000`, and routes supported provider requests and media proxy
+traffic through that loopback service. The only standard playback choices are MegaPlay
+(Server 1), AniXo, Megavid, TryEmbed, and CinexStream. Unused upstream Kuhi provider modules
+are pruned from the packaged APK. A returned embed URL is not proof that the selected
+episode actually plays. This path does **not** require the three hosted API/proxy/PocketBase Actions
 secrets or a server we own.
 
 The app still uses the internet to reach AniList, providers, and stream CDNs. The
