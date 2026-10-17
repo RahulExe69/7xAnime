@@ -83,11 +83,14 @@ jobs:
               "provider control-hide requests": "requestEmbeddedControlsHidden",
               "tap-to-show mini-player controls": "revealMiniControls();",
               "temporary mini-player controls": "}, 3500);",
-              "initially hidden mini-player controls": 'miniControlsVisible ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"',
+              "initially hidden mini-player title": 'miniControlsVisible ? "opacity-100" : "opacity-0"',
               "animated player geometry transition": "node.animate([",
               "mini-player drag start": "const startMiniDrag = useCallback(",
               "mini-player drag movement": "const moveMiniPlayer = useCallback(",
               "mini-player offset transform": "--mini-player-offset",
+              "tap floating player to expand": 'dispatchPlayerAction("expand-mini-player");',
+              "always-visible mini-player close": 'data-mini-player-close="true"',
+              "transparent mini-player close": 'bg-transparent p-0 text-white shadow-none',
           }
           player_required = {
               "explicit provider pause detection": "const reportedPaused = eventNames.some(",
