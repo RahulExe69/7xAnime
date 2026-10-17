@@ -27,6 +27,24 @@ type MiniDragGesture = {
   moved: boolean;
 };
 type RectSnapshot = { left: number; top: number; width: number; height: number };
+type NativeSwipeProgress = {
+  phase: "start" | "move" | "end" | "cancel";
+  startX: number;
+  startY: number;
+  currentX: number;
+  currentY: number;
+  deltaX: number;
+  deltaY: number;
+  elapsed: number;
+};
+type NativeSwipeSession = {
+  isMiniPlayer: boolean;
+  startX: number;
+  startY: number;
+  startedAt: number;
+  origin: RectSnapshot;
+  previewing: boolean;
+};
 
 const SWIPE_THRESHOLD = 72;
 const SWIPE_MAX_X_DRIFT = 120;
@@ -44,8 +62,9 @@ export function PlayerViewport({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [miniControlsVisible, setMiniControlsVisible] = useState(false);
   const miniControlsTimerRef = useRef<number | null>(null);
-  const [miniOffset, setMiniOffset] = useState({ x: 0, y: 0 });
   const miniOffsetRef = useRef({ x: 0, y: 0 });
+  const nativeSwipeRef = useRef<NativeSwipeSession | null>(null);
+  const swipePreviewActiveRef = useRef(false);
   const [isMiniDragging, setIsMiniDragging] = useState(false);
   const miniDragRef = useRef<MiniDragGesture | null>(null);
   const suppressMiniClickRef = useRef(false);
@@ -75,26 +94,46 @@ export function PlayerViewport({
       y: Number.isFinite(next.y) ? next.y : 0,
     };
     miniOffsetRef.current = normalized;
-    setMiniOffset(normalized);
+    rootRef.current?.style.setProperty("--mini-player-offset", `${normalized.x}px ${normalized.y}px`);
   }, []);
 
-  // Keep the most recent on-screen rectangle. The FLIP animation uses it as
-  // the starting geometry when route state turns the persistent player into
-  // a mini-player (or when a mini-player expands back to the page/fullscreen).
+  // Capture layout only on meaningful browser events instead of forcing a
+  // getBoundingClientRect() read every animation frame. The old perpetual RAF
+  // loop caused needless main-thread work while the video was playing.
   useEffect(() => {
     let frame = 0;
     const capture = () => {
+      frame = 0;
       const node = rootRef.current;
-      if (node && layoutAnimationRef.current?.playState !== "running") {
-        const rect = node.getBoundingClientRect();
-        lastRectRef.current = {
-          left: rect.left, top: rect.top, width: rect.width, height: rect.height,
-        };
-      }
+      if (!node || layoutAnimationRef.current?.playState === "running" || swipePreviewActiveRef.current) return;
+      const rect = node.getBoundingClientRect();
+      lastRectRef.current = {
+        left: rect.left, top: rect.top, width: rect.width, height: rect.height,
+      };
+    };
+    const scheduleCapture = () => {
+      if (frame) return;
       frame = window.requestAnimationFrame(capture);
     };
-    frame = window.requestAnimationFrame(capture);
-    return () => window.cancelAnimationFrame(frame);
+    scheduleCapture();
+    window.addEventListener("resize", scheduleCapture, { passive: true });
+    window.addEventListener("scroll", scheduleCapture, { passive: true, capture: true });
+    const viewport = window.visualViewport;
+    viewport?.addEventListener("resize", scheduleCapture, { passive: true });
+    viewport?.addEventListener("scroll", scheduleCapture, { passive: true });
+    const node = rootRef.current;
+    const observer = node && typeof ResizeObserver !== "undefined"
+      ? new ResizeObserver(scheduleCapture)
+      : null;
+    if (node) observer?.observe(node);
+    return () => {
+      if (frame) window.cancelAnimationFrame(frame);
+      window.removeEventListener("resize", scheduleCapture);
+      window.removeEventListener("scroll", scheduleCapture, true);
+      viewport?.removeEventListener("resize", scheduleCapture);
+      viewport?.removeEventListener("scroll", scheduleCapture);
+      observer?.disconnect();
+    };
   }, []);
 
   useLayoutEffect(() => {
@@ -107,6 +146,18 @@ export function PlayerViewport({
     const node = rootRef.current;
     if (!node) return;
     const from = lastRectRef.current;
+    const interactiveSwipeTransition =
+      swipePreviewActiveRef.current && !previous.isMiniPlayer && isMiniPlayer;
+    if (interactiveSwipeTransition) {
+      // The live gesture follows the finger with an inline transform. Clear it
+      // before measuring the destination; FLIP continues from the last visible
+      // gesture frame into the fixed mini-player slot without jumping.
+      node.style.transform = "";
+      node.style.transformOrigin = "";
+      node.style.borderRadius = "";
+      node.style.transition = "";
+      swipePreviewActiveRef.current = false;
+    }
     const rect = node.getBoundingClientRect();
     const to: RectSnapshot = {
       left: rect.left, top: rect.top, width: rect.width, height: rect.height,
@@ -181,6 +232,12 @@ export function PlayerViewport({
       { method: "setControls", value: false },
       { event: "command", func: "setControls", args: [false] },
       { controls: false },
+      { event: "picture-in-picture", enabled: false },
+      { type: "picture-in-picture", enabled: false },
+      { action: "disable-picture-in-picture" },
+      { method: "setPictureInPicture", value: false },
+      { pictureInPicture: false },
+      { pip: false },
     ];
     for (const command of commands) {
       try { target.postMessage(command, "*"); } catch { /* provider ignored */ }
@@ -258,11 +315,15 @@ export function PlayerViewport({
     const viewportHeight = document.documentElement.clientHeight || window.innerHeight;
     const left = Math.min(Math.max(drag.originLeft + deltaX, 8), Math.max(8, viewportWidth - drag.originWidth - 8));
     const top = Math.min(Math.max(drag.originTop + deltaY, 8), Math.max(8, viewportHeight - drag.originHeight - 8));
-    updateMiniOffset({
+    const normalized = {
       x: drag.startOffsetX + left - drag.originLeft,
       y: drag.startOffsetY + top - drag.originTop,
-    });
-  }, [updateMiniOffset]);
+    };
+    // Drive the compositor directly while dragging. React only updates the
+    // final snapped position, not once per touch-move event.
+    miniOffsetRef.current = normalized;
+    rootRef.current?.style.setProperty("--mini-player-offset", `${normalized.x}px ${normalized.y}px`);
+  }, []);
 
   const finishMiniDrag = useCallback((event: PointerEvent<HTMLDivElement>) => {
     const drag = miniDragRef.current;
@@ -339,6 +400,26 @@ export function PlayerViewport({
     };
   }, [isMiniPlayer, requestEmbeddedControlsHidden]);
 
+  // HTML5 videos rendered in our own document can be explicitly denied native
+  // Picture-in-Picture. Cross-origin providers are constrained separately by
+  // removing the PiP permission from their iframe allow policy below.
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root) return;
+    const disablePictureInPicture = () => {
+      root.querySelectorAll("video").forEach((video) => {
+        video.disablePictureInPicture = true;
+        video.setAttribute("disablepictureinpicture", "");
+        video.disableRemotePlayback = true;
+        video.controlsList.add("noremoteplayback");
+      });
+    };
+    disablePictureInPicture();
+    const observer = new MutationObserver(disablePictureInPicture);
+    observer.observe(root, { childList: true, subtree: true });
+    return () => observer.disconnect();
+  }, []);
+
   const handleVerticalSwipe = useCallback((deltaY: number) => {
     if (deltaY < 0) {
       if (isMiniPlayer) dispatchPlayerAction("expand-mini-player");
@@ -352,15 +433,111 @@ export function PlayerViewport({
 
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return;
-    const handleNativeIframeSwipe = (event: Event) => {
-      const detail = (event as CustomEvent<{ deltaY?: number }>).detail;
-      if (typeof detail?.deltaY === "number" && Math.abs(detail.deltaY) >= SWIPE_THRESHOLD) {
-        handleVerticalSwipe(detail.deltaY);
+    const settlePreview = (node: HTMLDivElement) => {
+      const currentTransform = node.style.transform;
+      if (!currentTransform) return;
+      const animation = node.animate(
+        [
+          { transform: currentTransform },
+          { transform: "translate3d(0, 0, 0) scale(1, 1)" },
+        ],
+        { duration: 150, easing: "cubic-bezier(0.22, 1, 0.36, 1)" },
+      );
+      void animation.finished.finally(() => {
+        if (!swipePreviewActiveRef.current) {
+          node.style.transform = "";
+          node.style.transformOrigin = "";
+          node.style.borderRadius = "";
+          node.style.transition = "";
+        }
+      }).catch(() => undefined);
+    };
+    const handleNativeSwipeProgress = (event: Event) => {
+      const detail = (event as CustomEvent<NativeSwipeProgress>).detail;
+      if (!detail || !["start", "move", "end", "cancel"].includes(detail.phase)) return;
+      const node = rootRef.current;
+      if (!node) return;
+
+      if (detail.phase === "start") {
+        const target = document.elementFromPoint(detail.startX, detail.startY);
+        if (!target || !node.contains(target)) {
+          nativeSwipeRef.current = null;
+          return;
+        }
+        const rect = node.getBoundingClientRect();
+        nativeSwipeRef.current = {
+          isMiniPlayer,
+          startX: detail.startX,
+          startY: detail.startY,
+          startedAt: detail.elapsed,
+          origin: { left: rect.left, top: rect.top, width: rect.width, height: rect.height },
+          previewing: false,
+        };
+        return;
+      }
+
+      const session = nativeSwipeRef.current;
+      if (!session) return;
+      const deltaX = detail.currentX - session.startX;
+      const deltaY = detail.currentY - session.startY;
+      const validVertical = Math.abs(deltaY) >= SWIPE_THRESHOLD && Math.abs(deltaX) <= SWIPE_MAX_X_DRIFT;
+
+      if (detail.phase === "move") {
+        // Only the downward, full-player gesture gets the live YouTube-style
+        // shrink-to-corner preview. Native iframe touches now update the same
+        // element the finger is moving over, rather than waiting for ACTION_UP.
+        if (!session.isMiniPlayer && deltaY > 4 && Math.abs(deltaX) <= SWIPE_MAX_X_DRIFT) {
+          const viewportWidth = document.documentElement.clientWidth || window.innerWidth;
+          const viewportHeight = document.documentElement.clientHeight || window.innerHeight;
+          const safeAreaProbe = document.createElement("div");
+          safeAreaProbe.style.cssText = "position:fixed;visibility:hidden;pointer-events:none;padding-bottom:env(safe-area-inset-bottom);";
+          document.body.appendChild(safeAreaProbe);
+          const safeBottom = Number.parseFloat(getComputedStyle(safeAreaProbe).paddingBottom) || 0;
+          safeAreaProbe.remove();
+
+          const targetWidth = Math.min(Math.max(190, viewportWidth * 0.58), Math.min(360, viewportWidth - 24));
+          const targetHeight = targetWidth * 9 / 16;
+          const targetLeft = viewportWidth - targetWidth - 12;
+          const targetTop = viewportHeight - 88 - safeBottom - targetHeight;
+          const progress = Math.min(1, Math.max(0, deltaY / 240));
+          const left = session.origin.left + (targetLeft - session.origin.left) * progress;
+          const top = session.origin.top + (targetTop - session.origin.top) * progress;
+          const scaleX = 1 + ((targetWidth / session.origin.width) - 1) * progress;
+          const scaleY = 1 + ((targetHeight / session.origin.height) - 1) * progress;
+          node.style.transition = "none";
+          node.style.transformOrigin = "top left";
+          node.style.transform = `translate3d(${left - session.origin.left}px, ${top - session.origin.top}px, 0) scale(${scaleX}, ${scaleY})`;
+          node.style.borderRadius = `${16 + (14 - 16) * progress}px`;
+          const visible = node.getBoundingClientRect();
+          lastRectRef.current = {
+            left: visible.left, top: visible.top, width: visible.width, height: visible.height,
+          };
+          session.previewing = true;
+          swipePreviewActiveRef.current = true;
+        }
+        return;
+      }
+
+      nativeSwipeRef.current = null;
+      if (detail.phase === "end" && validVertical) {
+        if (!session.isMiniPlayer && deltaY > 0) {
+          // Keep the final finger-following frame as the FLIP start rectangle.
+          const visible = node.getBoundingClientRect();
+          lastRectRef.current = {
+            left: visible.left, top: visible.top, width: visible.width, height: visible.height,
+          };
+          swipePreviewActiveRef.current = session.previewing;
+          dispatchPlayerAction("minimize-player");
+        } else {
+          handleVerticalSwipe(deltaY);
+        }
+      } else if (session.previewing) {
+        settlePreview(node);
       }
     };
-    window.addEventListener("7xanime:native-player-swipe", handleNativeIframeSwipe);
-    return () => window.removeEventListener("7xanime:native-player-swipe", handleNativeIframeSwipe);
-  }, [handleVerticalSwipe]);
+    window.addEventListener("7xanime:native-player-swipe-progress", handleNativeSwipeProgress);
+    return () => window.removeEventListener("7xanime:native-player-swipe-progress", handleNativeSwipeProgress);
+  }, [dispatchPlayerAction, handleVerticalSwipe, isMiniPlayer]);
 
   const startGesture = useCallback((event: PointerEvent<HTMLElement>) => {
     if (event.pointerType === "mouse") return;
@@ -467,7 +644,6 @@ export function PlayerViewport({
       data-player-viewport="true"
       aria-label={title}
       data-mini-dragging={isMiniDragging ? "true" : "false"}
-      style={{ "--mini-player-offset": isMiniPlayer ? `${miniOffset.x}px ${miniOffset.y}px` : "0px 0px" } as React.CSSProperties}
     >
       <div className="absolute inset-0 h-full w-full">
         {children}
