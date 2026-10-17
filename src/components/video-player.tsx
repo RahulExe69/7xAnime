@@ -142,8 +142,7 @@ function VideoPlayer({
       duration,
     });
 
-    let trackedRequest: Promise<string | null>;
-    trackedRequest = request
+    const trackedRequest: Promise<string | null> = request
       .then((recordId) => {
         const isStillCurrentEpisode =
           animeInfoRef.current.id === currentAnimeInfo.id &&
