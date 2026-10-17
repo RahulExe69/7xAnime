@@ -10,7 +10,7 @@ from unittest.mock import AsyncMock, Mock, patch
 from fastapi.testclient import TestClient
 
 import local_api
-from src.providers import animenosub, anixo, animeparadise, cinexstream, megaflix, megavid, nontongo, tryembed
+from src.providers import anixo, cinexstream, megavid, tryembed
 
 
 class LocalAnimeApiTests(unittest.TestCase):
@@ -445,36 +445,6 @@ class LocalAnimeApiTests(unittest.TestCase):
         self.assertEqual([item["type"] for item in playable], ["m3u8", "mp4", "embed"])
         self.assertNotIn("dash", [item["type"] for item in playable])
 
-    def test_animenosub_adapter_parses_audio_flags_and_embedded_servers(self) -> None:
-        snippet = '<iframe src="https://vidmoly.to/embed/abc123"></iframe>'
-        encoded = base64.b64encode(snippet.encode("utf-8")).decode("ascii")
-        series_html = (
-            '<ul><li data-index="0"><a href="https://animenosub.to/attack-on-titan-dub/episode-1">'
-            '<div class="epl-num">1</div><i class="anititle">Episode 1</i>'
-            '<span class="btn-dubbed">Dubbed</span></a></li></ul>'
-        )
-        embeds_html = f'<select><option value="{encoded}" data-index="0">VidMoly</option></select>'
-
-        async def exercise() -> None:
-            with patch.object(animenosub, "fetch_text", new=AsyncMock(return_value=series_html)):
-                episodes = await animenosub.episode_catalogue("attack-on-titan-dub")
-            self.assertEqual(len(episodes), 1)
-            self.assertTrue(episodes[0]["hasDub"])
-            self.assertFalse(episodes[0]["hasSub"])
-            self.assertEqual(episodes[0]["number"], 1)
-
-            with patch.object(animenosub, "fetch_text", new=AsyncMock(return_value=embeds_html)):
-                streams = await animenosub.source_options(
-                    "https://animenosub.to/attack-on-titan-dub/episode-1"
-                )
-            self.assertEqual(len(streams), 1)
-            self.assertEqual(streams[0]["type"], "embed")
-            self.assertEqual(streams[0]["url"], "https://vidmoly.to/embed/abc123")
-            self.assertEqual(streams[0]["referer"], "https://vidmoly.to/")
-
-        asyncio.run(exercise())
-
-
     def test_anixo_and_megavid_build_documented_embed_routes_without_network(self) -> None:
         context = {
             "media": {"id": 21, "episodes": 12, "title": {"english": "Test Series"}},
@@ -507,86 +477,7 @@ class LocalAnimeApiTests(unittest.TestCase):
 
         asyncio.run(exercise())
 
-    def test_animeparadise_maps_documented_search_and_episode_payloads(self) -> None:
-        payloads = [
-            {"data": [{
-                "_id": "ap-series-9",
-                "title": "Título japonés",
-                "alternativeTitle": {"english": "Test Series"},
-            }]},
-            {"data": [
-                {"uid": "ap-uid-1", "number": 1, "title": "Episode 1"},
-                {"uid": "ap-special", "number": 1.5, "title": "Special"},
-                {"uid": "ap-uid-2", "number": 2, "title": "Episode 2"},
-            ]},
-        ]
-
-        async def exercise() -> None:
-            with patch.object(
-                animeparadise, "_get_json", new=AsyncMock(side_effect=payloads)
-            ) as get_json:
-                results = await animeparadise.search("Test Series")
-                episodes = await animeparadise.episode_catalogue("ap-series-9")
-
-            self.assertEqual(results, [{"slug": "ap-series-9", "text": "Test Series"}])
-            self.assertEqual([item["number"] for item in episodes], [1, 2])
-            self.assertEqual(episodes[0]["uid"], "ap-uid-1")
-            self.assertEqual(get_json.await_args_list[0].args, ("/search", {"q": "Test Series", "limit": 20}))
-            self.assertEqual(get_json.await_args_list[1].args, ("/anime/ap-series-9/episode",))
-
-        asyncio.run(exercise())
-
-    def test_animeparadise_resolves_signed_hls_and_subtitles_without_network(self) -> None:
-        context = {
-            "media": {"id": 21, "episodes": 12, "title": {"english": "Test Series"}},
-            "anizip": None,
-        }
-        series = {
-            "mediaId": "ap-series-9",
-            "title": "Test Series",
-            "mode": "direct",
-            "offset": 0,
-            "score": 1.0,
-        }
-        catalogue = [
-            {"number": 1, "title": "Episode 1", "uid": "ap-uid-1", "mediaId": "ap-series-9"},
-            {"number": 2, "title": "Episode 2", "uid": "ap-uid-2", "mediaId": "ap-series-9"},
-        ]
-
-        async def exercise() -> None:
-            with (
-                patch.object(animeparadise, "resolve_series", new=AsyncMock(return_value=series)),
-                patch.object(animeparadise, "episode_catalogue", new=AsyncMock(return_value=catalogue)),
-                patch.object(animeparadise, "_get_json", new=AsyncMock(return_value={
-                    "data": {"episode": {
-                        "streamLink": "signed token+/",
-                        "subData": [{"url": "https://subs.example/ep2.vtt", "label": "English"}],
-                    }}
-                })) as get_json,
-            ):
-                sources = await animeparadise.watch(21, "sub", 2, context)
-
-            self.assertEqual(len(sources), 1)
-            self.assertEqual(sources[0]["type"], "hls")
-            self.assertEqual(sources[0]["server"], "AnimeParadise")
-            self.assertIn("/m3u8?url=", sources[0]["url"])
-            self.assertIn("signed+token%2B%2F", sources[0]["url"])
-            self.assertEqual(sources[0]["referer"], "https://animeparadise.moe/")
-            self.assertEqual(sources[0]["subtitles"][0]["url"], "https://subs.example/ep2.vtt")
-            get_json.assert_awaited_once_with("/ep/ap-uid-2", {"origin": "ap-series-9"})
-
-            with (
-                patch.object(animeparadise, "resolve_series", new=AsyncMock(return_value=series)),
-                patch.object(animeparadise, "episode_catalogue", new=AsyncMock(return_value=catalogue)),
-            ):
-                episodes = await animeparadise.get_episodes(21, context)
-            self.assertEqual(len(episodes["episodes"]["sub"]), 2)
-            self.assertEqual(episodes["episodes"]["sub"][1]["id"], "watch/animeparadise/21/sub/animeparadise-2")
-            self.assertEqual(episodes["episodes"]["dub"], [])
-
-        asyncio.run(exercise())
-
-    def test_yomi_server_adapters_construct_documented_embed_routes_without_network(self) -> None:
+    def test_tryembed_and_cinexstream_build_documented_embed_routes_without_network(self) -> None:
         context = {
             "media": {"id": 21, "episodes": 12, "title": {"english": "Test Series"}},
             "anizip": None,
@@ -594,10 +485,8 @@ class LocalAnimeApiTests(unittest.TestCase):
 
         async def exercise() -> None:
             cases = [
-                (megaflix, "dub", 2, "https://www.megaflix.buzz/stream/ani/21/2/dub?color=%23ff3b72&autoplay=true", "MegaFlix"),
                 (tryembed, "sub", 3, "https://tryembed.us.cc/embed/anime/21/3/sub", "TryEmbed"),
                 (cinexstream, "dub", 4, "https://cinextream.cc/api/embed/anime/dub/21/4?color=7c6ee0", "CinexStream"),
-                (nontongo, "sub", 5, "https://nontongo.win/anime/21/5/play", "NontonGo"),
             ]
             for module, audio, episode, expected_url, label in cases:
                 sources = await module.watch(21, audio, episode, context)
@@ -610,11 +499,6 @@ class LocalAnimeApiTests(unittest.TestCase):
                 episodes = await module.get_episodes(21, context)
                 self.assertEqual(episodes["episodes"]["sub"][episode - 1]["number"], episode)
                 self.assertEqual(episodes["episodes"]["sub"][episode - 1]["id"], f"watch/{module.NAME}/21/sub/{module.NAME}-{episode}")
-
-            nontongo_episodes = await nontongo.get_episodes(21, context)
-            self.assertEqual(nontongo_episodes["episodes"]["dub"], [])
-            with self.assertRaisesRegex(RuntimeError, "does not support dub"):
-                await nontongo.watch(21, "dub", 1, context)
 
         asyncio.run(exercise())
 
@@ -651,10 +535,8 @@ class LocalAnimeApiTests(unittest.TestCase):
         async def exercise() -> None:
             with (
                 patch.object(local_api.provider_race, "providers", return_value=[
-                    ("anineko", object()), ("anixo", anixo), ("megavid", megavid),
-                    ("animeparadise", animeparadise),
-                    ("megaflix", megaflix), ("tryembed", tryembed),
-                    ("cinexstream", cinexstream), ("nontongo", nontongo),
+                    ("anixo", anixo), ("megavid", megavid),
+                    ("tryembed", tryembed), ("cinexstream", cinexstream),
                 ]),
                 patch.object(local_api.provider_race, "build_ctx", new=AsyncMock(return_value={
                     "media": {"id": 21, "title": {"english": "Test"}}, "anizip": None,
