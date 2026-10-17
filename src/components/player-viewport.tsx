@@ -148,6 +148,81 @@ export function PlayerViewport({
     };
   }, [isMiniPlayer, isFullscreen]);
 
+  const enterFullscreen = useCallback(async () => {
+    if (isFullscreen) return;
+    setIsFullscreen(true);
+    await enterNativePlayerFullscreen();
+  }, [isFullscreen]);
+
+  const exitFullscreen = useCallback(async () => {
+    if (!isFullscreen) return;
+    setIsFullscreen(false);
+    await exitNativePlayerFullscreen();
+  }, [isFullscreen]);
+
+  const toggleFullscreen = useCallback(() => {
+    if (isFullscreen) void exitFullscreen();
+    else void enterFullscreen();
+  }, [enterFullscreen, exitFullscreen, isFullscreen]);
+
+  const enterPictureInPicture = useCallback(() => {
+    void enterNativePictureInPicture();
+  }, []);
+
+  const dispatchPlayerAction = useCallback((action: "expand-mini-player" | "minimize-player" | "close-mini-player") => {
+    if (typeof window !== "undefined") window.dispatchEvent(new Event(`7xanime:${action}`));
+  }, []);
+
+  const requestEmbeddedControlsHidden = useCallback(() => {
+    const frame = rootRef.current?.querySelector("iframe");
+    const target = frame?.contentWindow;
+    if (!target) return;
+    // Cross-origin providers expose different control APIs. Send harmless,
+    // common "disable/hide controls" messages where supported; the touch shield
+    // remains the reliable fallback for providers that ignore these requests.
+    const commands = [
+      { event: "controls", enabled: false, visible: false, value: false },
+      { type: "controls", enabled: false, visible: false, value: false },
+      { action: "hide-controls" },
+      { method: "setControls", value: false },
+      { event: "command", func: "setControls", args: [false] },
+      { controls: false },
+    ];
+    for (const command of commands) {
+      try { target.postMessage(command, "*"); } catch { /* provider ignored */ }
+    }
+  }, []);
+
+  const requestEmbeddedControlsVisible = useCallback(() => {
+    const frame = rootRef.current?.querySelector("iframe");
+    const target = frame?.contentWindow;
+    if (!target) return;
+    const commands = [
+      { event: "controls", enabled: true, visible: true, value: true },
+      { type: "controls", enabled: true, visible: true, value: true },
+      { action: "show-controls" },
+      { method: "setControls", value: true },
+      { event: "command", func: "setControls", args: [true] },
+      { controls: true },
+    ];
+    for (const command of commands) {
+      try { target.postMessage(command, "*"); } catch { /* provider ignored */ }
+    }
+  }, []);
+
+  const revealMiniControls = useCallback(() => {
+    if (!isMiniPlayer) return;
+    requestEmbeddedControlsHidden();
+    if (miniControlsTimerRef.current !== null) {
+      window.clearTimeout(miniControlsTimerRef.current);
+    }
+    setMiniControlsVisible(true);
+    miniControlsTimerRef.current = window.setTimeout(() => {
+      setMiniControlsVisible(false);
+      miniControlsTimerRef.current = null;
+    }, 3500);
+  }, [isMiniPlayer, requestEmbeddedControlsHidden]);
+
   const startMiniDrag = useCallback((event: PointerEvent<HTMLDivElement>) => {
     if (!isMiniPlayer) return;
     event.preventDefault();
@@ -225,81 +300,6 @@ export function PlayerViewport({
     revealMiniControls();
     window.setTimeout(() => { suppressMiniClickRef.current = false; }, 350);
   }, [revealMiniControls, updateMiniOffset]);
-
-  const enterFullscreen = useCallback(async () => {
-    if (isFullscreen) return;
-    setIsFullscreen(true);
-    await enterNativePlayerFullscreen();
-  }, [isFullscreen]);
-
-  const exitFullscreen = useCallback(async () => {
-    if (!isFullscreen) return;
-    setIsFullscreen(false);
-    await exitNativePlayerFullscreen();
-  }, [isFullscreen]);
-
-  const toggleFullscreen = useCallback(() => {
-    if (isFullscreen) void exitFullscreen();
-    else void enterFullscreen();
-  }, [enterFullscreen, exitFullscreen, isFullscreen]);
-
-  const enterPictureInPicture = useCallback(() => {
-    void enterNativePictureInPicture();
-  }, []);
-
-  const dispatchPlayerAction = useCallback((action: "expand-mini-player" | "minimize-player" | "close-mini-player") => {
-    if (typeof window !== "undefined") window.dispatchEvent(new Event(`7xanime:${action}`));
-  }, []);
-
-  const requestEmbeddedControlsHidden = useCallback(() => {
-    const frame = rootRef.current?.querySelector("iframe");
-    const target = frame?.contentWindow;
-    if (!target) return;
-    // Cross-origin providers expose different control APIs. Send harmless,
-    // common "disable/hide controls" messages where supported; the touch shield
-    // remains the reliable fallback for providers that ignore these requests.
-    const commands = [
-      { event: "controls", enabled: false, visible: false, value: false },
-      { type: "controls", enabled: false, visible: false, value: false },
-      { action: "hide-controls" },
-      { method: "setControls", value: false },
-      { event: "command", func: "setControls", args: [false] },
-      { controls: false },
-    ];
-    for (const command of commands) {
-      try { target.postMessage(command, "*"); } catch { /* provider ignored */ }
-    }
-  }, []);
-
-  const requestEmbeddedControlsVisible = useCallback(() => {
-    const frame = rootRef.current?.querySelector("iframe");
-    const target = frame?.contentWindow;
-    if (!target) return;
-    const commands = [
-      { event: "controls", enabled: true, visible: true, value: true },
-      { type: "controls", enabled: true, visible: true, value: true },
-      { action: "show-controls" },
-      { method: "setControls", value: true },
-      { event: "command", func: "setControls", args: [true] },
-      { controls: true },
-    ];
-    for (const command of commands) {
-      try { target.postMessage(command, "*"); } catch { /* provider ignored */ }
-    }
-  }, []);
-
-  const revealMiniControls = useCallback(() => {
-    if (!isMiniPlayer) return;
-    requestEmbeddedControlsHidden();
-    if (miniControlsTimerRef.current !== null) {
-      window.clearTimeout(miniControlsTimerRef.current);
-    }
-    setMiniControlsVisible(true);
-    miniControlsTimerRef.current = window.setTimeout(() => {
-      setMiniControlsVisible(false);
-      miniControlsTimerRef.current = null;
-    }, 3500);
-  }, [isMiniPlayer, requestEmbeddedControlsHidden]);
 
   useEffect(() => {
     if (!isMiniPlayer) {
