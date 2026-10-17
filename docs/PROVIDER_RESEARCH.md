@@ -37,13 +37,13 @@
 - Filter formats to what the player supports. Do not expose DASH-only results until a DASH engine is implemented. Embed-only results must preserve the provider's frame requirements.
 - Configure external aggregators with an explicit base URL (and user-owned/self-hosted endpoint where required). Do not hard-code a guessed public deployment, copy GPL source without complying with its terms, or copy scraper source where the repository provides no license.
 
-## Work already started in the current PR
+## Historical implementation notes (superseded by SERVERS.md)
 
-- The bundled local runtime currently starts from Kuhi's ten native Python adapters and adds one separately authored, embed-first AnimeNoSub adapter (not one of the eight Gemini-listed repositories); the smoke test requires all eleven to import.
+- At the time of this research, the runtime bundled Kuhi's ten native Python adapters plus an independently authored AnimeNoSub adapter. That broad provider bundle has since been removed; the APK now packages only AniXo, Megavid, TryEmbed, and CinexStream adapters.
 - The player retries alternate streams returned by one selected provider, preserves each stream's own referer/header hints, and reports player errors separately from extraction results.
 - A native Android WebView navigation guard blocks external top-level redirects while allowing in-frame player navigation; the Android iframe sandbox attribute is removed for the local Android playback path.
 - Failed provider buttons are hidden for the current anime/episode/audio after a request or playback failure, with a small **Retry failed** control. This does not use a provider's global “recent fail” counter to hide sources for unrelated episodes.
-- Latest CI checks for the existing provider/runtime path must remain green before merging. Live website/provider playback still requires on-device verification.
+- These notes describe the earlier provider/runtime implementation and are not a merge checklist for the current code. Use docs/SERVERS.md for the current allowlist. Live provider playback still requires on-device verification.
 
 ## References checked
 
@@ -166,7 +166,7 @@ The current PR now contains independently written, manual-only adapters for AniX
 - **Megavid:** confirmed route shape from its live official docs: `/ani/{anilist-id}/{ep-num}/{sub|dub}`. Its docs describe progress/completion/error events and state that player pages must be embedded in an iframe. Its documented JSON source API is not used because origin restrictions are described. [Official docs](https://megavid.buzz/).
 - **Auto is intentionally kept separate:** both adapters are excluded from the local Auto extraction race. Their routes can be generated without scraping or resolving a stream, so allowing them to win Auto would turn a syntactically valid URL into a false “working” result.
 - **MegaPlay remains Server 1:** its official site currently documents the AniList form `https://megaplay.buzz/stream/ani/{anilist-id}/{ep-num}/{language}` and the app already uses it as the dedicated iframe choice and when native extraction needs a fallback. MegaPlay-backed wrappers such as Anikoto/Cosmic are not counted as independent upstreams.
-- **NontonGo is now integrated as a manual-only embed route**, not as a direct stream extractor. Its site warns about popup ads, so the iframe remains outside Auto and should be checked on Android. **MiruroAPI remains unsuitable as a required dependency** until its hosted service is independently confirmed. AnimeParadise was subsequently added as a manual HLS candidate, still pending device playback.
+- NontonGo was briefly integrated as a manual-only embed route, then retired from the supported set. Do not restore it based on this historical note. **MiruroAPI remains unsuitable as a required dependency** until its hosted service is independently confirmed. AnimeParadise was subsequently added as a manual HLS candidate, still pending device playback.
 
 The network-free contract tests cover manual route construction, sub/dub flags, synthetic episode metadata when AniList/AniZip gives a count, signed AnimeParadise HLS URL encoding, subtitle mapping, and exclusion from Auto racing. These tests verify adapter logic—not upstream availability or actual playback.
 
@@ -176,7 +176,7 @@ The network-free contract tests cover manual route construction, sub/dub flags, 
 
 The user tested an Android build and reported that **MegaPlay (Server 1), AniXo, and Megavid work** for the tested title/episode. This is stronger evidence than route-construction tests, but not a universal availability guarantee. The user also reports the five player choices on live yomi.to normally work (with some fluctuation); that's useful field evidence for the website, but does not prove this replica's URL adapters work identically. AnimeParadise, Cosmic Player, and the four Yomi-derived routes still need device verification.
 
-To avoid repeatedly hammering upstreams, the app exposes MegaPlay as Server 1 plus eight manual selections: AniXo, Megavid, AnimeParadise, Cosmic Player, MegaFlix, TryEmbed, CinexStream, and NontonGo. The backend allowlist filters routes to those choices; Auto excludes the embed-only candidates and AnimeParadise. AnimeParadise catalogue lookups are deferred until selected. Cosmic is a MegaPlay-backed player wrapper, not an independent upstream. The four Yomi-derived adapters mirror URL patterns in `api/lib/streams.js`; they construct iframe routes and don't resolve the underlying media themselves. Legacy Kuhi adapters remain bundled but parked, and AnimeNoSub remains parked.
+The historical build exposed MegaPlay plus a larger set of manual candidates. That configuration is retired; only MegaPlay, AniXo, Megavid, TryEmbed, and CinexStream are supported now. AnimeParadise catalogue lookups are deferred until selected. Cosmic is a MegaPlay-backed player wrapper, not an independent upstream. The four Yomi-derived adapters mirror URL patterns in `api/lib/streams.js`; they construct iframe routes and don't resolve the underlying media themselves. Legacy Kuhi adapters remain bundled but parked, and AnimeNoSub remains parked.
 
 The eight researched, not-yet-integrated candidates remain **research only** and have not been queried or integrated as part of this change:
 1. [amvstrm-ani-api](https://github.com/saurabhgangule/amvstrm-ani-api)
