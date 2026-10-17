@@ -492,8 +492,8 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
     attemptedSourceIdsRef.current.clear();
     // Android should start with the dedicated MegaPlay iframe (Server 1).
     // Resetting this to false sends every newly opened anime into the local
-    // Auto/Kuhi route before the user has selected Auto, which can loop on
-    // resolution retries when no automatic candidates are eligible.
+    // Keep a newly opened anime on MegaPlay rather than sending it through the
+    // retired Auto route, which has no eligible direct-stream providers.
     setUseFallback(isLocalBackendEnabled());
     setIsHindiMode(false);
     setSelectedHindiServer(0);
@@ -593,8 +593,8 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
       current?.episodeId === activeEpisodeId ? null : current,
     );
 
-    // After two attempts, advance from Auto to MegaPlay or to the next
-    // configured provider for a manual selection.
+    // After two attempts, leave the disabled Auto route on MegaPlay or advance
+    // a failed manual selection to the next configured embed provider.
     if (isLocalBackendEnabled() && activeEpisodeId.startsWith("watch/auto/")) {
       setUseFallback(true);
       return;
@@ -1416,7 +1416,7 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
             )}
             {failedServerProviderNames.length > 0 && (
               <span className="self-center px-1 text-[10px] text-zinc-500" role="status">
-                Automatically skipped {failedServerProviderNames.length} failed server{failedServerProviderNames.length === 1 ? "" : "s"}. Use Auto to try the server pool again.
+                Automatically skipped {failedServerProviderNames.length} failed server{failedServerProviderNames.length === 1 ? "" : "s"}. Tap a server to retry it, or retry MegaPlay Server 1.
               </span>
             )}
             {isLocalBackendEnabled() && !nativeCatalogueComplete && availableProviderNames.length === 0 && (
@@ -1633,7 +1633,7 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
               : "This provider returned no playable stream for this episode. It has not been silently replaced with another provider.")}
             <div className="flex flex-wrap gap-2">
               <Button size="sm" onClick={() => selectFallbackServer()}>Try Server 1 · MegaPlay</Button>
-              </div>
+            </div>
             <span className="text-xs text-zinc-500">Or tap a differently named provider below to test that server directly.</span>
           </AlertDescription>
         </Alert>
@@ -1748,7 +1748,7 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
           <AlertCircle className="h-4 w-4 text-[#ff70bd]" />
           <AlertTitle className="font-bold">No more streams from this provider</AlertTitle>
           <AlertDescription className="mt-1 text-sm text-zinc-400">
-            Try Auto or select another server.
+            Try MegaPlay Server 1 or select another server.
           </AlertDescription>
         </Alert>
         {playerControls}
