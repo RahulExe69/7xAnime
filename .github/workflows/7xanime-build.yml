@@ -458,7 +458,7 @@ jobs:
                   f"{sorted(reported - active_manual)}"
               )
           print(
-              "Packaged API: all 18 adapter modules imported; only four approved "
+              "Packaged API: all four active adapter modules imported; only four approved "
               "manual choices are exposed; health, auth, diagnostics and CORS passed."
           )
           PY
