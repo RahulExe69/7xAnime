@@ -563,39 +563,6 @@ def copy_python_source() -> None:
             fail(f"The extra {provider_name} provider adapter is missing.")
         shutil.copy2(extra_provider, destination_src / "providers" / f"{provider_name}.py")
 
-    # The pinned upstream snapshot includes PEP 701 f-string syntax that
-    # Python 3.11 cannot parse. The Android workflow deliberately uses Python
-    # 3.11, so make these two provider modules compatible before importing them.
-    anibd_file = destination_src / "providers" / "anibd.py"
-    anibd_text = anibd_file.read_text(encoding="utf-8")
-    anibd_lines = anibd_text.splitlines()
-    anibd_patched = False
-    for index, line in enumerate(anibd_lines):
-        if "apilink.php?data=" in line and "quote(provider_link" in line:
-            indent = line[:len(line) - len(line.lstrip())]
-            anibd_lines[index:index + 1] = [
-                indent + """encoded_link = quote(provider_link, safe="-_.!~*'()")""",
-                indent + """data = await fetch_json(f"{BASE}/apilink.php?data={encoded_link}")""",
-            ]
-            anibd_patched = True
-            break
-    if anibd_patched:
-        anibd_text = "\n".join(anibd_lines) + "\n"
-    elif "encoded_link = quote(provider_link," not in anibd_text:
-        fail("Could not apply the Python 3.11 compatibility patch to anibd.py.")
-    anibd_file.write_text(anibd_text, encoding="utf-8")
-
-    mkissa_file = destination_src / "providers" / "mkissa.py"
-    mkissa_text = mkissa_file.read_text(encoding="utf-8")
-    pep701_fragment = """safe="'")"""
-    if pep701_fragment in mkissa_text:
-        if mkissa_text.count(pep701_fragment) != 2:
-            fail("Expected two Python 3.11-incompatible quote expressions in mkissa.py.")
-        mkissa_text = mkissa_text.replace(pep701_fragment, "safe=chr(39))")
-    elif "safe=chr(39))" not in mkissa_text:
-        fail("Could not apply the Python 3.11 compatibility patch to mkissa.py.")
-    mkissa_file.write_text(mkissa_text, encoding="utf-8")
-
     # The upstream race waits up to eight seconds after finding a winning stream,
     # only to collect optional latency measurements. That tail delay is noticeable
     # on mobile, so cancel slower competitors almost immediately after a winner.
