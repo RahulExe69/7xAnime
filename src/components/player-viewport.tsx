@@ -1,6 +1,6 @@
 "use client";
 
-import React, { PointerEvent, ReactNode, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { PointerEvent, ReactNode, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { App } from "@capacitor/app";
 import { Capacitor } from "@capacitor/core";
 import { usePathname } from "next/navigation";
@@ -42,7 +42,6 @@ type NativeSwipeSession = {
   isFullscreen: boolean;
   startX: number;
   startY: number;
-  startedAt: number;
   origin: RectSnapshot;
   target: RectSnapshot | null;
   previewing: boolean;
@@ -514,7 +513,6 @@ export function PlayerViewport({
           isFullscreen,
           startX: detail.startX,
           startY: detail.startY,
-          startedAt: detail.elapsed,
           origin: { left: rect.left, top: rect.top, width: rect.width, height: rect.height },
           target,
           previewing: false,
