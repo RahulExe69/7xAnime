@@ -92,7 +92,13 @@ jobs:
               "always-visible mini-player close": 'data-mini-player-close="true"',
               "transparent mini-player close": 'bg-transparent p-0 text-white shadow-none',
           }
+          viewport_forbidden = {
+              "custom fullscreen overlay button removed": "toggleFullscreen",
+              "custom native PiP overlay button removed": "enterPictureInPicture",
+              "custom fullscreen/PiP icon imports removed": "Maximize2",
+          }
           player_required = {
+              "embedded iframe grants fullscreen and PiP": 'allow="autoplay; fullscreen; picture-in-picture; encrypted-media"',
               "explicit provider pause detection": "const reportedPaused = eventNames.some(",
               "paused-state watchdog guard": 'if (embedPlaybackStateRef.current === "paused")',
               "pause preservation during recovery": "pauseAfterEmbedRecoveryRef.current = true;",
@@ -100,11 +106,12 @@ jobs:
               "paused-player errors cannot trigger reconnects": "const pausedFrame = externalEmbedFrameRef.current;",
           }
           missing_viewport = [label for label, snippet in viewport_required.items() if snippet not in viewport]
+          forbidden_viewport = [label for label, snippet in viewport_forbidden.items() if snippet in viewport]
           missing_player = [label for label, snippet in player_required.items() if snippet not in player]
-          if missing_viewport or missing_player:
+          if missing_viewport or forbidden_viewport or missing_player:
               raise SystemExit(
-                  f"Mini-player interaction/pause protections are missing: "
-                  f"viewport={missing_viewport}, player={missing_player}"
+                  f"Player interaction contracts are missing/violated: "
+                  f"viewport={missing_viewport}, forbidden={forbidden_viewport}, player={missing_player}"
               )
           print("Web proxy and mini-player safety contracts passed.")
           PY
