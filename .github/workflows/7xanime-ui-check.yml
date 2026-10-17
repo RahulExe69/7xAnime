@@ -75,7 +75,30 @@ jobs:
               raise SystemExit(f"Web media proxy safeguards are missing: {missing}")
           if "response.arrayBuffer()" in proxy:
               raise SystemExit("Web media proxy must not buffer full media responses")
-          print("Web media proxy validation, redirect and streaming contracts passed.")
+
+          viewport = Path("src/components/player-viewport.tsx").read_text(encoding="utf-8")
+          player = Path("src/app/anime/watch/video-player-section.tsx").read_text(encoding="utf-8")
+          viewport_required = {
+              "mini-player interaction shield": 'data-mini-player-interaction-shield="true"',
+              "provider control-hide requests": "requestEmbeddedControlsHidden",
+              "tap-to-show mini-player controls": "revealMiniControls();",
+              "temporary mini-player controls": "}, 3500);",
+              "initially hidden mini-player controls": 'miniControlsVisible ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"',
+          }
+          player_required = {
+              "explicit provider pause detection": "const reportedPaused = eventNames.some(",
+              "paused-state watchdog guard": 'if (embedPlaybackStateRef.current === "paused")',
+              "pause preservation during recovery": "pauseAfterEmbedRecoveryRef.current = true;",
+              "post-recovery pause command": "requestExternalPlayerPause(frameAtSchedule)",
+          }
+          missing_viewport = [label for label, snippet in viewport_required.items() if snippet not in viewport]
+          missing_player = [label for label, snippet in player_required.items() if snippet not in player]
+          if missing_viewport or missing_player:
+              raise SystemExit(
+                  f"Mini-player interaction/pause protections are missing: "
+                  f"viewport={missing_viewport}, player={missing_player}"
+              )
+          print("Web proxy and mini-player safety contracts passed.")
           PY
 
       - name: Install dependencies
