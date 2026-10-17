@@ -157,6 +157,7 @@ export function PlayerViewport({
       node.style.transformOrigin = "";
       node.style.borderRadius = "";
       node.style.transition = "";
+      node.style.willChange = "";
       swipePreviewActiveRef.current = false;
     }
     const rect = node.getBoundingClientRect();
