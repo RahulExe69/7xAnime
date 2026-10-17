@@ -12,13 +12,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import WatchButton from "@/components/watch-button";
 import { IAnime } from "@/types/anime";
 import AnimeCarousel from "@/components/anime-carousel";
-const AnimeEpisodes = dynamic(() => import("@/components/anime-episodes"), {
-  loading: () => (
-    <div role="status" className="py-8 text-center text-sm text-zinc-500">
-      Loading episodes…
-    </div>
-  ),
-});
 import CharacterCard from "@/components/common/character-card";
 import { ROUTES } from "@/constants/routes";
 import WatchTrailer from "@/components/watch-trailer";
@@ -37,6 +30,14 @@ import Loading from "@/app/loading";
 import { useAuthStore } from "@/store/auth-store";
 import { toast } from "sonner";
 import useBookMarks from "@/hooks/use-get-bookmark";
+
+const AnimeEpisodes = dynamic(() => import("@/components/anime-episodes"), {
+  loading: () => (
+    <div role="status" className="py-8 text-center text-sm text-zinc-500">
+      Loading episodes…
+    </div>
+  ),
+});
 
 const SelectOptions: ISelectOptions[] = [
   {
