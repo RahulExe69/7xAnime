@@ -214,15 +214,15 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
 
   // Android starts with the dedicated MegaPlay iframe. The four retained embed
   // providers are explicit alternatives, not an automatic extraction race.
-  const localAutoEpisodeId = isLocalBackendEnabled() && animeIdParam
-    ? `watch/auto/${animeIdParam}/${preferredCategory}/episode-${requestedEpisodeNumber}`
+  const localFallbackEpisodeId = isLocalBackendEnabled() && animeIdParam
+    ? `watch/megaplay/${animeIdParam}/${preferredCategory}/episode-${requestedEpisodeNumber}`
     : "";
-  const activeEpisodeId = episodeIdParam || localAutoEpisodeId || preferredEpisodeId ||
+  const activeEpisodeId = episodeIdParam || localFallbackEpisodeId || preferredEpisodeId ||
     (epParam ? targetEpByNumber?.episodeId || "" : allEpisodesData?.episodes?.[0]?.episodeId || "");
   const hasManualProviderSelection =
     isLocalBackendEnabled() &&
     !!episodeIdParam &&
-    !episodeIdParam.startsWith("watch/auto/");
+    !episodeIdParam.startsWith("watch/megaplay/");
 
   useEffect(() => {
     if (!isWatchRoute || typeof window === "undefined") return;
@@ -234,7 +234,7 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
   // When a URL contains only ?ep=N, EpisodePlaylist owns the highlighted
   // selection while the player may use a temporary watch/auto URL. Syncing
   // that temporary URL back into the same store creates a feedback loop:
-  // the player writes watch/auto/.../dub/episode-N, the playlist writes its
+  // the player writes watch/megaplay/.../dub/episode-N, the playlist writes its
   // provider episode ID, and the two effects keep triggering each other
   // until React throws error #185 (maximum update depth exceeded).
   useEffect(() => {
@@ -593,7 +593,7 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
 
     // After two attempts, leave the disabled Auto route on MegaPlay or advance
     // a failed manual selection to the next configured embed provider.
-    if (isLocalBackendEnabled() && activeEpisodeId.startsWith("watch/auto/")) {
+    if (isLocalBackendEnabled() && activeEpisodeId.startsWith("watch/megaplay/")) {
       setUseFallback(true);
       return;
     }
@@ -628,7 +628,7 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
       resolutionRetriesRef.current[activeEpisodeId] = 0;
       resolutionRetryInFlightRef.current = null;
       setRetryingResolution(null);
-      if (isLocalBackendEnabled() && activeEpisodeId.startsWith("watch/auto/")) {
+      if (isLocalBackendEnabled() && activeEpisodeId.startsWith("watch/megaplay/")) {
         setUseFallback(true);
       } else {
         advanceAfterSourceFailure();
@@ -924,7 +924,7 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
     }
 
     const nextEpisodeId = isLocalBackendEnabled()
-      ? "watch/auto/" + animeIdParam + "/" + activeCategory + "/episode-" + nextNumber
+      ? "watch/megaplay/" + animeIdParam + "/" + activeCategory + "/episode-" + nextNumber
       : nextProviderEpisode?.id || nextAnyProviderEpisode?.id || catalogueEpisode?.episodeId || "";
     if (!nextEpisodeId) return;
 
@@ -936,7 +936,7 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
         episodeId: nextEpisodeId,
       };
     }
-    setUseFallback(false);
+    setUseFallback(isLocalBackendEnabled());
     setIsHindiMode(false);
     setSelectedEpisode(nextEpisodeId);
 
@@ -965,8 +965,8 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
         .map((item) => item.id) || availableProviderNames)
     : availableProviderNames;
   // Keep SUB-only servers discoverable while ENGLISH is selected, but hide a
-  // provider after its recovery attempts fail. Internal auto-failover still
-  // retains the complete provider order; this filter only affects the chooser.
+  // provider after its recovery attempts fail. The internal failover sequence
+  // retains the complete supported provider order.
   const selectableServerProviderNames = serverProviderNames;
   const failedServerProviderNames = selectableServerProviderNames.filter(
     (providerName) => providerPlaybackOutcomes[providerName] === "failed",
@@ -975,29 +975,6 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
     (providerName) => providerPlaybackOutcomes[providerName] !== "failed",
   );
 
-  // An automatic provider race reports the outcomes of sources it actually
-  // attempted. Apply those failures to this screen's scoped hide/retry state;
-  // never infer per-episode failure from the backend's global failure counters.
-  useEffect(() => {
-    const timings = episodeData?.timings;
-    if (!isLocalBackendEnabled() || !activeEpisodeId.startsWith("watch/auto/") || !timings) return;
-    const failedProviders = Object.entries(timings)
-      .filter(([, outcome]) => outcome && outcome.ok === false)
-      .map(([providerName]) => providerName);
-    if (!failedProviders.length || retryingResolution?.episodeId === activeEpisodeId) return;
-    setProviderPlaybackOutcomes((previous) => {
-      let changed = false;
-      const next = { ...previous };
-      for (const providerName of failedProviders) {
-        if (next[providerName] !== "failed") {
-          next[providerName] = "failed";
-          changed = true;
-        }
-      }
-      return changed ? next : previous;
-    });
-  }, [activeEpisodeId, episodeData?.timings, retryingResolution]);
-
   const selectedProviderIndex = visibleServerProviderNames.indexOf(currentProviderName);
   const fallbackServerNumber = 1;
   const activeServerNumber = isHindiMode
@@ -1005,17 +982,8 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
     : useFallback || isFallbackActive
       ? fallbackServerNumber
       : selectedProviderIndex >= 0 ? selectedProviderIndex + 2 : 1;
-  const isAutomaticServerActive =
-    isLocalBackendEnabled() &&
-    currentProviderName === "auto" &&
-    !isHindiMode &&
-    !isFallbackActive;
-  const actualProviderName = episodeData?.provider || "";
-  const activeServerLabel = isAutomaticServerActive
-    ? actualProviderName && actualProviderName !== "auto"
-      ? `Auto → ${getProviderDisplayName(actualProviderName)}`
-      : "Auto"
-    : !isFallbackActive && !isHindiMode && providerPlaybackOutcomes[currentProviderName] === "failed"
+  const activeServerLabel =
+    !isFallbackActive && !isHindiMode && providerPlaybackOutcomes[currentProviderName] === "failed"
       ? `${getProviderDisplayName(currentProviderName)} unavailable`
       : activeServerNumber === 1
         ? "Server 1 — MegaPlay"
