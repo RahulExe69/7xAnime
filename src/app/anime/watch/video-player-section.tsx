@@ -1047,30 +1047,6 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
     setIsHindiMode(true);
   };
 
-  const selectAutomaticServer = () => {
-    flushLatestEmbedProgress();
-    setFallbackPlaybackFailed(false);
-    playbackRetriesRef.current = { key: `${activeEpisodeId}|0`, count: 0 };
-    setRetryingPlayback(null);
-    setRetryingResolution(null);
-    setManualProviderPlaybackFailed(false);
-    setPlaybackSourceIndex(0);
-    resolutionRetriesRef.current = {};
-    resolutionRetryInFlightRef.current = null;
-    if (resolutionRetryReleaseTimerRef.current !== null) {
-      window.clearTimeout(resolutionRetryReleaseTimerRef.current);
-      resolutionRetryReleaseTimerRef.current = null;
-    }
-    // An explicit "Try Auto again" is a fresh attempt: clear the provider
-    // quarantine set so previously failed servers can be tested again.
-    attemptedSourceIdsRef.current.clear();
-    setProviderPlaybackOutcomes({});
-    setIsHindiMode(false);
-    setUseFallback(false);
-    const targetId = `watch/auto/${animeIdParam}/${activeCategory}/episode-${currentEpNumber}`;
-    setSelectedEpisode(targetId);
-    updateEpisodeUrl(targetId, currentEpNumber);
-  };
 
   const handlePlayerError = useCallback((detail?: string) => {
     // Do not resolve/retry/switch providers while the app is hidden. Explicit
@@ -1654,9 +1630,8 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
               ? `Playback failed: ${lastPlayerError || "the provider returned a stream that the player could not play."}`
               : "This provider returned no playable stream for this episode. It has not been silently replaced with another provider.")}
             <div className="flex flex-wrap gap-2">
-              <Button size="sm" variant="secondary" onClick={selectAutomaticServer}>Try Auto</Button>
               <Button size="sm" onClick={() => selectFallbackServer()}>Try Server 1 · MegaPlay</Button>
-            </div>
+              </div>
             <span className="text-xs text-zinc-500">Or tap a differently named provider below to test that server directly.</span>
           </AlertDescription>
         </Alert>
@@ -1675,7 +1650,7 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
           <AlertDescription className="mt-1 flex flex-col gap-3 text-sm text-zinc-400">
             MegaPlay and the available servers could not start this episode after automatic retries. Your latest saved timestamp is kept where a player reported it.
             <div className="flex flex-wrap gap-2">
-              <Button size="sm" onClick={selectAutomaticServer}>Try Auto again</Button>
+              <Button size="sm" onClick={() => selectFallbackServer()}>Retry Server 1 · MegaPlay</Button>
             </div>
             <span className="text-xs text-zinc-500">You can also choose another server below. Embedded providers may not expose a seek command, so exact resume is not guaranteed on every iframe.</span>
           </AlertDescription>
