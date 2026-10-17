@@ -47,7 +47,7 @@ LOCAL_WATCH_CACHE_TTL = 35.0
 LOCAL_ROUTE_TIMEOUT = 80.0
 # Active provider order drives deterministic server numbering and diagnostics.
 # Newly added sources remain manual-only until real-device playback is verified.
-# Keep unapproved Kuhi adapters parked to avoid unnecessary third-party requests.
+# The allowlist is the complete active set; the build prunes every other adapter.
 ACTIVE_PROVIDER_ORDER = ("anixo", "megavid", "tryembed", "cinexstream")
 ACTIVE_PROVIDER_ALLOWLIST = set(ACTIVE_PROVIDER_ORDER)
 MANUAL_EMBED_ONLY_PROVIDERS = {"anixo", "megavid", "tryembed", "cinexstream"}
@@ -418,7 +418,7 @@ async def _watch_one_for_player(mod, name, anilist_id, ep, audio, ctx):
 
 
 def _episode_number_from_slug(episode_slug: str) -> int:
-    # Kuhi emits ids such as "watch/anineko/12345/sub/anineko-12".
+    # Provider episode IDs end with an episode number, e.g. "watch/anixo/12345/sub/anixo-12".
     # Extract the final number regardless of the provider-specific slug prefix.
     match = re.search(r"(\d+)\s*$", episode_slug)
     return int(match.group(1)) if match else 1
@@ -437,8 +437,8 @@ async def legacy_watch_route(provider: str, anilist_id: int, audio: str, episode
     preferred = requested_provider if requested_provider in ACTIVE_PROVIDER_ALLOWLIST else None
 
     async def extract_streams() -> dict:
-        # Auto is the only mode allowed to race across providers. A manually
-        # selected server must never silently return another provider's stream.
+        # Automatic Kuhi routing is retired. A manually selected server must
+        # never silently return another provider's stream.
         if is_auto:
             return {
                 "anilistId": anilist_id,
@@ -511,7 +511,7 @@ async def legacy_watch_route(provider: str, anilist_id: int, audio: str, episode
         }
 
     # Bound metadata setup plus stream extraction. Manual selection stays strict;
-    # Auto races eligible providers while sharing context and per-source budgets.
+    # Auto is rejected before any provider request is made.
     try:
         data = await asyncio.wait_for(extract_streams(), timeout=LOCAL_ROUTE_TIMEOUT)
     except asyncio.TimeoutError:
