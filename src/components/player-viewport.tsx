@@ -43,6 +43,7 @@ type NativeSwipeSession = {
   startY: number;
   startedAt: number;
   origin: RectSnapshot;
+  target: RectSnapshot | null;
   previewing: boolean;
 };
 
@@ -435,7 +436,11 @@ export function PlayerViewport({
     if (!Capacitor.isNativePlatform()) return;
     const settlePreview = (node: HTMLDivElement) => {
       const currentTransform = node.style.transform;
-      if (!currentTransform) return;
+      swipePreviewActiveRef.current = false;
+      if (!currentTransform) {
+        node.style.willChange = "";
+        return;
+      }
       const animation = node.animate(
         [
           { transform: currentTransform },
@@ -449,6 +454,7 @@ export function PlayerViewport({
           node.style.transformOrigin = "";
           node.style.borderRadius = "";
           node.style.transition = "";
+          node.style.willChange = "";
         }
       }).catch(() => undefined);
     };
@@ -465,12 +471,33 @@ export function PlayerViewport({
           return;
         }
         const rect = node.getBoundingClientRect();
+        let target: RectSnapshot | null = null;
+        if (!isMiniPlayer) {
+          const viewportWidth = document.documentElement.clientWidth || window.innerWidth;
+          const viewportHeight = document.documentElement.clientHeight || window.innerHeight;
+          // Read the bottom safe-area inset once at gesture start, never inside
+          // the move loop, so finger-following stays compositor-friendly.
+          const safeAreaProbe = document.createElement("div");
+          safeAreaProbe.style.cssText = "position:fixed;visibility:hidden;pointer-events:none;padding-bottom:env(safe-area-inset-bottom);";
+          document.body.appendChild(safeAreaProbe);
+          const safeBottom = Number.parseFloat(getComputedStyle(safeAreaProbe).paddingBottom) || 0;
+          safeAreaProbe.remove();
+          const targetWidth = Math.min(Math.max(190, viewportWidth * 0.58), Math.min(360, viewportWidth - 24));
+          const targetHeight = targetWidth * 9 / 16;
+          target = {
+            left: viewportWidth - targetWidth - 12,
+            top: viewportHeight - 88 - safeBottom - targetHeight,
+            width: targetWidth,
+            height: targetHeight,
+          };
+        }
         nativeSwipeRef.current = {
           isMiniPlayer,
           startX: detail.startX,
           startY: detail.startY,
           startedAt: detail.elapsed,
           origin: { left: rect.left, top: rect.top, width: rect.width, height: rect.height },
+          target,
           previewing: false,
         };
         return;
@@ -486,31 +513,25 @@ export function PlayerViewport({
         // Only the downward, full-player gesture gets the live YouTube-style
         // shrink-to-corner preview. Native iframe touches now update the same
         // element the finger is moving over, rather than waiting for ACTION_UP.
-        if (!session.isMiniPlayer && deltaY > 4 && Math.abs(deltaX) <= SWIPE_MAX_X_DRIFT) {
-          const viewportWidth = document.documentElement.clientWidth || window.innerWidth;
-          const viewportHeight = document.documentElement.clientHeight || window.innerHeight;
-          const safeAreaProbe = document.createElement("div");
-          safeAreaProbe.style.cssText = "position:fixed;visibility:hidden;pointer-events:none;padding-bottom:env(safe-area-inset-bottom);";
-          document.body.appendChild(safeAreaProbe);
-          const safeBottom = Number.parseFloat(getComputedStyle(safeAreaProbe).paddingBottom) || 0;
-          safeAreaProbe.remove();
-
-          const targetWidth = Math.min(Math.max(190, viewportWidth * 0.58), Math.min(360, viewportWidth - 24));
-          const targetHeight = targetWidth * 9 / 16;
-          const targetLeft = viewportWidth - targetWidth - 12;
-          const targetTop = viewportHeight - 88 - safeBottom - targetHeight;
+        if (!session.isMiniPlayer && session.target && deltaY > 4 && Math.abs(deltaX) <= SWIPE_MAX_X_DRIFT) {
+          const target = session.target;
           const progress = Math.min(1, Math.max(0, deltaY / 240));
-          const left = session.origin.left + (targetLeft - session.origin.left) * progress;
-          const top = session.origin.top + (targetTop - session.origin.top) * progress;
-          const scaleX = 1 + ((targetWidth / session.origin.width) - 1) * progress;
-          const scaleY = 1 + ((targetHeight / session.origin.height) - 1) * progress;
+          const left = session.origin.left + (target.left - session.origin.left) * progress;
+          const top = session.origin.top + (target.top - session.origin.top) * progress;
+          const scaleX = 1 + ((target.width / session.origin.width) - 1) * progress;
+          const scaleY = 1 + ((target.height / session.origin.height) - 1) * progress;
           node.style.transition = "none";
           node.style.transformOrigin = "top left";
+          node.style.willChange = "transform";
           node.style.transform = `translate3d(${left - session.origin.left}px, ${top - session.origin.top}px, 0) scale(${scaleX}, ${scaleY})`;
           node.style.borderRadius = `${16 + (14 - 16) * progress}px`;
-          const visible = node.getBoundingClientRect();
+          // Geometry is derivable from the gesture progress, avoiding a forced
+          // synchronous layout read on every touch-move.
           lastRectRef.current = {
-            left: visible.left, top: visible.top, width: visible.width, height: visible.height,
+            left,
+            top,
+            width: session.origin.width + (target.width - session.origin.width) * progress,
+            height: session.origin.height + (target.height - session.origin.height) * progress,
           };
           session.previewing = true;
           swipePreviewActiveRef.current = true;
@@ -522,12 +543,9 @@ export function PlayerViewport({
       if (detail.phase === "end" && validVertical) {
         if (!session.isMiniPlayer && deltaY > 0) {
           // Keep the final finger-following frame as the FLIP start rectangle.
-          const visible = node.getBoundingClientRect();
-          lastRectRef.current = {
-            left: visible.left, top: visible.top, width: visible.width, height: visible.height,
-          };
           swipePreviewActiveRef.current = session.previewing;
-          dispatchPlayerAction("minimize-player");
+          if (session.previewing) dispatchPlayerAction("minimize-player");
+          else handleVerticalSwipe(deltaY);
         } else {
           handleVerticalSwipe(deltaY);
         }
