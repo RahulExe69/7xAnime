@@ -430,7 +430,7 @@ export function PlayerViewport({
         video.disablePictureInPicture = true;
         video.setAttribute("disablepictureinpicture", "");
         video.disableRemotePlayback = true;
-        video.controlsList.add("noremoteplayback");
+        video.setAttribute("controlslist", "noremoteplayback");
       });
     };
     disablePictureInPicture();
