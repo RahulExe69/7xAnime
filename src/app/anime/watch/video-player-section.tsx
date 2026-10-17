@@ -1543,7 +1543,7 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
               title={`${hindiDubData?.matchedTitle || anime?.anime?.info?.name || "Anime"} episode ${currentEpNumber} Hindi dub via ${selectedHindi.host}`}
               width="100%"
               height="100%"
-              allow="autoplay; fullscreen; picture-in-picture; encrypted-media"
+              allow="autoplay; fullscreen; encrypted-media"
               allowFullScreen
               sandbox="allow-scripts allow-same-origin allow-forms allow-presentation"
               referrerPolicy="strict-origin-when-cross-origin"
@@ -1677,7 +1677,7 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
             title={`${anime?.anime?.info?.name || "Anime"} episode ${currentEpNumber} via MegaPlay`}
             width="100%"
             height="100%"
-            allow="autoplay; fullscreen; picture-in-picture; encrypted-media"
+            allow="autoplay; fullscreen; encrypted-media"
             allowFullScreen
             sandbox={isLocalBackendEnabled() ? undefined : "allow-scripts allow-same-origin allow-forms allow-presentation"}
             referrerPolicy="strict-origin-when-cross-origin"
@@ -1705,7 +1705,7 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
             title={`${anime?.anime?.info?.name || "Anime"} episode ${currentEpNumber} via ${getProviderDisplayName(embedProvider)}`}
             width="100%"
             height="100%"
-            allow="autoplay; fullscreen; picture-in-picture; encrypted-media"
+            allow="autoplay; fullscreen; encrypted-media"
             allowFullScreen
             sandbox={isLocalBackendEnabled() ? undefined : "allow-scripts allow-same-origin allow-forms allow-presentation"}
             referrerPolicy="strict-origin-when-cross-origin"
