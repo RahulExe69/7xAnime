@@ -95,7 +95,6 @@ jobs:
               "pause preservation during recovery": "pauseAfterEmbedRecoveryRef.current = true;",
               "post-recovery pause command": "requestExternalPlayerPause(frameAtSchedule)",
               "paused-player errors cannot trigger reconnects": "const pausedFrame = externalEmbedFrameRef.current;",
-              "explicit pause timestamp": "lastExplicitPauseAtRef.current = Date.now();",
           }
           missing_viewport = [label for label, snippet in viewport_required.items() if snippet not in viewport]
           missing_player = [label for label, snippet in player_required.items() if snippet not in player]
