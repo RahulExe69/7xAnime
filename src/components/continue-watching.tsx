@@ -56,6 +56,7 @@ async function resolveAnimeMetadata(id: string): Promise<{ title: string; poster
 export default function ContinueWatching({ loading = false }: { loading: boolean }) {
   const [anime, setAnime] = useState<WatchedAnime[] | null>(null);
   const [brokenPosters, setBrokenPosters] = useState<Set<string>>(() => new Set());
+  const [metadataRepairAttempts, setMetadataRepairAttempts] = useState<Set<string>>(() => new Set());
   const scrollRef = useRef<HTMLDivElement>(null);
   const { auth } = useAuthStore();
   const { bookmarks } = useBookMarks({ page: 1, per_page: 14, status: "watching" });
@@ -181,7 +182,26 @@ export default function ContinueWatching({ loading = false }: { loading: boolean
           return (
             <Link key={`${item.id}-${index}`} href={ROUTES.watchAnime(item.id, episodeNumber)} className="group flex w-[68%] max-w-[360px] shrink-0 snap-start items-center gap-3 rounded-2xl border border-white/[0.07] bg-[#19070d] p-2.5 transition-colors duration-150 hover:border-[#ff3b72]/65 dark:border-white/[0.07] dark:bg-[#19070d] dark:hover:border-[#ff3b72] sm:w-[48%] md:w-[38%] lg:w-[30%]">
               <div className="relative grid h-[70px] w-[50px] shrink-0 place-items-center overflow-hidden rounded-xl bg-gradient-to-br from-[#351021] via-[#1b0a17] to-[#100b18]">
-                {poster ? <Image src={item.poster} alt={item.name} fill sizes="72px" className="object-cover" onError={() => setBrokenPosters((previous) => new Set(previous).add(String(item.id)))} /> : <Film className="h-6 w-6 text-[#ff7398]" aria-hidden="true" />}
+                {poster ? <Image src={item.poster} alt={item.name} fill sizes="72px" className="object-cover" onError={() => {
+                  const id = String(item.id);
+                  setBrokenPosters((previous) => new Set(previous).add(id));
+                  if (metadataRepairAttempts.has(id)) return;
+                  setMetadataRepairAttempts((previous) => new Set(previous).add(id));
+                  void resolveAnimeMetadata(id).then((metadata) => {
+                    if (!metadata) return;
+                    setAnime((current) => current?.map((entry) => String(entry.id) === id ? {
+                      ...entry,
+                      name: isGenericTitle(entry.name) ? metadata.title || "Anime details unavailable" : entry.name,
+                      jname: isGenericTitle(entry.jname) ? metadata.title || entry.jname : entry.jname,
+                      poster: metadata.poster || entry.poster,
+                    } : entry) ?? null);
+                    if (metadata.poster) setBrokenPosters((previous) => {
+                      const next = new Set(previous);
+                      next.delete(id);
+                      return next;
+                    });
+                  });
+                }} /> : <Film className="h-6 w-6 text-[#ff7398]" aria-hidden="true" />}
                 <span className="absolute inset-0 grid place-items-center bg-black/0 text-white transition group-hover:bg-black/25"><Play className="h-6 w-6 opacity-0 drop-shadow group-hover:opacity-100" /></span>
               </div>
               <div className="min-w-0 flex-1">
