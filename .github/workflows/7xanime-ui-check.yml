@@ -44,9 +44,19 @@ jobs:
           cp .env.backend.example .env.backend
           docker compose config --quiet
 
+      - name: Reconcile lockfile with declared Capacitor dependencies
+        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+
+      - name: Upload reconciled lockfile for verification
+        uses: actions/upload-artifact@v4
+        with:
+          name: 7xanime-lockfile-sync
+          path: package-lock.json
+          if-no-files-found: error
+          retention-days: 2
+
       - name: Install dependencies
-        run: |
-          npm ci --prefer-offline --no-audit --no-fund
+        run: npm ci --prefer-offline --no-audit
 
       - name: Build static web bundle
         run: npm run build:android-web
