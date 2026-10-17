@@ -375,6 +375,64 @@ class LocalAnimeApiTests(unittest.TestCase):
         self.assertEqual(request_headers["Range"], "bytes=0-3")
         fake_client.send.assert_awaited_once()
 
+    def test_public_media_validator_rejects_private_dns_answers(self) -> None:
+        async def exercise() -> None:
+            fake_loop = Mock()
+            fake_loop.getaddrinfo = AsyncMock(
+                return_value=[
+                    (2, 1, 6, "", ("10.0.0.8", 443)),
+                    (2, 1, 6, "", ("93.184.216.34", 443)),
+                ]
+            )
+            with patch.object(local_api.asyncio, "get_running_loop", return_value=fake_loop):
+                with self.assertRaisesRegex(ValueError, "private or reserved"):
+                    await local_api._validated_public_remote_url("https://cdn.example/video.m3u8")
+            fake_loop.getaddrinfo.assert_awaited_once_with(
+                "cdn.example",
+                443,
+                type=local_api.socket.SOCK_STREAM,
+            )
+
+        asyncio.run(exercise())
+
+    def test_media_proxy_validates_redirect_targets_before_following(self) -> None:
+        class RedirectResponse:
+            is_success = False
+            status_code = 302
+            headers = {"location": "http://127.0.0.1/private"}
+            encoding = "utf-8"
+
+            async def aclose(self):
+                return None
+
+        fake_response = RedirectResponse()
+        fake_client = AsyncMock()
+        fake_client.build_request = Mock(return_value=object())
+        fake_client.send = AsyncMock(return_value=fake_response)
+
+        async def validate_target(value: str) -> str:
+            if "127.0.0.1" in value:
+                raise ValueError("Local network targets are not allowed")
+            return value
+
+        async def exercise() -> None:
+            with (
+                patch.object(local_api, "_get_media_http_client", return_value=fake_client),
+                patch.object(local_api, "_validated_public_remote_url", new=AsyncMock(side_effect=validate_target)),
+            ):
+                response = self.client.get(
+                    "/api/proxy",
+                    params={"url": "https://cdn.example/redirect.m3u8"},
+                    headers=self.auth,
+                )
+
+            self.assertEqual(response.status_code, 400, response.text)
+            self.assertIn("Local network targets", response.json()["detail"])
+            fake_client.send.assert_awaited_once()
+            fake_response.aclose.assert_awaited_once()
+
+        asyncio.run(exercise())
+
     def test_player_media_format_filter_accepts_hls_mp4_and_embed_but_not_dash(self) -> None:
         streams = [
             {"url": "https://cdn.example/video.mpd", "type": "dash"},
