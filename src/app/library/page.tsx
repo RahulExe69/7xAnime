@@ -68,7 +68,7 @@ export default function LibraryPage() {
       return [...latestByAnime.values()].map((item) => ({
         id: item.animeId,
         title: item.animeTitle || "Anime",
-        poster: item.poster || "/brand/7xanime-mark.svg",
+        poster: item.poster || "",
         episode: item.episodeNumber || 1,
         status: "watching",
         progress: {
@@ -87,7 +87,7 @@ export default function LibraryPage() {
       return {
         id: item.animeId,
         title: item.animeTitle || "Untitled anime",
-        poster: item.thumbnail || "/brand/7xanime-mark.svg",
+        poster: item.thumbnail || "",
         episode: latest?.episodeNumber || 1,
         status: normalizeStatus(item.status),
         progress: latest,
