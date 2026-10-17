@@ -282,6 +282,8 @@ jobs:
               raise SystemExit("Native video-ended callback is missing")
           if "advanceToNextEpisode" not in watch_section or "episode-" not in watch_section:
               raise SystemExit("Automatic next-episode routing is missing")
+          if 'useState<boolean>(() => isLocalBackendEnabled())' not in watch_section:
+              raise SystemExit("Android must start on Server 1 without requiring a manual server tap")
           if "aniembed:ended" not in watch_section or "lastWatchParamsRef.current = {" not in watch_section:
               raise SystemExit("Embedded ended events or mini-player episode state sync is missing")
           if "if (nativeCatalogueComplete && !catalogueEpisode)" not in watch_section:
