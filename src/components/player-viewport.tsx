@@ -482,8 +482,8 @@ export function PlayerViewport({
       if (!node) return;
 
       if (detail.phase === "start") {
-        const target = document.elementFromPoint(detail.startX, detail.startY);
-        if (!target || !node.contains(target)) {
+        const hitTarget = document.elementFromPoint(detail.startX, detail.startY);
+        if (!hitTarget || !node.contains(hitTarget)) {
           nativeSwipeRef.current = null;
           return;
         }
