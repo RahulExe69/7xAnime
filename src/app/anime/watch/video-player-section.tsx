@@ -13,7 +13,7 @@ import { useQuery } from "react-query";
 import { getHindiDubStreams } from "@/lib/hindi-dub";
 import { ArrowLeft, Captions, Mic, AlertCircle } from "lucide-react";
 import Link from "next/link";
-import { getProviderDisplayName, getServerProviderTitle, isProviderSelectable, KUHI_PROVIDER_ORDER } from "@/lib/server-map";
+import { getProviderDisplayName, getServerProviderTitle, isProviderSelectable, ACTIVE_EMBED_PROVIDER_ORDER } from "@/lib/server-map";
 import { Switch } from "@/components/ui/switch";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -452,8 +452,8 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
       // contribute a catalogue. On a detected failure, continue to the next
       // server automatically; SUB-only sources are switched to SUB explicitly.
       const orderedProviders = [
-        ...KUHI_PROVIDER_ORDER,
-        ...providerNames.filter((name) => !KUHI_PROVIDER_ORDER.includes(name as (typeof KUHI_PROVIDER_ORDER)[number])),
+        ...ACTIVE_EMBED_PROVIDER_ORDER,
+        ...providerNames.filter((name) => !ACTIVE_EMBED_PROVIDER_ORDER.includes(name as (typeof ACTIVE_EMBED_PROVIDER_ORDER)[number])),
       ];
       for (const providerName of orderedProviders) {
         const category = isProviderSelectable(providerName, preferredCategory)
