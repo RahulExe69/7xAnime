@@ -44,6 +44,30 @@ jobs:
           cp .env.backend.example .env.backend
           docker compose config --quiet
 
+      - name: Verify web media proxy safety and streaming contracts
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          proxy = Path("src/app/api/proxy/route.ts").read_text(encoding="utf-8")
+          required = {
+              "Node runtime for DNS validation": 'export const runtime = "nodejs"',
+              "dynamic response handling": 'export const dynamic = "force-dynamic"',
+              "manual redirect validation": 'redirect: "manual"',
+              "public IP validation": "isNonPublicAddress",
+              "DNS resolution checks": 'lookup(host, { all: true, verbatim: true })',
+              "range request forwarding": 'request.headers.get("range")',
+              "conditional range forwarding": 'request.headers.get("if-range")',
+              "streamed media response": "new NextResponse(response.body",
+          }
+          missing = [label for label, snippet in required.items() if snippet not in proxy]
+          if missing:
+              raise SystemExit(f"Web media proxy safeguards are missing: {missing}")
+          if "response.arrayBuffer()" in proxy:
+              raise SystemExit("Web media proxy must not buffer full media responses")
+          print("Web media proxy validation, redirect and streaming contracts passed.")
+          PY
+
       - name: Reconcile lockfile with declared Capacitor dependencies
         run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
 
