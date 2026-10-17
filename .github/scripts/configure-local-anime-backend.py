@@ -549,15 +549,13 @@ def copy_python_source() -> None:
     # Copy the independently authored extra adapters into the packaged provider tree.
     # AniXo and Megavid are manual-only embed servers; local_api.py excludes them
     # from Auto racing so a constructed iframe URL cannot masquerade as playback.
+    # Keep only the four manually supported embed adapters. MegaPlay is a
+    # dedicated iframe in the frontend and does not need a Python adapter.
     extra_providers = {
-        "animenosub": "android-local-backend/extra-providers/animenosub.py",
         "anixo": "android-local-backend/extra-providers/anixo.py",
         "megavid": "android-local-backend/extra-providers/megavid.py",
-        "animeparadise": "android-local-backend/extra-providers/animeparadise.py",
-        "megaflix": "android-local-backend/extra-providers/megaflix.py",
         "tryembed": "android-local-backend/extra-providers/tryembed.py",
         "cinexstream": "android-local-backend/extra-providers/cinexstream.py",
-        "nontongo": "android-local-backend/extra-providers/nontongo.py",
     }
     for provider_name, relative_path in extra_providers.items():
         extra_provider = ROOT / relative_path
@@ -608,17 +606,9 @@ def copy_python_source() -> None:
     ranking_match = re.search(r"(?s)RANKING\s*=\s*\[(.*?)\]", race_text)
     if not ranking_match:
         fail("Could not locate Kuhi's provider ranking.")
-    ranking_block = ranking_match.group(1)
-    if '"animenosub"' not in ranking_block:
-        if '"animeonsen"' not in ranking_block:
-            fail("Could not append AnimeNoSub to Kuhi's provider ranking.")
-        ranking_block = ranking_block.replace('"animeonsen"', '"animeonsen", "animenosub"', 1)
-
-    # These added adapters are selectable manually during verification; local_api.py
-    # excludes them from Auto so route construction cannot masquerade as playback.
-    for provider_name in ("anixo", "megavid", "animeparadise", "megaflix", "tryembed", "cinexstream", "nontongo"):
-        if f'"{provider_name}"' not in ranking_block:
-            ranking_block = ranking_block.rstrip().rstrip(",") + f', "{provider_name}"'
+    # Retire Kuhi's broad provider pool. Only these four embed adapters are
+    # registered; MegaPlay is the dedicated frontend fallback, not a Kuhi module.
+    ranking_block = '"anixo", "megavid", "tryembed", "cinexstream"'
     race_text = race_text[:ranking_match.start(1)] + ranking_block + race_text[ranking_match.end(1):]
 
     slow_cleanup = "await asyncio.wait(pending, timeout=8.0)"
@@ -643,6 +633,19 @@ def copy_python_source() -> None:
     elif "WATCH_TIMEOUT = 45.0" not in race_text:
         fail("Could not locate the upstream stream provider timeout.")
     race_file.write_text(race_text, encoding="utf-8")
+
+    # Keep the Kuhi API's catalogue/context helpers, but do not package its
+    # unrelated provider adapters. The active provider registry is exactly the
+    # four adapters above; this pruning also prevents dormant modules from being
+    # imported accidentally by future changes.
+    retained_provider_files = {
+        "__init__.py", "_race.py", "_match.py", "_media.py", "_cache.py",
+        "anixo.py", "megavid.py", "tryembed.py", "cinexstream.py",
+    }
+    provider_dir = destination_src / "providers"
+    for provider_file in provider_dir.glob("*.py"):
+        if provider_file.name not in retained_provider_files:
+            provider_file.unlink()
 
     shutil.copy2(local_api, PYTHON_ROOT / "local_api.py")
     shutil.copy2(requirements, PYTHON_ROOT / "requirements.txt")
