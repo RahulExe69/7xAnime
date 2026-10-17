@@ -275,6 +275,7 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
   const lastEmbedSignalAtRef = useRef(0);
   const embedPlaybackStateRef = useRef<"unknown" | "playing" | "paused">("unknown");
   const pauseAfterEmbedRecoveryRef = useRef(false);
+  const lastExplicitPauseAtRef = useRef(0);
   const externalEmbedFrameRef = useRef<HTMLIFrameElement | null>(null);
   const embedResumeTimersRef = useRef<number[]>([]);
 
@@ -302,23 +303,29 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
       : null;
     // A deliberate pause must survive recovery and a newly loaded embed. There
     // is no standard cross-origin pause API, so retry common commands while the
-    // provider initializes; never send a play/autoplay command.
+    // provider initializes; never send a play/autoplay command. When paused,
+    // avoid seeking (which can wake some embeds) and keep reasserting pause for
+    // longer than the providers' usual delayed startup/autoplay window.
     const shouldRemainPaused = pauseAfterEmbedRecoveryRef.current ||
       embedPlaybackStateRef.current === "paused";
     if (resumeTime === null && !shouldRemainPaused) return;
 
-    // Try after document load and again as the cross-origin player initializes.
-    // Seeking is optional; reasserting pause is important after a paused recovery.
     embedResumeTimersRef.current.forEach((timer) => window.clearTimeout(timer));
     embedResumeTimersRef.current = [];
     const frameAtSchedule = frame;
     const sourceAtSchedule = frame.src;
-    for (const delay of [0, 500, 1300, 2800]) {
+    const delays = shouldRemainPaused
+      ? [0, 500, 1300, 2800, 5000, 8000, 12000]
+      : [0, 500, 1300, 2800];
+    for (const delay of delays) {
       const timer = window.setTimeout(() => {
         if (externalEmbedFrameRef.current !== frameAtSchedule ||
             frameAtSchedule.src !== sourceAtSchedule) return;
-        if (resumeTime !== null) requestExternalPlayerSeek(frameAtSchedule, resumeTime);
-        if (shouldRemainPaused) requestExternalPlayerPause(frameAtSchedule);
+        if (shouldRemainPaused) {
+          requestExternalPlayerPause(frameAtSchedule);
+        } else if (resumeTime !== null) {
+          requestExternalPlayerSeek(frameAtSchedule, resumeTime);
+        }
       }, delay);
       embedResumeTimersRef.current.push(timer);
     }
@@ -1021,10 +1028,16 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
     // PiP is a visible playback session and may continue using normal recovery.
     if (isLocalBackendEnabled() && !appIsActive && !nativePipActive) return;
 
-    // If an actual error occurs during a deliberate pause, recover the source
-    // but make the new embed reassert pause instead of unexpectedly playing.
+    // A paused embed is not a stalled embed. Retrying this path remounts the
+    // cross-origin iframe, which loses its manual pause even if we send a later
+    // best-effort pause message. Ignore recovery signals until the provider
+    // explicitly reports playback again; reinforce pause on the existing frame.
     if (embedPlaybackStateRef.current === "paused") {
       pauseAfterEmbedRecoveryRef.current = true;
+      lastEmbedSignalAtRef.current = Date.now();
+      const pausedFrame = externalEmbedFrameRef.current;
+      if (pausedFrame) requestExternalPlayerPause(pausedFrame);
+      return;
     }
 
     const retryKey = `${activeEpisodeId}|${playbackSourceIndex}`;
@@ -1106,6 +1119,14 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
       blockedPlayerActionAtRef.current = { retryKey: playerRetryKey, at: now };
 
       const detail = (event as CustomEvent<{ reason?: string; host?: string }>).detail || {};
+      // Some embedded servers emit or trigger blocked actions while paused;
+      // never let these background signals reconnect a deliberately paused video.
+      if (embedPlaybackStateRef.current === "paused") {
+        lastEmbedSignalAtRef.current = now;
+        const pausedFrame = externalEmbedFrameRef.current;
+        if (pausedFrame) requestExternalPlayerPause(pausedFrame);
+        return;
+      }
       const reason = String(detail.reason || "blocked popup");
       const host = String(detail.host || "third-party player");
       // Blocked popups, JS dialogs and top-level redirects are recovery signals,
@@ -1179,7 +1200,11 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
       ) || status === "playing";
       if (reportedPaused) {
         embedPlaybackStateRef.current = "paused";
+        lastExplicitPauseAtRef.current = Date.now();
+        pauseAfterEmbedRecoveryRef.current = true;
         lastEmbedSignalAtRef.current = Date.now();
+        const pausedFrame = externalEmbedFrameRef.current;
+        if (pausedFrame) requestExternalPlayerPause(pausedFrame);
       } else if (reportedPlaying) {
         embedPlaybackStateRef.current = "playing";
         pauseAfterEmbedRecoveryRef.current = false;
