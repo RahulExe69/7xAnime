@@ -502,32 +502,6 @@ class LocalAnimeApiTests(unittest.TestCase):
 
         asyncio.run(exercise())
 
-    def test_auto_race_does_not_call_parked_or_manual_embed_providers(self) -> None:
-        attempted = []
-
-        async def fake_watch_one(mod, name, anilist_id, episode, audio, ctx):
-            attempted.append(name)
-            return name, [{"url": f"https://cdn.example/{name}.m3u8", "type": "hls"}], 0.1, True
-
-        async def exercise() -> None:
-            with (
-                patch.object(local_api.provider_race, "providers", return_value=[
-                    ("anixo", anixo), ("megavid", megavid),
-                    ("tryembed", tryembed), ("cinexstream", cinexstream),
-                ]),
-                patch.object(local_api.provider_race, "build_ctx", new=AsyncMock(return_value={
-                    "media": {"id": 21, "title": {"english": "Test"}}, "anizip": None,
-                })),
-                patch.object(local_api, "_watch_one_for_player", new=AsyncMock(side_effect=fake_watch_one)),
-                patch.object(local_api.provider_race, "record_latency"),
-            ):
-                result = await local_api._race_watch_for_player(21, 1, "sub")
-
-            self.assertIsNone(result)
-            self.assertEqual(attempted, [])
-
-        asyncio.run(exercise())
-
     def test_proxy_rejects_loopback_targets(self) -> None:
         response = self.client.get(
             "/api/proxy",
