@@ -29,6 +29,8 @@ export function PlayerViewport({
   const isWatchRoute = pathname === "/anime/watch" || pathname.startsWith("/anime/watch/");
   const isMiniPlayer = !isWatchRoute;
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [miniControlsVisible, setMiniControlsVisible] = useState(false);
+  const miniControlsTimerRef = useRef<number | null>(null);
   const isFullscreenRef = useRef(false);
   isFullscreenRef.current = isFullscreen;
 
@@ -56,6 +58,34 @@ export function PlayerViewport({
   const dispatchPlayerAction = useCallback((action: "expand-mini-player" | "minimize-player" | "close-mini-player") => {
     if (typeof window !== "undefined") window.dispatchEvent(new Event(`7xanime:${action}`));
   }, []);
+
+  const revealMiniControls = useCallback(() => {
+    if (!isMiniPlayer) return;
+    if (miniControlsTimerRef.current !== null) {
+      window.clearTimeout(miniControlsTimerRef.current);
+    }
+    setMiniControlsVisible(true);
+    miniControlsTimerRef.current = window.setTimeout(() => {
+      setMiniControlsVisible(false);
+      miniControlsTimerRef.current = null;
+    }, 3500);
+  }, [isMiniPlayer]);
+
+  useEffect(() => {
+    if (!isMiniPlayer) {
+      setMiniControlsVisible(false);
+      if (miniControlsTimerRef.current !== null) {
+        window.clearTimeout(miniControlsTimerRef.current);
+        miniControlsTimerRef.current = null;
+      }
+    }
+    return () => {
+      if (miniControlsTimerRef.current !== null) {
+        window.clearTimeout(miniControlsTimerRef.current);
+        miniControlsTimerRef.current = null;
+      }
+    };
+  }, [isMiniPlayer]);
 
   const handleVerticalSwipe = useCallback((deltaY: number) => {
     if (deltaY < 0) {
@@ -189,6 +219,19 @@ export function PlayerViewport({
         {children}
       </div>
 
+      {isMiniPlayer && (
+        <div
+          aria-label="Mini-player interaction shield"
+          data-mini-player-interaction-shield="true"
+          className="absolute inset-0 z-[10001] cursor-pointer bg-transparent"
+          onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            revealMiniControls();
+          }}
+        />
+      )}
+
       {Capacitor.isNativePlatform() && (
         <button
           type="button"
@@ -222,20 +265,21 @@ export function PlayerViewport({
       </button>
 
       {isMiniPlayer && (
-        <div className="pointer-events-none absolute inset-x-0 top-0 z-[10003] flex items-start justify-between gap-2 rounded-t-2xl bg-gradient-to-b from-black/90 via-black/35 to-transparent p-2 pb-5">
+        <div className={`pointer-events-none absolute inset-x-0 top-0 z-[10003] flex items-start justify-between gap-2 rounded-t-2xl bg-gradient-to-b from-black/90 via-black/35 to-transparent p-2 pb-5 transition-opacity duration-200 ${miniControlsVisible ? "opacity-100" : "opacity-0"}`}>
           <span className="min-w-0 flex-1 truncate pt-1 text-xs font-semibold text-white drop-shadow">{title.replace(/ video player$/i, "")}</span>
-          <div className="pointer-events-auto flex shrink-0 items-center gap-1">
+          <div className={`flex shrink-0 items-center gap-1 ${miniControlsVisible ? "pointer-events-auto" : "pointer-events-none"}`}>
             <button
               type="button"
               onPointerDown={(event) => event.stopPropagation()}
               onClick={(event) => {
                 event.preventDefault();
                 event.stopPropagation();
+                revealMiniControls();
                 dispatchPlayerAction("expand-mini-player");
               }}
               aria-label="Return to full player"
               title="Return to full player"
-              className="grid h-8 w-8 place-items-center rounded-lg border border-white/15 bg-black/65 text-white shadow-md backdrop-blur-sm"
+              className={`grid h-8 w-8 place-items-center rounded-lg border border-white/15 bg-black/65 text-white shadow-md backdrop-blur-sm transition-opacity ${miniControlsVisible ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"}`}
             >
               <Maximize2 size={16} />
             </button>
@@ -245,11 +289,12 @@ export function PlayerViewport({
               onClick={(event) => {
                 event.preventDefault();
                 event.stopPropagation();
+                revealMiniControls();
                 dispatchPlayerAction("close-mini-player");
               }}
               aria-label="Close mini-player"
               title="Close mini-player"
-              className="grid h-8 w-8 place-items-center rounded-lg border border-white/15 bg-black/65 text-white shadow-md backdrop-blur-sm"
+              className={`grid h-8 w-8 place-items-center rounded-lg border border-white/15 bg-black/65 text-white shadow-md backdrop-blur-sm transition-opacity ${miniControlsVisible ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"}`}
             >
               <X size={16} />
             </button>
