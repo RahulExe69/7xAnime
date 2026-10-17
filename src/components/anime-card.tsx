@@ -54,7 +54,7 @@ const AnimeCard = ({ displayDetails = true, variant = "sm", ...props }: Props) =
       props.className,
     )}>
       <div className="relative aspect-[2/3] w-full overflow-hidden bg-[#1b0710]">
-        <Image src={props.poster || "/brand/7xanime-mark.svg"} alt={props.title} fill sizes="(max-width: 640px) 42vw, (max-width: 1024px) 22vw, 180px" className="object-cover transition-transform duration-150 group-hover:scale-[1.02]" />
+        {props.poster ? <Image src={props.poster} alt={props.title} fill sizes="(max-width: 640px) 42vw, (max-width: 1024px) 22vw, 180px" className="object-cover transition-transform duration-150 group-hover:scale-[1.02]" /> : <div aria-hidden="true" className="absolute inset-0 bg-gradient-to-br from-[#351021] via-[#1b0a17] to-[#100b18]" />}
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#0a0306] via-[#0a0306]/10 to-black/20" />
         {score && <span className="absolute right-2 top-2 z-[5] inline-flex items-center gap-1 rounded-lg border border-white/10 bg-[#0a0306]/85 px-2 py-1 text-[11px] font-bold text-white shadow-sm backdrop-blur-sm"><span className="text-amber-300">★</span> {score}</span>}
         {props.episodeCard && !!props.episodes && !props.episodeLabel && <span className="absolute left-2 top-10 z-[5] rounded-lg border border-white/10 bg-[#0a0306]/85 px-2 py-1 text-[10px] font-bold text-white backdrop-blur-sm">EP {props.episodes}</span>}
