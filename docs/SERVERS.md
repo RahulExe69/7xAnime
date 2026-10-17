@@ -1,54 +1,45 @@
-# 7xAnime playback server guide
+# 7xAnime playback servers
 
-**Server 1 remains MegaPlay**, followed by manually selectable AniXo, Megavid, AnimeParadise, MegaFlix, TryEmbed, CinexStream, and NontonGo. MegaPlay, AniXo and Megavid are user-reported working on a tested title; the remaining manual routes still need real-device verification. Other Kuhi adapters remain parked. Auto excludes these manual-only choices.
+This is the source of truth for the providers 7xAnime is allowed to use. Keep this list aligned with `src/lib/server-map.ts`, `ACTIVE_PROVIDER_ORDER` in `android-local-backend/local_api.py`, and the adapter list in `.github/scripts/configure-local-anime-backend.py`.
 
-## New manual test servers
+## Active server list — exactly five
 
-- **AnimeParadise** — independent candidate using its documented JSON catalog and signed HLS stream endpoint. It is manual-only initially; selecting it triggers matching/resolution so the app does not scrape its API for every anime page. Sub only is exposed because the documented adapter supports subbed episodes.
-- **Yomi-derived routes** — the four manual URL adapters use the route patterns documented in [Wabsa-kh/yomi-anime-api](https://github.com/Wabsa-kh/yomi-anime-api): MegaFlix `/stream/ani/{AniListID}/{episode}/{sub|dub}`, TryEmbed `/embed/anime/{AniListID}/{episode}/{sub|dub}`, CinexStream `/api/embed/anime/{sub|dub}/{AniListID}/{episode}?color=7c6ee0`, and NontonGo `/anime/{AniListID}/{episode}/play`. These routes construct embeds; they are not proof of independently verified streams. NontonGo is sub-only.
-
-- **Shared Android ad filtering** — every configured embedded provider uses the same WebView interception layer and maintained filter lists; this is not restricted to Megavid. Provider-owned first-party ads and cosmetic HTML overlays can still evade request-level filtering.
-
-All four Yomi-derived routes and AnimeParadise are held out of automatic provider racing until real Android playback is verified. A module-loaded diagnostic only proves the Python adapter imported; it does not guarantee that a title or episode plays.
-
-## Numbered server labels
-
-The Android package still contains legacy adapter code, but the app exposes only the seven allowlisted manual selections below after Server 1. AnimeParadise is resolved only after explicit selection to avoid unnecessary searches; its HLS/signed-link flow still requires a phone playback check. Other Kuhi adapters are disabled at the app/backend allowlist and must not be contacted by episode discovery or playback. The active server map is:
-
-| Local rank | API provider key | Display name | Provider site |
+| Server | Provider | Implementation | Notes |
 |---:|---|---|---|
-| 1 | `megaplay` | MegaPlay (dedicated iframe) | https://megaplay.buzz |
-| 2 | `anixo` | AniXo (manual embed) | https://anixo.buzz |
-| 3 | `megavid` | Megavid (manual embed) | https://megavid.buzz |
-| 4 | `animeparadise` | AnimeParadise (manual HLS) | https://animeparadise.moe |
-| 5 | `megaflix` | MegaFlix (manual embed) | https://www.megaflix.buzz |
-| 6 | `tryembed` | TryEmbed (manual embed) | https://tryembed.us.cc |
-| 7 | `cinexstream` | CinexStream (manual embed) | https://cinextream.cc |
-| 8 | `nontongo` | NontonGo (sub-only manual embed) | https://nontongo.win |
+| 1 | **MegaPlay** | Dedicated frontend iframe at `https://megaplay.buzz/stream/ani/{AniListID}/{episode}/{sub-or-dub}` | Default Android playback and final fallback. No Python adapter. |
+| 2 | **AniXo** | `android-local-backend/extra-providers/anixo.py` | Manually selectable embed. |
+| 3 | **Megavid** | `android-local-backend/extra-providers/megavid.py` | Manually selectable embed. |
+| 4 | **TryEmbed** | `android-local-backend/extra-providers/tryembed.py` | Manually selectable embed. |
+| 5 | **CinexStream** | `android-local-backend/extra-providers/cinexstream.py` | Manually selectable embed. |
 
-For Sub/Dub, the UI filters providers by the selected audio type and media formats the player can use. The visible provider labels start at **Server 2** because Server 1 is reserved for MegaPlay. AniXo, Megavid, MegaFlix, TryEmbed, CinexStream, and NontonGo are manually selectable iframe endpoints; AnimeParadise returns HLS but stays manual-only during verification. A route response is not playback proof, and all seven choices after MegaPlay are deliberately excluded from Auto. A provider can be loaded but still have no stream for a particular anime/episode; diagnostics distinguish module-load, route/stream extraction, and observed player events. Providers stay in the chooser while retrying; after the retry budget is exhausted, failed providers are hidden from the chooser and the player advances to the next configured server, finally falling back to MegaPlay after candidates are exhausted. The **Try Auto again** action clears the current failed-provider set to test the pool afresh. A failed route or detected player failure is retried twice while preserving the latest available episode timestamp where the player reports one. Cross-origin HTML ad overlays may not emit failure signals or expose a safe close/seek API, so not every in-page ad can trigger switching or support timestamp restoration. Auto is not a parallel race over the manual iframe choices; it moves through the configured candidates sequentially and uses MegaPlay as final fallback. The same server number may refer to a different provider if the compatible provider set changes.
+These are the only supported playback choices. AniXo, Megavid, TryEmbed, and CinexStream construct cross-origin embed URLs; the parent app cannot guarantee the provider's playback controls, availability, or ad overlays. A module loading or URL being returned does not prove an episode plays. Test actual playback on Android before claiming reliability.
 
-## Hindi dub catalogue
+## Provider architecture and Auto
 
-The Hindi button uses the community project [ZeroTwo-Py/anime-api](https://github.com/ZeroTwo-Py/anime-api), which documents search at `/api/search?s={title}&page=1` and embedded stream results at `/api/stream?id={slug}&season={season}&ep={episode}`. The APK calls the catalogue through fixed, token-protected local routes; the web build calls its public API endpoint directly. Stream results are third-party embeds, not a direct stream guaranteed to work on every device.
+The Android APK still uses a small part of the pinned Kuhi API project for its existing catalogue endpoints and shared AniList/AniZip context helpers. **Kuhi's broad provider catalogue is not an active source pool.** The build rewrites its provider ranking to exactly `anixo`, `megavid`, `tryembed`, and `cinexstream`, then removes all other provider modules from the packaged provider directory. This keeps the shared backend infrastructure while avoiding the unstable, unused Kuhi provider adapters.
 
-While Hindi mode is active, its first available Hindi embed is **Server 1**, followed by Server 2, Server 3, etc. Hindi mode has its own server list, so these numbers refer only to the Hindi embeds. When you return to SUB/ENGLISH, Server 1 is MegaPlay again and the upstream providers start at Server 2.
+The four active adapters are iframe routes, not independent direct-media extractors, so they are excluded from the direct-stream Auto race. On Android, opening an anime should start MegaPlay Server 1. If playback fails, the app may try the four supported manual embeds in order before returning to MegaPlay. Do not route a fresh anime open through the Kuhi Auto endpoint.
 
-Hindi titles and episodes are not available in that catalogue for every series. A missing title/episode, blocked embed, or provider outage is reported in the player; regular Sub/Dub and Server 1 remain available. No reliable Urdu-specific episode/stream endpoint was verified during this research, so the app does not label any source as Urdu.
+## Retired providers — do not re-add without a deliberate review
 
-## Fallback URL
+The following provider adapters were removed from the supported list and are pruned from the Android APK:
 
-Server 1 currently opens:
+- **AnimeParadise** — removed; its direct HLS/signed-link integration was not part of the stable five-server set.
+- **MegaFlix** — removed; not part of the desired active five.
+- **NontonGo** — removed; not part of the desired active five.
+- **AnimeNoSub** — removed; unrelated embed/catalogue adapter.
+- **Legacy Kuhi providers** such as AniNeko, AniZone, AniKoto, ReAnime, AniWaves, KAA, AniBD, AnimeGG, Mkissa, and AnimeOnsen — not packaged or selectable.
 
-`https://megaplay.buzz/stream/ani/{anilistId}/{episodeNumber}/{sub-or-dub}`
+Do not add retired providers back to `src/lib/server-map.ts`, `ACTIVE_PROVIDER_ORDER`, the extra-adapter copy map, or the provider ranking in the build script unless the provider is deliberately re-evaluated and tested on a real Android device. Research-only candidates belong in a research document, not the runtime provider registry.
 
-The iframe progress listener also recognises messages from MegaCloud. Kuhi's pinned source remains in the repository for later research, but it is currently parked: local diagnostics and watch routes allow only AniXo, Megavid, AnimeParadise, MegaFlix, TryEmbed, CinexStream, and NontonGo; background episode discovery skips AnimeParadise until a user selects it. Frontend labels/audio-format capability metadata are kept in `src/lib/server-map.ts`.
+## Hindi dub
 
-## Updating the map
+Hindi dub remains a separate feature using the community `ZeroTwo-Py/anime-api` catalogue through the fixed `/hindi/search` and `/hindi/stream` routes. Its third-party embeds are separate from the five standard SUB/ENGLISH servers; do not mix Hindi server numbering with the standard server list.
 
-When updating the bundled Kuhi revision, compare its `src/providers/_race.py` `RANKING` list with `KUHI_PROVIDER_ORDER` in `src/lib/server-map.ts`, then test a series with many providers and one with partial provider availability.
+## Testing checklist
 
-
-## Player UX and ad filtering
-
-Android uses a conservative known-ad-domain request filter, blocks pop-up windows and remote JS alert/confirm/prompt dialogs, and keeps external top-level navigation blocked. It cannot reliably remove HTML overlays served by the provider itself. The player viewport provides native fullscreen/landscape, app-owned swipe gestures and double-tap ±10-second seeking for the app-owned ArtPlayer player; cross-origin embeds may retain provider-owned gesture behaviour. See [PLAYER-MARATHON.md](PLAYER-MARATHON.md) for scope and physical-device test checklist.
+- Verify that the frontend map and Android `ACTIVE_PROVIDER_ORDER` contain only AniXo, Megavid, TryEmbed, and CinexStream.
+- Verify that the generated APK provider registry contains exactly those four adapters and none of the retired modules.
+- Verify a fresh anime open uses MegaPlay Server 1 without displaying a Kuhi Auto retry screen.
+- Verify each manual embed on a physical Android device for sub and dub where supported.
+- Treat cross-origin provider controls and in-page overlays as provider-owned; the app can filter network requests and block popups but cannot reliably rewrite the provider's internal HUD.
