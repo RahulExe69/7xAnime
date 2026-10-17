@@ -764,7 +764,7 @@ def install_player_swipe_observer(main_activity: Path) -> None:
                     // start over the active player; ordinary page scrolling isn't
                     // sent through evaluateJavascript on every move.
                     webView.evaluateJavascript("(function(){var t=document.elementFromPoint("
-                        + cssX + "," + cssY + ");return !!(t&&t.closest&&t.closest('[data-player-viewport=true]'));})()",
+                        + cssX + "," + cssY + ");return !!(t&&t.tagName==='IFRAME'&&t.closest('[data-player-viewport=true]'));})()",
                         value -> {
                             if (token == gestureToken && value != null && value.equals("true")) {
                                 trackingPlayerGesture = true;
