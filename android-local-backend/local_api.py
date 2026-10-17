@@ -820,7 +820,7 @@ async def local_media_proxy(request: Request, url: str, referer: str = ""):
                 continue
             prefix_chunks.append(chunk)
             prefix.extend(chunk)
-            if b"\\n" in prefix and prefix.lstrip().startswith(b"#EXTM3U"):
+            if b"\n" in prefix and prefix.lstrip().startswith(b"#EXTM3U"):
                 break
 
         is_manifest = (
@@ -878,7 +878,7 @@ async def local_media_proxy(request: Request, url: str, referer: str = ""):
                 else:
                     rewritten.append(line)
             return Response(
-                content="\\n".join(rewritten),
+                content="\n".join(rewritten),
                 media_type="application/vnd.apple.mpegurl",
                 headers={"Cache-Control": "no-store"},
             )
