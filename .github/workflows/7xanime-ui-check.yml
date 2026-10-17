@@ -46,8 +46,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          npm install --package-lock-only --ignore-scripts --no-audit --no-fund
-          npm ci --prefer-offline --no-audit
+          npm ci --prefer-offline --no-audit --no-fund
 
       - name: Build static web bundle
         run: npm run build:android-web
