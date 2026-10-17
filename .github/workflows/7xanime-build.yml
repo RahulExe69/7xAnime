@@ -4,6 +4,7 @@ on:
   pull_request:
     branches:
       - master
+      - fix/player-embed-pip-background
   workflow_dispatch:
     inputs:
       build_type:
