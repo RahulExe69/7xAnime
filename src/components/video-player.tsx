@@ -88,6 +88,10 @@ function VideoPlayer({
   const watchHistoryIdsRef = useRef<string[]>([]); // Store initial list
   const watchedRecordIdRef = useRef<string | null>(null);
   const updateTimerRef = useRef<NodeJS.Timeout | null>(null);
+  // Coalesce rapid pause/seek/timeupdate callbacks so PocketBase never receives
+  // concurrent progress writes for the same player.
+  const progressSyncInFlightRef = useRef<Promise<string | null> | null>(null);
+  const pendingProgressRef = useRef<{ current: number; duration: number } | null>(null);
   const lastUpdateTimeRef = useRef<number>(0);
   const hasMetMinWatchTimeRef = useRef<boolean>(false); // Track if min time met for this episode
   const initialSeekTimeRef = useRef<number | null>(null);
@@ -119,12 +123,43 @@ function VideoPlayer({
       return Promise.resolve(null);
     }
 
-    return syncWatchProgress(bookmarkIdRef.current, watchedRecordIdRef.current, {
+    // If a save is already running, remember only the newest position. A small
+    // pending slot preserves the final seek/pause position without spawning
+    // multiple overlapping network requests for one episode.
+    if (progressSyncInFlightRef.current) {
+      pendingProgressRef.current = { current, duration };
+      return progressSyncInFlightRef.current;
+    }
+
+    const request = syncWatchProgress(bookmarkIdRef.current, watchedRecordIdRef.current, {
       episodeId: currentServersData.episodeId,
       episodeNumber,
       current,
       duration,
     });
+
+    let trackedRequest: Promise<string | null>;
+    trackedRequest = request
+      .then((recordId) => {
+        if (recordId) watchedRecordIdRef.current = recordId;
+        return recordId;
+      })
+      .finally(() => {
+        if (progressSyncInFlightRef.current === trackedRequest) {
+          progressSyncInFlightRef.current = null;
+        }
+
+        const pending = pendingProgressRef.current;
+        pendingProgressRef.current = null;
+        if (pending) {
+          void persistWatchProgress(pending.current, pending.duration).catch((error) => {
+            console.error("Error syncing coalesced watch progress:", error);
+          });
+        }
+      });
+
+    progressSyncInFlightRef.current = trackedRequest;
+    return trackedRequest;
   };
 
   useEffect(() => {
