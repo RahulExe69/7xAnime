@@ -17,7 +17,7 @@ import { Button } from "./ui/button";
 type WatchedAnime = IAnime & { episode: WatchHistory | string };
 
 const isGenericTitle = (value?: string | null) =>
-  !value?.trim() || /^(anime|untitled|continue watching|unknown anime|anime details unavailable)$/i.test(value.trim());
+  !value?.trim() || /^(anime|untitled|continue watching|unknown anime|loading anime details…|anime details unavailable)$/i.test(value.trim());
 
 const isBrandArtwork = (value?: string | null) => {
   if (!value?.trim()) return true;
