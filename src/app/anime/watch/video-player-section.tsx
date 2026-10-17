@@ -708,7 +708,6 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
 
   const handleCategoryChange = (cat: "sub" | "dub") => {
     setIsHindiMode(false);
-    setUseFallback(false);
     setPreferredCategory(cat);
     localStorage.setItem("preferredAudio", cat);
 
@@ -725,14 +724,17 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
       : undefined;
     const targetId = target?.id || (isLocalBackendEnabled() && preferredProvider
       ? `watch/${preferredProvider}/${animeIdParam}/${cat}/${preferredProvider}-${currentEpNumber}`
-      : isLocalBackendEnabled()
-        ? `watch/auto/${animeIdParam}/${cat}/episode-${currentEpNumber}`
-        : "");
+      : "");
 
     if (targetId) {
+      setUseFallback(false);
       attemptedSourceIdsRef.current.delete(targetId);
       setSelectedEpisode(targetId);
       updateEpisodeUrl(targetId, currentEpNumber);
+    } else {
+      // No supported embed advertises this audio track; keep playback on
+      // MegaPlay instead of routing the request into the retired Kuhi Auto pool.
+      setUseFallback(isLocalBackendEnabled());
     }
   };
 
