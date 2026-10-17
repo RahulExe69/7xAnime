@@ -55,6 +55,20 @@ export function PlayerViewport({
   const isFullscreenRef = useRef(false);
   isFullscreenRef.current = isFullscreen;
 
+  // Embedded providers now own their visible fullscreen/PiP controls. These
+  // native helpers remain for the app's existing swipe-to-fullscreen gestures.
+  const enterFullscreen = useCallback(async () => {
+    if (isFullscreen) return;
+    setIsFullscreen(true);
+    await enterNativePlayerFullscreen();
+  }, [isFullscreen]);
+
+  const exitFullscreen = useCallback(async () => {
+    if (!isFullscreen) return;
+    setIsFullscreen(false);
+    await exitNativePlayerFullscreen();
+  }, [isFullscreen]);
+
   const updateMiniOffset = useCallback((next: { x: number; y: number }) => {
     const normalized = {
       x: Number.isFinite(next.x) ? next.x : 0,
