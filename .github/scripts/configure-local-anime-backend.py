@@ -574,13 +574,13 @@ def copy_python_source() -> None:
     # unrelated provider adapters. The active provider registry is exactly the
     # four adapters above; this pruning also prevents dormant modules from being
     # imported accidentally by future changes.
-    retained_provider_files = {
-        "__init__.py", "_race.py", "_match.py", "_media.py", "_cache.py",
-        "anixo.py", "megavid.py", "tryembed.py", "cinexstream.py",
-    }
+    active_provider_names = set(extra_providers)
     provider_dir = destination_src / "providers"
     for provider_file in provider_dir.glob("*.py"):
-        if provider_file.name not in retained_provider_files:
+        # Underscore-prefixed files are shared backend helpers, not provider
+        # adapters. Keep them because the four maintained adapters depend on
+        # common HTTP, matching, cache, and media utilities.
+        if not provider_file.name.startswith("_") and provider_file.stem not in active_provider_names:
             provider_file.unlink()
 
     shutil.copy2(local_api, PYTHON_ROOT / "local_api.py")
