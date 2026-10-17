@@ -84,12 +84,18 @@ jobs:
               "tap-to-show mini-player controls": "revealMiniControls();",
               "temporary mini-player controls": "}, 3500);",
               "initially hidden mini-player controls": 'miniControlsVisible ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"',
+              "animated player geometry transition": "node.animate([",
+              "mini-player drag start": "const startMiniDrag = useCallback(",
+              "mini-player drag movement": "const moveMiniPlayer = useCallback(",
+              "mini-player offset transform": "--mini-player-offset",
           }
           player_required = {
               "explicit provider pause detection": "const reportedPaused = eventNames.some(",
               "paused-state watchdog guard": 'if (embedPlaybackStateRef.current === "paused")',
               "pause preservation during recovery": "pauseAfterEmbedRecoveryRef.current = true;",
               "post-recovery pause command": "requestExternalPlayerPause(frameAtSchedule)",
+              "paused-player errors cannot trigger reconnects": "const pausedFrame = externalEmbedFrameRef.current;",
+              "explicit pause timestamp": "lastExplicitPauseAtRef.current = Date.now();",
           }
           missing_viewport = [label for label, snippet in viewport_required.items() if snippet not in viewport]
           missing_player = [label for label, snippet in player_required.items() if snippet not in player]
