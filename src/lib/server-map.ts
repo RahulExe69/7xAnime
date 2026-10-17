@@ -7,39 +7,31 @@ export type ProviderInfo = {
   formats: readonly ("hls" | "mp4" | "embed" | "dash")[];
 };
 
-/** Explicitly selectable manual sources. AnimeParadise is a direct HLS
- * candidate awaiting device verification. Manual embed sources remain outside Auto.
+/**
+ * Supported manual embed providers. MegaPlay is implemented as the dedicated
+ * Server 1 iframe in VideoPlayerSection and has no Python provider module.
+ *
+ * Keep this list aligned with ACTIVE_PROVIDER_ORDER in android-local-backend/local_api.py
+ * and the four adapters copied by .github/scripts/configure-local-anime-backend.py.
+ * Retired provider names intentionally do not appear here; see docs/SERVERS.md.
  */
-export const DISABLED_PROVIDER_NAMES = new Set(["animeparadise", "megaflix", "nontongo"]);
 export const KUHI_PROVIDER_ORDER = ["anixo", "megavid", "tryembed", "cinexstream"] as const;
 
-/**
- * Explicitly supported manual player/embed routes. These are advertised audio/format
- * capabilities, not a guarantee that every title or episode plays. The four Yomi-derived
- * adapters construct iframe URLs and are not treated as direct stream extractors.
- */
 export const PROVIDER_INFO: Record<string, ProviderInfo> = {
   anixo: { name: "AniXo", site: "https://anixo.buzz", audio: ["sub", "dub"], formats: ["embed"] },
   megavid: { name: "Megavid", site: "https://megavid.buzz", audio: ["sub", "dub"], formats: ["embed"] },
-  animeparadise: { name: "AnimeParadise", site: "https://animeparadise.moe", audio: ["sub"], formats: ["hls"] },
-  megaflix: { name: "MegaFlix", site: "https://www.megaflix.buzz", audio: ["sub", "dub"], formats: ["embed"] },
   tryembed: { name: "TryEmbed", site: "https://tryembed.us.cc", audio: ["sub", "dub"], formats: ["embed"] },
   cinexstream: { name: "CinexStream", site: "https://cinextream.cc", audio: ["sub", "dub"], formats: ["embed"] },
-  nontongo: { name: "NontonGo", site: "https://nontongo.win", audio: ["sub"], formats: ["embed"] },
 };
 
 export const isProviderSelectable = (providerName: string, category: ProviderAudio): boolean => {
-  const normalized = providerName.toLowerCase();
-  if (DISABLED_PROVIDER_NAMES.has(normalized)) return false;
-  const provider = PROVIDER_INFO[normalized];
-  if (!provider) return true;
+  const provider = PROVIDER_INFO[providerName.toLowerCase()];
+  if (!provider) return providerName.toLowerCase() === "auto";
   return provider.audio.includes(category) && provider.formats.some((format) => format !== "dash");
 };
 
 export const getServerLabel = (providerNames: string[], providerName: string): string => {
   const index = providerNames.indexOf(providerName);
-  // If the episode list came from the API metadata fallback, the "auto" route
-  // tries the provider race; it is the only visible route until provider data resolves.
   if (index >= 0) return `Server ${index + 2}`;
   return providerName.toLowerCase() === "auto" ? "Automatic server selection" : "Unnumbered provider";
 };
@@ -59,6 +51,6 @@ export const getServerProviderTitle = (providerNames: string[], providerName: st
   const label = getServerLabel(providerNames, providerName);
   const provider = PROVIDER_INFO[providerName.toLowerCase()];
   if (provider) return `${label} — ${provider.name} (${provider.site})`;
-  if (providerName.toLowerCase() === "auto") return `${label} — automatic Kuhi provider routing`;
+  if (providerName.toLowerCase() === "auto") return `${label} — automatic stream selection`;
   return `${label} — ${providerName || "unidentified provider"}`;
 };
