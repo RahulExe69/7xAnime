@@ -79,6 +79,23 @@ export function PlayerViewport({
     }
   }, []);
 
+  const requestEmbeddedControlsVisible = useCallback(() => {
+    const frame = rootRef.current?.querySelector("iframe");
+    const target = frame?.contentWindow;
+    if (!target) return;
+    const commands = [
+      { event: "controls", enabled: true, visible: true, value: true },
+      { type: "controls", enabled: true, visible: true, value: true },
+      { action: "show-controls" },
+      { method: "setControls", value: true },
+      { event: "command", func: "setControls", args: [true] },
+      { controls: true },
+    ];
+    for (const command of commands) {
+      try { target.postMessage(command, "*"); } catch { /* provider ignored */ }
+    }
+  }, []);
+
   const revealMiniControls = useCallback(() => {
     if (!isMiniPlayer) return;
     requestEmbeddedControlsHidden();
@@ -94,6 +111,7 @@ export function PlayerViewport({
 
   useEffect(() => {
     if (!isMiniPlayer) {
+      requestEmbeddedControlsVisible();
       setMiniControlsVisible(false);
       if (miniControlsTimerRef.current !== null) {
         window.clearTimeout(miniControlsTimerRef.current);
@@ -106,7 +124,7 @@ export function PlayerViewport({
         miniControlsTimerRef.current = null;
       }
     };
-  }, [isMiniPlayer]);
+  }, [isMiniPlayer, requestEmbeddedControlsVisible]);
 
   useEffect(() => {
     if (!isMiniPlayer) return;
