@@ -90,6 +90,25 @@ const requestExternalPlayerSeek = (frame: HTMLIFrameElement, seconds: number) =>
   }
 };
 
+// Third-party embeds have no universal pause API, so recovery uses several
+// common postMessage shapes. Unsupported messages are safely ignored by providers.
+const requestExternalPlayerPause = (frame: HTMLIFrameElement) => {
+  const target = frame.contentWindow;
+  if (!target) return;
+  const commands = [
+    { event: "pause" },
+    { type: "pause" },
+    { action: "pause" },
+    { method: "pause" },
+    { command: "pause" },
+    { event: "command", func: "pauseVideo", args: [] },
+    { func: "pauseVideo", args: [] },
+  ];
+  for (const command of commands) {
+    try { target.postMessage(command, "*"); } catch { /* provider ignored */ }
+  }
+};
+
 const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
   const searchParams = useSearchParams();
   const liveAnimeIdParam = searchParams.get("anime") || "";
@@ -258,6 +277,8 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
   } | null>(null);
   const embedLoadStartedAtRef = useRef(0);
   const lastEmbedSignalAtRef = useRef(0);
+  const embedPlaybackStateRef = useRef<"unknown" | "playing" | "paused">("unknown");
+  const pauseAfterEmbedRecoveryRef = useRef(false);
   const externalEmbedFrameRef = useRef<HTMLIFrameElement | null>(null);
   const embedResumeTimersRef = useRef<number[]>([]);
 
@@ -279,11 +300,19 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
           )
         : null
     );
-    if (!progress || progress.current < 5 || progress.duration <= 0 ||
-        progress.current >= progress.duration - 15) return;
+    const resumeTime = progress && progress.current >= 5 && progress.duration > 0 &&
+      progress.current < progress.duration - 15
+      ? progress.current
+      : null;
+    // A deliberate pause must survive recovery and a newly loaded embed. There
+    // is no standard cross-origin pause API, so retry common commands while the
+    // provider initializes; never send a play/autoplay command.
+    const shouldRemainPaused = pauseAfterEmbedRecoveryRef.current ||
+      embedPlaybackStateRef.current === "paused";
+    if (resumeTime === null && !shouldRemainPaused) return;
 
-    // Try after the document load and again as the cross-origin player finishes
-    // initializing. A provider can accept seek messages only after its API is ready.
+    // Try after document load and again as the cross-origin player initializes.
+    // Seeking is optional; reasserting pause is important after a paused recovery.
     embedResumeTimersRef.current.forEach((timer) => window.clearTimeout(timer));
     embedResumeTimersRef.current = [];
     const frameAtSchedule = frame;
@@ -292,7 +321,8 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
       const timer = window.setTimeout(() => {
         if (externalEmbedFrameRef.current !== frameAtSchedule ||
             frameAtSchedule.src !== sourceAtSchedule) return;
-        requestExternalPlayerSeek(frameAtSchedule, progress.current);
+        if (resumeTime !== null) requestExternalPlayerSeek(frameAtSchedule, resumeTime);
+        if (shouldRemainPaused) requestExternalPlayerPause(frameAtSchedule);
       }, delay);
       embedResumeTimersRef.current.push(timer);
     }
@@ -302,6 +332,12 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
     embedResumeTimersRef.current.forEach((timer) => window.clearTimeout(timer));
     embedResumeTimersRef.current = [];
   }, []);
+
+  useEffect(() => {
+    // Paused/playing state belongs to an episode, not to the next one.
+    embedPlaybackStateRef.current = "unknown";
+    pauseAfterEmbedRecoveryRef.current = false;
+  }, [activeEpisodeId]);
 
   const flushLatestEmbedProgress = useCallback(() => {
     const latest = lastEmbedProgressRef.current;
@@ -1039,6 +1075,12 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
     // PiP is a visible playback session and may continue using normal recovery.
     if (isLocalBackendEnabled() && !appIsActive && !nativePipActive) return;
 
+    // If an actual error occurs during a deliberate pause, recover the source
+    // but make the new embed reassert pause instead of unexpectedly playing.
+    if (embedPlaybackStateRef.current === "paused") {
+      pauseAfterEmbedRecoveryRef.current = true;
+    }
+
     const retryKey = `${activeEpisodeId}|${playbackSourceIndex}`;
     if (playbackRetriesRef.current.key !== retryKey) {
       playbackRetriesRef.current = { key: retryKey, count: 0 };
@@ -1183,6 +1225,20 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
       const eventType = eventNames[0] || "";
       const status = normalizeEventName(payload.status);
       const failed = eventType.includes("error") || status === "error";
+      const reportedPaused = eventNames.some((name) =>
+        name === "pause" || name === "paused" || name.endsWith(":pause") || name.endsWith(":paused")
+      ) || status === "paused";
+      const reportedPlaying = eventNames.some((name) =>
+        name === "play" || name === "playing" || name.endsWith(":play") || name.endsWith(":playing")
+      ) || status === "playing";
+      if (reportedPaused) {
+        embedPlaybackStateRef.current = "paused";
+        lastEmbedSignalAtRef.current = Date.now();
+      } else if (reportedPlaying) {
+        embedPlaybackStateRef.current = "playing";
+        pauseAfterEmbedRecoveryRef.current = false;
+        lastEmbedSignalAtRef.current = Date.now();
+      }
 
       // Providers disagree on which field carries the ended signal and how
       // they spell it (event/type/action, camelCase, spaces or underscores).
@@ -1266,6 +1322,14 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
     embedLoadStartedAtRef.current = Date.now();
     lastEmbedSignalAtRef.current = 0;
     const interval = window.setInterval(() => {
+      if (embedPlaybackStateRef.current === "paused") {
+        // A paused episode is intentionally not advancing. Do not misclassify
+        // silence from a paused iframe as a dead stream and remount it.
+        const now = Date.now();
+        embedLoadStartedAtRef.current = now;
+        lastEmbedSignalAtRef.current = now;
+        return;
+      }
       const lastSignal = Math.max(embedLoadStartedAtRef.current, lastEmbedSignalAtRef.current);
       const stallTimeoutMs = observedEmbedProvider === "tryembed" ? 8000 : 18000;
       if (Date.now() - lastSignal < stallTimeoutMs) return;
