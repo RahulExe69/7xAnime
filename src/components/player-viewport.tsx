@@ -4,8 +4,8 @@ import React, { PointerEvent, ReactNode, useCallback, useEffect, useLayoutEffect
 import { App } from "@capacitor/app";
 import { Capacitor } from "@capacitor/core";
 import { usePathname } from "next/navigation";
-import { Maximize2, Minimize2, PictureInPicture, X } from "lucide-react";
-import { enterNativePictureInPicture, enterNativePlayerFullscreen, exitNativePlayerFullscreen } from "@/lib/native-player-fullscreen";
+import { X } from "lucide-react";
+import { enterNativePlayerFullscreen, exitNativePlayerFullscreen } from "@/lib/native-player-fullscreen";
 
 type PlayerViewportProps = {
   children: ReactNode;
@@ -148,26 +148,6 @@ export function PlayerViewport({
     };
   }, [isMiniPlayer, isFullscreen]);
 
-  const enterFullscreen = useCallback(async () => {
-    if (isFullscreen) return;
-    setIsFullscreen(true);
-    await enterNativePlayerFullscreen();
-  }, [isFullscreen]);
-
-  const exitFullscreen = useCallback(async () => {
-    if (!isFullscreen) return;
-    setIsFullscreen(false);
-    await exitNativePlayerFullscreen();
-  }, [isFullscreen]);
-
-  const toggleFullscreen = useCallback(() => {
-    if (isFullscreen) void exitFullscreen();
-    else void enterFullscreen();
-  }, [enterFullscreen, exitFullscreen, isFullscreen]);
-
-  const enterPictureInPicture = useCallback(() => {
-    void enterNativePictureInPicture();
-  }, []);
 
   const dispatchPlayerAction = useCallback((action: "expand-mini-player" | "minimize-player" | "close-mini-player") => {
     if (typeof window !== "undefined") window.dispatchEvent(new Event(`7xanime:${action}`));
@@ -499,38 +479,6 @@ export function PlayerViewport({
           }}
         />
       )}
-
-      {Capacitor.isNativePlatform() && (
-        <button
-          type="button"
-          onPointerDown={(event) => event.stopPropagation()}
-          onClick={(event) => {
-            event.preventDefault();
-            event.stopPropagation();
-            enterPictureInPicture();
-          }}
-          title="Picture-in-picture"
-          aria-label="Picture-in-picture"
-          className={`absolute right-14 top-2 z-[10002] flex h-10 w-10 items-center justify-center rounded-xl border border-white/15 bg-black/65 text-white shadow-lg backdrop-blur-sm transition hover:bg-black/85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-400 ${isMiniPlayer ? "hidden" : ""}`}
-        >
-          <PictureInPicture size={18} />
-        </button>
-      )}
-
-      <button
-        type="button"
-        onPointerDown={(event) => event.stopPropagation()}
-        onClick={(event) => {
-          event.preventDefault();
-          event.stopPropagation();
-          toggleFullscreen();
-        }}
-        title={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
-        aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
-        className={`absolute right-2 top-2 z-[10002] flex h-10 w-10 items-center justify-center rounded-xl border border-white/15 bg-black/65 text-white shadow-lg backdrop-blur-sm transition hover:bg-black/85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-400 ${isMiniPlayer ? "hidden" : ""}`}
-      >
-        {isFullscreen ? <Minimize2 size={19} /> : <Maximize2 size={19} />}
-      </button>
 
       {isMiniPlayer && (
         <>
