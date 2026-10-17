@@ -34,6 +34,14 @@ jobs:
           node-version: 22
           cache: npm
 
+      - name: Restore Next.js build cache
+        uses: actions/cache@v4
+        with:
+          path: .next/cache
+          key: ${{ runner.os }}-nextjs-${{ hashFiles('package-lock.json') }}-${{ github.ref }}
+          restore-keys: |
+            ${{ runner.os }}-nextjs-${{ hashFiles('package-lock.json') }}-
+
       - name: Validate backend bootstrap scripts
         run: |
           python3 -m py_compile pocketbase/init-collections.py .github/scripts/configure-capacitor-android.py .github/scripts/configure-local-anime-backend.py .github/scripts/configure-release-signing.py android-local-backend/local_api.py
