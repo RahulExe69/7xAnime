@@ -60,6 +60,15 @@ jobs:
           node-version: 22
           cache: npm
 
+      - name: Restore Next.js build cache
+        uses: actions/cache@v4
+        with:
+          path: .next/cache
+          key: ${{ runner.os }}-nextjs-${{ hashFiles('package-lock.json') }}-${{ github.ref }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-nextjs-${{ hashFiles('package-lock.json') }}-${{ github.ref }}-
+            ${{ runner.os }}-nextjs-${{ hashFiles('package-lock.json') }}-
+
       - name: Setup Python 3.11
         uses: actions/setup-python@v5
         with:
@@ -110,8 +119,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          npm install --package-lock-only --ignore-scripts --no-audit --no-fund
-          npm ci --prefer-offline --no-audit
+          npm ci --prefer-offline --no-audit --no-fund
 
       - name: Build static web bundle
         run: npm run build:android-web

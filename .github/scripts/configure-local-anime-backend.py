@@ -546,18 +546,13 @@ def copy_python_source() -> None:
         shutil.rmtree(destination_src)
     shutil.copytree(source_dir / "src", destination_src)
 
-    # Copy the independently authored extra adapters into the packaged provider tree.
-    # AniXo and Megavid are manual-only embed servers; local_api.py excludes them
-    # from Auto racing so a constructed iframe URL cannot masquerade as playback.
+    # Copy only the four supported embed adapters into the packaged provider tree.
+    # MegaPlay is a dedicated frontend iframe and does not need a Python adapter.
     extra_providers = {
-        "animenosub": "android-local-backend/extra-providers/animenosub.py",
         "anixo": "android-local-backend/extra-providers/anixo.py",
         "megavid": "android-local-backend/extra-providers/megavid.py",
-        "animeparadise": "android-local-backend/extra-providers/animeparadise.py",
-        "megaflix": "android-local-backend/extra-providers/megaflix.py",
         "tryembed": "android-local-backend/extra-providers/tryembed.py",
         "cinexstream": "android-local-backend/extra-providers/cinexstream.py",
-        "nontongo": "android-local-backend/extra-providers/nontongo.py",
     }
     for provider_name, relative_path in extra_providers.items():
         extra_provider = ROOT / relative_path
@@ -565,84 +560,28 @@ def copy_python_source() -> None:
             fail(f"The extra {provider_name} provider adapter is missing.")
         shutil.copy2(extra_provider, destination_src / "providers" / f"{provider_name}.py")
 
-    # The pinned upstream snapshot includes PEP 701 f-string syntax that
-    # Python 3.11 cannot parse. The Android workflow deliberately uses Python
-    # 3.11, so make these two provider modules compatible before importing them.
-    anibd_file = destination_src / "providers" / "anibd.py"
-    anibd_text = anibd_file.read_text(encoding="utf-8")
-    anibd_lines = anibd_text.splitlines()
-    anibd_patched = False
-    for index, line in enumerate(anibd_lines):
-        if "apilink.php?data=" in line and "quote(provider_link" in line:
-            indent = line[:len(line) - len(line.lstrip())]
-            anibd_lines[index:index + 1] = [
-                indent + """encoded_link = quote(provider_link, safe="-_.!~*'()")""",
-                indent + """data = await fetch_json(f"{BASE}/apilink.php?data={encoded_link}")""",
-            ]
-            anibd_patched = True
-            break
-    if anibd_patched:
-        anibd_text = "\n".join(anibd_lines) + "\n"
-    elif "encoded_link = quote(provider_link," not in anibd_text:
-        fail("Could not apply the Python 3.11 compatibility patch to anibd.py.")
-    anibd_file.write_text(anibd_text, encoding="utf-8")
-
-    mkissa_file = destination_src / "providers" / "mkissa.py"
-    mkissa_text = mkissa_file.read_text(encoding="utf-8")
-    pep701_fragment = """safe="'")"""
-    if pep701_fragment in mkissa_text:
-        if mkissa_text.count(pep701_fragment) != 2:
-            fail("Expected two Python 3.11-incompatible quote expressions in mkissa.py.")
-        mkissa_text = mkissa_text.replace(pep701_fragment, "safe=chr(39))")
-    elif "safe=chr(39))" not in mkissa_text:
-        fail("Could not apply the Python 3.11 compatibility patch to mkissa.py.")
-    mkissa_file.write_text(mkissa_text, encoding="utf-8")
-
-    # The upstream race waits up to eight seconds after finding a winning stream,
-    # only to collect optional latency measurements. That tail delay is noticeable
-    # on mobile, so cancel slower competitors almost immediately after a winner.
+    # Restrict the copied Kuhi registry to the four maintained embed adapters.
     race_file = destination_src / "providers" / "_race.py"
     race_text = race_file.read_text(encoding="utf-8")
-
-    # Register the added adapter only in the copied, packaged provider tree.
     ranking_match = re.search(r"(?s)RANKING\s*=\s*\[(.*?)\]", race_text)
     if not ranking_match:
-        fail("Could not locate Kuhi's provider ranking.")
-    ranking_block = ranking_match.group(1)
-    if '"animenosub"' not in ranking_block:
-        if '"animeonsen"' not in ranking_block:
-            fail("Could not append AnimeNoSub to Kuhi's provider ranking.")
-        ranking_block = ranking_block.replace('"animeonsen"', '"animeonsen", "animenosub"', 1)
-
-    # These added adapters are selectable manually during verification; local_api.py
-    # excludes them from Auto so route construction cannot masquerade as playback.
-    for provider_name in ("anixo", "megavid", "animeparadise", "megaflix", "tryembed", "cinexstream", "nontongo"):
-        if f'"{provider_name}"' not in ranking_block:
-            ranking_block = ranking_block.rstrip().rstrip(",") + f', "{provider_name}"'
+        fail("Could not locate the provider registry in the pinned backend.")
+    ranking_block = '"anixo", "megavid", "tryembed", "cinexstream"'
     race_text = race_text[:ranking_match.start(1)] + ranking_block + race_text[ranking_match.end(1):]
-
-    slow_cleanup = "await asyncio.wait(pending, timeout=8.0)"
-    if slow_cleanup in race_text:
-        race_text = race_text.replace(slow_cleanup, "await asyncio.wait(pending, timeout=0.2)", 1)
-    elif "await asyncio.wait(pending, timeout=0.2)" not in race_text:
-        fail("Could not locate the upstream stream-race cleanup wait.")
-
-    # A failed stream race must also fail fast enough for the UI to try the next
-    # provider or Server 1. Successful providers still return as soon as one wins.
-    # Provider extraction can perform several network/decryption steps. Eight seconds
-    # caused healthy modules to be reported as failures before extraction completed.
-    # Keep Kuhi's standalone routes consistent with the mobile adapter's
-    # provider budget. The mobile wrapper enforces its own per-provider timeout.
-    old_watch_timeout = "WATCH_TIMEOUT = 75.0"
-    if old_watch_timeout in race_text:
-        race_text = race_text.replace(old_watch_timeout, "WATCH_TIMEOUT = 45.0", 1)
-    elif "WATCH_TIMEOUT = 8.0" in race_text:
-        race_text = race_text.replace("WATCH_TIMEOUT = 8.0", "WATCH_TIMEOUT = 45.0", 1)
-    elif "WATCH_TIMEOUT = 22.0" in race_text:
-        race_text = race_text.replace("WATCH_TIMEOUT = 22.0", "WATCH_TIMEOUT = 45.0", 1)
-    elif "WATCH_TIMEOUT = 45.0" not in race_text:
-        fail("Could not locate the upstream stream provider timeout.")
     race_file.write_text(race_text, encoding="utf-8")
+
+    # Keep the Kuhi API's catalogue/context helpers, but do not package its
+    # unrelated provider adapters. The active provider registry is exactly the
+    # four adapters above; this pruning also prevents dormant modules from being
+    # imported accidentally by future changes.
+    active_provider_names = set(extra_providers)
+    provider_dir = destination_src / "providers"
+    for provider_file in provider_dir.glob("*.py"):
+        # Underscore-prefixed files are shared backend helpers, not provider
+        # adapters. Keep them because the four maintained adapters depend on
+        # common HTTP, matching, cache, and media utilities.
+        if not provider_file.name.startswith("_") and provider_file.stem not in active_provider_names:
+            provider_file.unlink()
 
     shutil.copy2(local_api, PYTHON_ROOT / "local_api.py")
     shutil.copy2(requirements, PYTHON_ROOT / "requirements.txt")

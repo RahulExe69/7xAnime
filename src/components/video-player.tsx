@@ -88,6 +88,18 @@ function VideoPlayer({
   const watchHistoryIdsRef = useRef<string[]>([]); // Store initial list
   const watchedRecordIdRef = useRef<string | null>(null);
   const updateTimerRef = useRef<NodeJS.Timeout | null>(null);
+  // Coalesce rapid pause/seek/timeupdate callbacks so PocketBase never receives
+  // concurrent progress writes for the same player.
+  type ProgressSnapshot = {
+    current: number;
+    duration: number;
+    animeInfo: typeof animeInfo;
+    serversData: IEpisodeServers;
+    bookmarkId: string | null;
+    watchedRecordId: string | null;
+  };
+  const progressSyncInFlightRef = useRef<Promise<string | null> | null>(null);
+  const pendingProgressRef = useRef<ProgressSnapshot | null>(null);
   const lastUpdateTimeRef = useRef<number>(0);
   const hasMetMinWatchTimeRef = useRef<boolean>(false); // Track if min time met for this episode
   const initialSeekTimeRef = useRef<number | null>(null);
@@ -99,12 +111,8 @@ function VideoPlayer({
     populate: false,
   });
 
-  const persistWatchProgress = (
-    current: number,
-    duration: number,
-  ): Promise<string | null> => {
-    const currentAnimeInfo = animeInfoRef.current;
-    const currentServersData = serversDataRef.current;
+  const persistProgressSnapshot = (snapshot: ProgressSnapshot): Promise<string | null> => {
+    const { current, duration, animeInfo: currentAnimeInfo, serversData: currentServersData } = snapshot;
     const episodeNumber = parseInt(currentServersData.episodeNo, 10) || 1;
     if (isLocalBackendEnabled()) {
       saveLocalWatchProgress({
@@ -119,13 +127,57 @@ function VideoPlayer({
       return Promise.resolve(null);
     }
 
-    return syncWatchProgress(bookmarkIdRef.current, watchedRecordIdRef.current, {
+    // If a save is already running, remember the latest snapshot. This caps
+    // network concurrency at one and prevents an old episode's queued position
+    // from being accidentally written to the next episode after a fast switch.
+    if (progressSyncInFlightRef.current) {
+      pendingProgressRef.current = snapshot;
+      return progressSyncInFlightRef.current;
+    }
+
+    const request = syncWatchProgress(snapshot.bookmarkId, snapshot.watchedRecordId, {
       episodeId: currentServersData.episodeId,
       episodeNumber,
       current,
       duration,
     });
+
+    const trackedRequest: Promise<string | null> = request
+      .then((recordId) => {
+        const isStillCurrentEpisode =
+          animeInfoRef.current.id === currentAnimeInfo.id &&
+          serversDataRef.current.episodeId === currentServersData.episodeId &&
+          serversDataRef.current.episodeNo === currentServersData.episodeNo;
+        if (recordId && isStillCurrentEpisode) watchedRecordIdRef.current = recordId;
+        return recordId;
+      })
+      .finally(() => {
+        if (progressSyncInFlightRef.current === trackedRequest) {
+          progressSyncInFlightRef.current = null;
+        }
+
+        const pending = pendingProgressRef.current;
+        pendingProgressRef.current = null;
+        if (pending) {
+          void persistProgressSnapshot(pending).catch((error) => {
+            console.error("Error syncing coalesced watch progress:", error);
+          });
+        }
+      });
+
+    progressSyncInFlightRef.current = trackedRequest;
+    return trackedRequest;
   };
+
+  const persistWatchProgress = (current: number, duration: number): Promise<string | null> =>
+    persistProgressSnapshot({
+      current,
+      duration,
+      animeInfo: animeInfoRef.current,
+      serversData: serversDataRef.current,
+      bookmarkId: bookmarkIdRef.current,
+      watchedRecordId: watchedRecordIdRef.current,
+    });
 
   useEffect(() => {
     isAutoSkipEnabledRef.current = autoSkip;
@@ -725,10 +777,17 @@ function VideoPlayer({
         // Immediately sync progress if min time just met and no record exists
         if (!watchedRecordIdRef.current) {
           console.log("Triggering initial sync after min watch time.");
+          const episodeIdAtSync = serversDataRef.current.episodeId;
+          const animeIdAtSync = animeInfoRef.current.id;
           persistWatchProgress(currentTime, duration).then((newId) => {
-            if (newId) {
+            const isStillCurrentEpisode =
+              animeInfoRef.current.id === animeIdAtSync &&
+              serversDataRef.current.episodeId === episodeIdAtSync;
+            if (newId && isStillCurrentEpisode) {
               watchedRecordIdRef.current = newId;
-              watchHistoryIdsRef.current.push(newId);
+              if (!watchHistoryIdsRef.current.includes(newId)) {
+                watchHistoryIdsRef.current.push(newId);
+              }
             }
           });
           lastUpdateTimeRef.current = Date.now(); // Prevent immediate throttled update

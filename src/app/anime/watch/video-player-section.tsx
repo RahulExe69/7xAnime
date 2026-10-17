@@ -13,7 +13,7 @@ import { useQuery } from "react-query";
 import { getHindiDubStreams } from "@/lib/hindi-dub";
 import { ArrowLeft, Captions, Mic, AlertCircle } from "lucide-react";
 import Link from "next/link";
-import { DISABLED_PROVIDER_NAMES, getProviderDisplayName, getServerProviderTitle, isProviderSelectable, KUHI_PROVIDER_ORDER } from "@/lib/server-map";
+import { getProviderDisplayName, getServerProviderTitle, isProviderSelectable, ACTIVE_EMBED_PROVIDER_ORDER } from "@/lib/server-map";
 import { Switch } from "@/components/ui/switch";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -84,6 +84,25 @@ const requestExternalPlayerSeek = (frame: HTMLIFrameElement, seconds: number) =>
     { action: "seek", time, currentTime: time },
     { event: "command", func: "seekTo", args: [time, true] },
     { method: "seekTo", value: time },
+  ];
+  for (const command of commands) {
+    try { target.postMessage(command, "*"); } catch { /* provider ignored */ }
+  }
+};
+
+// Third-party embeds have no universal pause API, so recovery uses several
+// common postMessage shapes. Unsupported messages are safely ignored by providers.
+const requestExternalPlayerPause = (frame: HTMLIFrameElement) => {
+  const target = frame.contentWindow;
+  if (!target) return;
+  const commands = [
+    { event: "pause" },
+    { type: "pause" },
+    { action: "pause" },
+    { method: "pause" },
+    { command: "pause" },
+    { event: "command", func: "pauseVideo", args: [] },
+    { func: "pauseVideo", args: [] },
   ];
   for (const command of commands) {
     try { target.postMessage(command, "*"); } catch { /* provider ignored */ }
@@ -175,7 +194,7 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
     [allEpisodesData?.rawResponse?.providers],
   );
   const providerNames = useMemo(
-    () => Object.keys(rawProviders).filter((name) => !DISABLED_PROVIDER_NAMES.has(name.toLowerCase())),
+    () => Object.keys(rawProviders).filter((name) => isProviderSelectable(name, preferredCategory)),
     [rawProviders],
   );
 
@@ -193,19 +212,17 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
     return "";
   }, [episodeIdParam, epParam, preferredCategory, providerNames, rawProviders]);
 
-  // In the Android build, start with Kuhi's automatic route immediately. The
-  // local API races providers for a working stream while the full provider
-  // catalogue continues loading; waiting for every episode scraper first made
-  // the watch screen look frozen for far too long.
-  const localAutoEpisodeId = isLocalBackendEnabled() && animeIdParam
-    ? `watch/auto/${animeIdParam}/${preferredCategory}/episode-${requestedEpisodeNumber}`
+  // Android starts with the dedicated MegaPlay iframe. The four retained embed
+  // providers are explicit alternatives, not an automatic extraction race.
+  const localFallbackEpisodeId = isLocalBackendEnabled() && animeIdParam
+    ? `watch/megaplay/${animeIdParam}/${preferredCategory}/episode-${requestedEpisodeNumber}`
     : "";
-  const activeEpisodeId = episodeIdParam || localAutoEpisodeId || preferredEpisodeId ||
+  const activeEpisodeId = episodeIdParam || localFallbackEpisodeId || preferredEpisodeId ||
     (epParam ? targetEpByNumber?.episodeId || "" : allEpisodesData?.episodes?.[0]?.episodeId || "");
   const hasManualProviderSelection =
     isLocalBackendEnabled() &&
     !!episodeIdParam &&
-    !episodeIdParam.startsWith("watch/auto/");
+    !episodeIdParam.startsWith("watch/megaplay/");
 
   useEffect(() => {
     if (!isWatchRoute || typeof window === "undefined") return;
@@ -215,9 +232,9 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
 
   // Only mirror an explicit episode ID from the URL into Zustand.
   // When a URL contains only ?ep=N, EpisodePlaylist owns the highlighted
-  // selection while the player may use a temporary watch/auto URL. Syncing
+  // selection while the player may use a temporary watch/megaplay URL. Syncing
   // that temporary URL back into the same store creates a feedback loop:
-  // the player writes watch/auto/.../dub/episode-N, the playlist writes its
+  // the player writes watch/megaplay/.../dub/episode-N, the playlist writes its
   // provider episode ID, and the two effects keep triggering each other
   // until React throws error #185 (maximum update depth exceeded).
   useEffect(() => {
@@ -225,11 +242,9 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
     setSelectedEpisode(episodeIdParam);
   }, [episodeIdParam, selectedEpisode, setSelectedEpisode]);
 
-  // On native Android, begin with Server 1 (MegaPlay) immediately. The previous
-  // first-run path waited for the Auto provider race to initialize and could sit
-  // on "reconnecting to Auto" until the viewer manually tapped a server. Users
-  // can still choose Auto or any provider explicitly; this is only the initial
-  // playback default for the bundled local-backend APK.
+  // On native Android, begin with Server 1 (MegaPlay) immediately. The legacy
+  // Kuhi Auto race is retired; the four supported embed providers are explicit
+  // alternatives selected from the server chooser.
   const [useFallback, setUseFallback] = useState<boolean>(() => isLocalBackendEnabled());
   const [isHindiMode, setIsHindiMode] = useState<boolean>(false);
   const [selectedHindiServer, setSelectedHindiServer] = useState<number>(0);
@@ -258,6 +273,8 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
   } | null>(null);
   const embedLoadStartedAtRef = useRef(0);
   const lastEmbedSignalAtRef = useRef(0);
+  const embedPlaybackStateRef = useRef<"unknown" | "playing" | "paused">("unknown");
+  const pauseAfterEmbedRecoveryRef = useRef(false);
   const externalEmbedFrameRef = useRef<HTMLIFrameElement | null>(null);
   const embedResumeTimersRef = useRef<number[]>([]);
 
@@ -279,20 +296,45 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
           )
         : null
     );
-    if (!progress || progress.current < 5 || progress.duration <= 0 ||
-        progress.current >= progress.duration - 15) return;
+    const resumeTime = progress && progress.current >= 5 && progress.duration > 0 &&
+      progress.current < progress.duration - 15
+      ? progress.current
+      : null;
+    // A deliberate pause must survive recovery and a newly loaded embed. There
+    // is no standard cross-origin pause API, so retry common commands while the
+    // provider initializes; never send a play/autoplay command. When paused,
+    // avoid seeking (which can wake some embeds) and keep reasserting pause for
+    // longer than the providers' usual delayed startup/autoplay window.
+    const shouldRemainPaused = pauseAfterEmbedRecoveryRef.current ||
+      embedPlaybackStateRef.current === "paused";
+    if (resumeTime === null && !shouldRemainPaused) return;
 
-    // Try after the document load and again as the cross-origin player finishes
-    // initializing. A provider can accept seek messages only after its API is ready.
     embedResumeTimersRef.current.forEach((timer) => window.clearTimeout(timer));
     embedResumeTimersRef.current = [];
     const frameAtSchedule = frame;
     const sourceAtSchedule = frame.src;
-    for (const delay of [0, 500, 1300, 2800]) {
+    const delays = shouldRemainPaused
+      ? [0, 500, 1300, 2800, 5000, 8000, 12000]
+      : [0, 500, 1300, 2800];
+    for (const delay of delays) {
       const timer = window.setTimeout(() => {
         if (externalEmbedFrameRef.current !== frameAtSchedule ||
             frameAtSchedule.src !== sourceAtSchedule) return;
-        requestExternalPlayerSeek(frameAtSchedule, progress.current);
+        if (shouldRemainPaused) {
+          // A user can resume playback while delayed pause retries are queued.
+          // Respect that newer explicit playing state rather than pausing again.
+          if (pauseAfterEmbedRecoveryRef.current || embedPlaybackStateRef.current === "paused") {
+            requestExternalPlayerPause(frameAtSchedule);
+          }
+          return;
+        }
+        if (
+          embedPlaybackStateRef.current !== "paused" &&
+          !pauseAfterEmbedRecoveryRef.current &&
+          resumeTime !== null
+        ) {
+          requestExternalPlayerSeek(frameAtSchedule, resumeTime);
+        }
       }, delay);
       embedResumeTimersRef.current.push(timer);
     }
@@ -302,6 +344,12 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
     embedResumeTimersRef.current.forEach((timer) => window.clearTimeout(timer));
     embedResumeTimersRef.current = [];
   }, []);
+
+  useEffect(() => {
+    // Paused/playing state belongs to an episode, not to the next one.
+    embedPlaybackStateRef.current = "unknown";
+    pauseAfterEmbedRecoveryRef.current = false;
+  }, [activeEpisodeId]);
 
   const flushLatestEmbedProgress = useCallback(() => {
     const latest = lastEmbedProgressRef.current;
@@ -420,8 +468,8 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
       // contribute a catalogue. On a detected failure, continue to the next
       // server automatically; SUB-only sources are switched to SUB explicitly.
       const orderedProviders = [
-        ...KUHI_PROVIDER_ORDER,
-        ...providerNames.filter((name) => !KUHI_PROVIDER_ORDER.includes(name as (typeof KUHI_PROVIDER_ORDER)[number])),
+        ...ACTIVE_EMBED_PROVIDER_ORDER,
+        ...providerNames.filter((name) => !ACTIVE_EMBED_PROVIDER_ORDER.includes(name as (typeof ACTIVE_EMBED_PROVIDER_ORDER)[number])),
       ];
       for (const providerName of orderedProviders) {
         const category = isProviderSelectable(providerName, preferredCategory)
@@ -456,7 +504,11 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
 
   useEffect(() => {
     attemptedSourceIdsRef.current.clear();
-    setUseFallback(false);
+    // Android should start with the dedicated MegaPlay iframe (Server 1).
+    // Resetting this to false sends every newly opened anime into the local
+    // Keep a newly opened anime on MegaPlay rather than sending it through the
+    // retired Auto route, which has no eligible direct-stream providers.
+    setUseFallback(isLocalBackendEnabled());
     setIsHindiMode(false);
     setSelectedHindiServer(0);
     setPreferredCategory(localStorage.getItem("preferredAudio") === "sub" ? "sub" : "dub");
@@ -555,9 +607,9 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
       current?.episodeId === activeEpisodeId ? null : current,
     );
 
-    // After two attempts, advance from Auto to MegaPlay or to the next
-    // configured provider for a manual selection.
-    if (isLocalBackendEnabled() && activeEpisodeId.startsWith("watch/auto/")) {
+    // After two attempts, keep the MegaPlay episode route on Server 1 or advance
+    // a failed manual selection to the next configured embed provider.
+    if (isLocalBackendEnabled() && activeEpisodeId.startsWith("watch/megaplay/")) {
       setUseFallback(true);
       return;
     }
@@ -592,7 +644,7 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
       resolutionRetriesRef.current[activeEpisodeId] = 0;
       resolutionRetryInFlightRef.current = null;
       setRetryingResolution(null);
-      if (isLocalBackendEnabled() && activeEpisodeId.startsWith("watch/auto/")) {
+      if (isLocalBackendEnabled() && activeEpisodeId.startsWith("watch/megaplay/")) {
         setUseFallback(true);
       } else {
         advanceAfterSourceFailure();
@@ -655,7 +707,8 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
     queryFn: async () => (await api.get<LocalProviderStatus>("/api/diagnostics/providers")).data,
     enabled: isLocalBackendEnabled(),
     staleTime: 1000 * 15,
-    refetchInterval: isLocalBackendEnabled() ? 5000 : false,
+    // Diagnostics are shared by the chooser and debug panel; refresh less often than player progress events.
+    refetchInterval: isLocalBackendEnabled() ? 15000 : false,
     refetchOnWindowFocus: false,
     retry: 0,
   });
@@ -669,7 +722,6 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
 
   const handleCategoryChange = (cat: "sub" | "dub") => {
     setIsHindiMode(false);
-    setUseFallback(false);
     setPreferredCategory(cat);
     localStorage.setItem("preferredAudio", cat);
 
@@ -686,14 +738,17 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
       : undefined;
     const targetId = target?.id || (isLocalBackendEnabled() && preferredProvider
       ? `watch/${preferredProvider}/${animeIdParam}/${cat}/${preferredProvider}-${currentEpNumber}`
-      : isLocalBackendEnabled()
-        ? `watch/auto/${animeIdParam}/${cat}/episode-${currentEpNumber}`
-        : "");
+      : "");
 
     if (targetId) {
+      setUseFallback(false);
       attemptedSourceIdsRef.current.delete(targetId);
       setSelectedEpisode(targetId);
       updateEpisodeUrl(targetId, currentEpNumber);
+    } else {
+      // No supported embed advertises this audio track; keep playback on
+      // MegaPlay instead of routing the request into the retired Kuhi Auto pool.
+      setUseFallback(isLocalBackendEnabled());
     }
   };
 
@@ -859,7 +914,7 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
   };
 
   const cleanParts = activeEpisodeId.replace(/^\//, "").split("/");
-  const currentProviderName = cleanParts[1] || providerNames[0] || "auto";
+  const currentProviderName = cleanParts[1] || providerNames[0] || "megaplay";
   const activeCategory = cleanParts[3] === "dub" ? "dub" : cleanParts[3] === "sub" ? "sub" : preferredCategory;
 
 
@@ -885,7 +940,7 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
     }
 
     const nextEpisodeId = isLocalBackendEnabled()
-      ? "watch/auto/" + animeIdParam + "/" + activeCategory + "/episode-" + nextNumber
+      ? "watch/megaplay/" + animeIdParam + "/" + activeCategory + "/episode-" + nextNumber
       : nextProviderEpisode?.id || nextAnyProviderEpisode?.id || catalogueEpisode?.episodeId || "";
     if (!nextEpisodeId) return;
 
@@ -897,7 +952,7 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
         episodeId: nextEpisodeId,
       };
     }
-    setUseFallback(false);
+    setUseFallback(isLocalBackendEnabled());
     setIsHindiMode(false);
     setSelectedEpisode(nextEpisodeId);
 
@@ -922,12 +977,12 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
   // honest error instead of silently swapping to another server.
   const serverProviderNames = isLocalBackendEnabled()
     ? (localProviderStatus?.providers
-        .filter((item) => item.moduleLoaded && !DISABLED_PROVIDER_NAMES.has(item.id.toLowerCase()))
+        .filter((item) => item.moduleLoaded)
         .map((item) => item.id) || availableProviderNames)
     : availableProviderNames;
   // Keep SUB-only servers discoverable while ENGLISH is selected, but hide a
-  // provider after its recovery attempts fail. Internal auto-failover still
-  // retains the complete provider order; this filter only affects the chooser.
+  // provider after its recovery attempts fail. The internal failover sequence
+  // retains the complete supported provider order.
   const selectableServerProviderNames = serverProviderNames;
   const failedServerProviderNames = selectableServerProviderNames.filter(
     (providerName) => providerPlaybackOutcomes[providerName] === "failed",
@@ -936,29 +991,6 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
     (providerName) => providerPlaybackOutcomes[providerName] !== "failed",
   );
 
-  // An automatic provider race reports the outcomes of sources it actually
-  // attempted. Apply those failures to this screen's scoped hide/retry state;
-  // never infer per-episode failure from the backend's global failure counters.
-  useEffect(() => {
-    const timings = episodeData?.timings;
-    if (!isLocalBackendEnabled() || !activeEpisodeId.startsWith("watch/auto/") || !timings) return;
-    const failedProviders = Object.entries(timings)
-      .filter(([, outcome]) => outcome && outcome.ok === false)
-      .map(([providerName]) => providerName);
-    if (!failedProviders.length || retryingResolution?.episodeId === activeEpisodeId) return;
-    setProviderPlaybackOutcomes((previous) => {
-      let changed = false;
-      const next = { ...previous };
-      for (const providerName of failedProviders) {
-        if (next[providerName] !== "failed") {
-          next[providerName] = "failed";
-          changed = true;
-        }
-      }
-      return changed ? next : previous;
-    });
-  }, [activeEpisodeId, episodeData?.timings, retryingResolution]);
-
   const selectedProviderIndex = visibleServerProviderNames.indexOf(currentProviderName);
   const fallbackServerNumber = 1;
   const activeServerNumber = isHindiMode
@@ -966,17 +998,8 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
     : useFallback || isFallbackActive
       ? fallbackServerNumber
       : selectedProviderIndex >= 0 ? selectedProviderIndex + 2 : 1;
-  const isAutomaticServerActive =
-    isLocalBackendEnabled() &&
-    currentProviderName === "auto" &&
-    !isHindiMode &&
-    !isFallbackActive;
-  const actualProviderName = episodeData?.provider || "";
-  const activeServerLabel = isAutomaticServerActive
-    ? actualProviderName && actualProviderName !== "auto"
-      ? `Auto → ${getProviderDisplayName(actualProviderName)}`
-      : "Auto"
-    : !isFallbackActive && !isHindiMode && providerPlaybackOutcomes[currentProviderName] === "failed"
+  const activeServerLabel =
+    !isFallbackActive && !isHindiMode && providerPlaybackOutcomes[currentProviderName] === "failed"
       ? `${getProviderDisplayName(currentProviderName)} unavailable`
       : activeServerNumber === 1
         ? "Server 1 — MegaPlay"
@@ -1008,35 +1031,23 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
     setIsHindiMode(true);
   };
 
-  const selectAutomaticServer = () => {
-    flushLatestEmbedProgress();
-    setFallbackPlaybackFailed(false);
-    playbackRetriesRef.current = { key: `${activeEpisodeId}|0`, count: 0 };
-    setRetryingPlayback(null);
-    setRetryingResolution(null);
-    setManualProviderPlaybackFailed(false);
-    setPlaybackSourceIndex(0);
-    resolutionRetriesRef.current = {};
-    resolutionRetryInFlightRef.current = null;
-    if (resolutionRetryReleaseTimerRef.current !== null) {
-      window.clearTimeout(resolutionRetryReleaseTimerRef.current);
-      resolutionRetryReleaseTimerRef.current = null;
-    }
-    // An explicit "Try Auto again" is a fresh attempt: clear the provider
-    // quarantine set so previously failed servers can be tested again.
-    attemptedSourceIdsRef.current.clear();
-    setProviderPlaybackOutcomes({});
-    setIsHindiMode(false);
-    setUseFallback(false);
-    const targetId = `watch/auto/${animeIdParam}/${activeCategory}/episode-${currentEpNumber}`;
-    setSelectedEpisode(targetId);
-    updateEpisodeUrl(targetId, currentEpNumber);
-  };
 
   const handlePlayerError = useCallback((detail?: string) => {
     // Do not resolve/retry/switch providers while the app is hidden. Explicit
     // PiP is a visible playback session and may continue using normal recovery.
     if (isLocalBackendEnabled() && !appIsActive && !nativePipActive) return;
+
+    // A paused embed is not a stalled embed. Retrying this path remounts the
+    // cross-origin iframe, which loses its manual pause even if we send a later
+    // best-effort pause message. Ignore recovery signals until the provider
+    // explicitly reports playback again; reinforce pause on the existing frame.
+    if (embedPlaybackStateRef.current === "paused") {
+      pauseAfterEmbedRecoveryRef.current = true;
+      lastEmbedSignalAtRef.current = Date.now();
+      const pausedFrame = externalEmbedFrameRef.current;
+      if (pausedFrame) requestExternalPlayerPause(pausedFrame);
+      return;
+    }
 
     const retryKey = `${activeEpisodeId}|${playbackSourceIndex}`;
     if (playbackRetriesRef.current.key !== retryKey) {
@@ -1117,6 +1128,14 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
       blockedPlayerActionAtRef.current = { retryKey: playerRetryKey, at: now };
 
       const detail = (event as CustomEvent<{ reason?: string; host?: string }>).detail || {};
+      // Some embedded servers emit or trigger blocked actions while paused;
+      // never let these background signals reconnect a deliberately paused video.
+      if (embedPlaybackStateRef.current === "paused") {
+        lastEmbedSignalAtRef.current = now;
+        const pausedFrame = externalEmbedFrameRef.current;
+        if (pausedFrame) requestExternalPlayerPause(pausedFrame);
+        return;
+      }
       const reason = String(detail.reason || "blocked popup");
       const host = String(detail.host || "third-party player");
       // Blocked popups, JS dialogs and top-level redirects are recovery signals,
@@ -1182,6 +1201,23 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
       const eventType = eventNames[0] || "";
       const status = normalizeEventName(payload.status);
       const failed = eventType.includes("error") || status === "error";
+      const reportedPaused = eventNames.some((name) =>
+        name === "pause" || name === "paused" || name.endsWith(":pause") || name.endsWith(":paused")
+      ) || status === "paused";
+      const reportedPlaying = eventNames.some((name) =>
+        name === "play" || name === "playing" || name.endsWith(":play") || name.endsWith(":playing")
+      ) || status === "playing";
+      if (reportedPaused) {
+        embedPlaybackStateRef.current = "paused";
+        pauseAfterEmbedRecoveryRef.current = true;
+        lastEmbedSignalAtRef.current = Date.now();
+        const pausedFrame = externalEmbedFrameRef.current;
+        if (pausedFrame) requestExternalPlayerPause(pausedFrame);
+      } else if (reportedPlaying) {
+        embedPlaybackStateRef.current = "playing";
+        pauseAfterEmbedRecoveryRef.current = false;
+        lastEmbedSignalAtRef.current = Date.now();
+      }
 
       // Providers disagree on which field carries the ended signal and how
       // they spell it (event/type/action, camelCase, spaces or underscores).
@@ -1265,6 +1301,14 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
     embedLoadStartedAtRef.current = Date.now();
     lastEmbedSignalAtRef.current = 0;
     const interval = window.setInterval(() => {
+      if (embedPlaybackStateRef.current === "paused") {
+        // A paused episode is intentionally not advancing. Do not misclassify
+        // silence from a paused iframe as a dead stream and remount it.
+        const now = Date.now();
+        embedLoadStartedAtRef.current = now;
+        lastEmbedSignalAtRef.current = now;
+        return;
+      }
       const lastSignal = Math.max(embedLoadStartedAtRef.current, lastEmbedSignalAtRef.current);
       const stallTimeoutMs = observedEmbedProvider === "tryembed" ? 8000 : 18000;
       if (Date.now() - lastSignal < stallTimeoutMs) return;
@@ -1371,7 +1415,7 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
             )}
             {failedServerProviderNames.length > 0 && (
               <span className="self-center px-1 text-[10px] text-zinc-500" role="status">
-                Automatically skipped {failedServerProviderNames.length} failed server{failedServerProviderNames.length === 1 ? "" : "s"}. Use Auto to try the server pool again.
+                Automatically skipped {failedServerProviderNames.length} failed server{failedServerProviderNames.length === 1 ? "" : "s"}. Tap a server to retry it, or retry MegaPlay Server 1.
               </span>
             )}
             {isLocalBackendEnabled() && !nativeCatalogueComplete && availableProviderNames.length === 0 && (
@@ -1386,7 +1430,7 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
             Provider diagnostics {localProviderStatus ? `· ${localProviderStatus.loadedCount}/${localProviderStatus.providerCount} modules loaded` : isLoadingProviderStatus ? "· checking…" : ""}
           </summary>
           <p className="mt-2 leading-5 text-zinc-500">
-            Loaded means the provider module is present, not that every anime has a playable stream. “URL returned” is not playback proof; AniXo and Megavid need trusted player events, while AnimeParadise needs successful HLS playback.
+            Loaded means the provider module is present, not that every anime has a playable stream. “URL returned” is not playback proof; embedded providers need successful playback on the actual device.
           </p>
           <div className="mt-2 max-h-52 space-y-1.5 overflow-y-auto pr-1">
             {(localProviderStatus?.providers || []).map((item) => (
@@ -1587,7 +1631,6 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
               ? `Playback failed: ${lastPlayerError || "the provider returned a stream that the player could not play."}`
               : "This provider returned no playable stream for this episode. It has not been silently replaced with another provider.")}
             <div className="flex flex-wrap gap-2">
-              <Button size="sm" variant="secondary" onClick={selectAutomaticServer}>Try Auto</Button>
               <Button size="sm" onClick={() => selectFallbackServer()}>Try Server 1 · MegaPlay</Button>
             </div>
             <span className="text-xs text-zinc-500">Or tap a differently named provider below to test that server directly.</span>
@@ -1608,7 +1651,7 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
           <AlertDescription className="mt-1 flex flex-col gap-3 text-sm text-zinc-400">
             MegaPlay and the available servers could not start this episode after automatic retries. Your latest saved timestamp is kept where a player reported it.
             <div className="flex flex-wrap gap-2">
-              <Button size="sm" onClick={selectAutomaticServer}>Try Auto again</Button>
+              <Button size="sm" onClick={() => selectFallbackServer()}>Retry Server 1 · MegaPlay</Button>
             </div>
             <span className="text-xs text-zinc-500">You can also choose another server below. Embedded providers may not expose a seek command, so exact resume is not guaranteed on every iframe.</span>
           </AlertDescription>
@@ -1704,7 +1747,7 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
           <AlertCircle className="h-4 w-4 text-[#ff70bd]" />
           <AlertTitle className="font-bold">No more streams from this provider</AlertTitle>
           <AlertDescription className="mt-1 text-sm text-zinc-400">
-            Try Auto or select another server.
+            Try MegaPlay Server 1 or select another server.
           </AlertDescription>
         </Alert>
         {playerControls}

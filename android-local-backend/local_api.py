@@ -9,14 +9,16 @@ import asyncio
 import ipaddress
 import re
 import secrets
+import socket
 import threading
+import weakref
 import time
 from urllib.parse import urlencode, urljoin, urlsplit
 
 import httpx
 import uvicorn
 from fastapi import Request
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import JSONResponse, Response, StreamingResponse
 
 from src.config import HEADERS
 from src.endpoints import router
@@ -45,7 +47,7 @@ LOCAL_WATCH_CACHE_TTL = 35.0
 LOCAL_ROUTE_TIMEOUT = 80.0
 # Active provider order drives deterministic server numbering and diagnostics.
 # Newly added sources remain manual-only until real-device playback is verified.
-# Keep unapproved Kuhi adapters parked to avoid unnecessary third-party requests.
+# The allowlist is the complete active set; the build prunes every other adapter.
 ACTIVE_PROVIDER_ORDER = ("anixo", "megavid", "tryembed", "cinexstream")
 ACTIVE_PROVIDER_ALLOWLIST = set(ACTIVE_PROVIDER_ORDER)
 MANUAL_EMBED_ONLY_PROVIDERS = {"anixo", "megavid", "tryembed", "cinexstream"}
@@ -321,7 +323,7 @@ async def local_provider_status():
         "loadedCount": len(available),
         "providerCount": len(ACTIVE_PROVIDER_ALLOWLIST),
         "providers": providers,
-        "note": "Module-loaded status is not a live guarantee for every anime or episode. Attempt metrics are collected as you select or play providers. AniXo, Megavid, TryEmbed, and CinexStream remain manual-only until device playback is verified. HLS, MP4, and embed URLs are supported; DASH-only results are skipped until a DASH engine is available.",
+        "note": "Only AniXo, Megavid, TryEmbed, and CinexStream are packaged as provider adapters. Module-loaded status is not a live guarantee for every anime or episode; attempt metrics are collected as you select or play providers. These four adapters construct cross-origin embeds, while MegaPlay is the dedicated frontend Server 1 fallback.",
     }
 
 
@@ -415,59 +417,8 @@ async def _watch_one_for_player(mod, name, anilist_id, ep, audio, ctx):
     return name, playable, seconds, True
 
 
-async def _race_watch_for_player(anilist_id: int, episode: int, audio: str) -> dict | None:
-    """Fastest-wins race that only accepts formats the Android player can use."""
-    mods = [
-        (name, mod)
-        for name, mod in provider_race.providers()
-        if name in ACTIVE_PROVIDER_ALLOWLIST
-        and name not in MANUAL_EMBED_ONLY_PROVIDERS
-    ]
-    if not mods:
-        return None
-    ctx = await _get_local_provider_context(anilist_id)
-    pending = {
-        asyncio.create_task(_watch_one_for_player(mod, name, anilist_id, episode, audio, ctx))
-        for name, mod in mods
-    }
-    timings: dict = {}
-    winner = None
-    try:
-        while pending:
-            done, pending = await asyncio.wait(pending, return_when=asyncio.FIRST_COMPLETED)
-            for task in done:
-                try:
-                    name, streams, seconds, ok = task.result()
-                except Exception as error:
-                    print(f"[7XAnime] provider race task failed: {str(error)[:120]}")
-                    continue
-                timings[name] = {"seconds": seconds, "ok": ok}
-                provider_race.record_latency(name, seconds, ok)
-                if ok and winner is None:
-                    winner = {"provider": name, "streams": streams}
-            if winner is not None:
-                break
-    finally:
-        for task in pending:
-            task.cancel()
-        if pending:
-            await asyncio.gather(*pending, return_exceptions=True)
-    if winner is None:
-        # Preserve all attempted-provider outcomes when Auto has no winner so
-        # the client can hide only sources that failed for this selection.
-        return {
-            "provider": "auto",
-            "streams": [],
-            "timings": timings,
-            "defaultProvider": provider_race.default_provider(),
-        }
-    winner["timings"] = timings
-    winner["defaultProvider"] = provider_race.default_provider()
-    return winner
-
-
 def _episode_number_from_slug(episode_slug: str) -> int:
-    # Kuhi emits ids such as "watch/anineko/12345/sub/anineko-12".
+    # Provider episode IDs end with an episode number, e.g. "watch/anixo/12345/sub/anixo-12".
     # Extract the final number regardless of the provider-specific slug prefix.
     match = re.search(r"(\d+)\s*$", episode_slug)
     return int(match.group(1)) if match else 1
@@ -486,28 +437,19 @@ async def legacy_watch_route(provider: str, anilist_id: int, audio: str, episode
     preferred = requested_provider if requested_provider in ACTIVE_PROVIDER_ALLOWLIST else None
 
     async def extract_streams() -> dict:
-        # Auto is the only mode allowed to race across providers. A manually
-        # selected server must never silently return another provider's stream.
+        # Automatic Kuhi routing is retired. A manually selected server must
+        # never silently return another provider's stream.
         if is_auto:
-            raced = await _race_watch_for_player(
-                anilist_id,
-                episode_number,
-                audio,
-            )
-            result = raced or {}
-            streams = result.get("streams") or []
             return {
                 "anilistId": anilist_id,
                 "episode": episode_number,
                 "type": audio,
-                "provider": result.get("provider") or "auto",
+                "provider": "auto",
                 "requestedProvider": "auto",
-                "defaultProvider": result.get("defaultProvider") or provider_race.default_provider(),
-                "providerStatus": "ok" if streams else "no_stream",
-                "providerError": None if streams else "No supported stream was returned. See per-provider diagnostics for timeout, HTTP, empty-result, or unsupported-format details.",
-                "timings": result.get("timings") or {},
-                "streams": streams,
-                "subtitles": provider_race.merge_subtitles(streams),
+                "providerStatus": "auto_disabled",
+                "providerError": "The legacy Kuhi Auto race is disabled. Use MegaPlay Server 1 or choose one of the four supported embed servers.",
+                "streams": [],
+                "subtitles": [],
             }
 
         if preferred is None:
@@ -569,7 +511,7 @@ async def legacy_watch_route(provider: str, anilist_id: int, audio: str, episode
         }
 
     # Bound metadata setup plus stream extraction. Manual selection stays strict;
-    # Auto races eligible providers while sharing context and per-source budgets.
+    # Auto is rejected before any provider request is made.
     try:
         data = await asyncio.wait_for(extract_streams(), timeout=LOCAL_ROUTE_TIMEOUT)
     except asyncio.TimeoutError:
@@ -666,15 +608,85 @@ def _validated_remote_url(value: str) -> str:
     if parts.scheme not in {"http", "https"} or not parts.hostname:
         raise ValueError("Only absolute HTTP(S) media URLs are supported")
     host = parts.hostname.lower().rstrip(".")
-    if host in {"localhost", "localhost.localdomain"} or host.endswith(".local"):
+    if (
+        host in {"localhost", "localhost.localdomain"}
+        or host.endswith((".localhost", ".local", ".internal", ".home.arpa"))
+    ):
         raise ValueError("Local network targets are not allowed")
     try:
-        address = ipaddress.ip_address(host)
+        address = ipaddress.ip_address(host.split("%", 1)[0])
     except ValueError:
         address = None  # Domain name rather than a literal IP address.
     if address is not None and not address.is_global:
         raise ValueError("Local or private IP targets are not allowed")
+    if parts.username or parts.password:
+        raise ValueError("Credential-bearing media URLs are not allowed")
     return value
+
+
+async def _validated_public_remote_url(value: str) -> str:
+    """Reject private DNS answers as well as private IP literals before every request."""
+    target = _validated_remote_url(value)
+    host = urlsplit(target).hostname
+    if not host:
+        raise ValueError("Media URL is missing a hostname")
+    try:
+        ipaddress.ip_address(host.split("%", 1)[0])
+        return target  # _validated_remote_url has already checked literal IP addresses.
+    except ValueError:
+        pass
+
+    loop = asyncio.get_running_loop()
+    port = urlsplit(target).port or (443 if urlsplit(target).scheme == "https" else 80)
+    try:
+        records = await asyncio.wait_for(
+            loop.getaddrinfo(host, port, type=socket.SOCK_STREAM),
+            timeout=5.0,
+        )
+    except Exception as error:
+        raise ValueError("Media hostname could not be resolved safely") from error
+
+    addresses = {record[4][0].split("%", 1)[0] for record in records}
+    if not addresses:
+        raise ValueError("Media hostname has no usable public addresses")
+    try:
+        if any(not ipaddress.ip_address(address).is_global for address in addresses):
+            raise ValueError("Media hostname resolves to a private or reserved IP address")
+    except ValueError as error:
+        if str(error) == "Media hostname resolves to a private or reserved IP address":
+            raise
+        raise ValueError("Media hostname resolved to an invalid IP address") from error
+    return target
+
+
+# Clients are scoped to an event loop because the API also runs inside isolated test loops.
+# Keeping them alive between requests enables HTTP connection reuse for HLS playlists/segments.
+_MEDIA_CLIENTS = weakref.WeakKeyDictionary()
+
+
+def _get_media_http_client() -> httpx.AsyncClient:
+    loop = asyncio.get_running_loop()
+    client = _MEDIA_CLIENTS.get(loop)
+    if client is None:
+        client = httpx.AsyncClient(
+            timeout=httpx.Timeout(connect=8.0, read=35.0, write=10.0, pool=5.0),
+            follow_redirects=False,
+            limits=httpx.Limits(
+                max_connections=24,
+                max_keepalive_connections=12,
+                keepalive_expiry=25.0,
+            ),
+        )
+        _MEDIA_CLIENTS[loop] = client
+    return client
+
+
+@app.on_event("shutdown")
+async def _close_media_http_client() -> None:
+    loop = asyncio.get_running_loop()
+    client = _MEDIA_CLIENTS.pop(loop, None)
+    if client is not None:
+        await client.aclose()
 
 
 def _proxied_url(target: str, referer: str) -> str:
@@ -685,61 +697,124 @@ def _proxied_url(target: str, referer: str) -> str:
     })
 
 
+def _media_proxy_headers(upstream: httpx.Response) -> dict[str, str]:
+    headers = {"Cache-Control": "no-store"}
+    for name in (
+        "content-range",
+        "accept-ranges",
+        "content-length",
+        "content-encoding",
+        "last-modified",
+        "etag",
+        "content-disposition",
+    ):
+        value = upstream.headers.get(name)
+        if value:
+            headers[name] = value
+    return headers
+
+
 @app.get("/api/proxy")
 async def local_media_proxy(request: Request, url: str, referer: str = ""):
-    """Proxy HLS manifests and segments, preserving byte ranges for MP4/media playback."""
+    """Stream media with range support, validated redirects, and pooled upstream connections."""
+    upstream: httpx.Response | None = None
     try:
-        target = _validated_remote_url(url)
+        target = await _validated_public_remote_url(url)
         effective_referer = referer.strip() or f"{urlsplit(target).scheme}://{urlsplit(target).netloc}/"
         headers = dict(HEADERS)
         headers["Referer"] = effective_referer
-        # Media elements use Range requests for video metadata, seeking and
-        # segmented delivery. Forward the range headers rather than turning
-        # every MP4/server response into an unseekable full-file download.
+        # Preserve Range/If-Range so MP4 seeking does not force a full-file download.
         for name in ("range", "if-range"):
             value = request.headers.get(name)
             if value:
                 headers[name.title()] = value
 
-        async with httpx.AsyncClient(timeout=35.0, follow_redirects=True) as client:
-            upstream = await client.get(target, headers=headers)
+        client = _get_media_http_client()
+        for redirect_count in range(6):
+            target = await _validated_public_remote_url(target)
+            outbound = client.build_request("GET", target, headers=headers)
+            upstream = await client.send(outbound, stream=True, follow_redirects=False)
+            location = upstream.headers.get("location")
+            if upstream.status_code not in {301, 302, 303, 307, 308} or not location:
+                break
 
+            await upstream.aclose()
+            upstream = None
+            if redirect_count == 5:
+                raise ValueError("Media source exceeded the redirect limit")
+            target = urljoin(target, location)
+        else:
+            raise ValueError("Media source exceeded the redirect limit")
+
+        assert upstream is not None
         content_type = upstream.headers.get("content-type", "application/octet-stream")
+        iterator = upstream.aiter_raw().__aiter__()
+        prefix_chunks: list[bytes] = []
+        prefix = bytearray()
+        while len(prefix) < 128:
+            try:
+                chunk = await anext(iterator)
+            except StopAsyncIteration:
+                break
+            if not chunk:
+                continue
+            prefix_chunks.append(chunk)
+            prefix.extend(chunk)
+            if b"\n" in prefix and prefix.lstrip().startswith(b"#EXTM3U"):
+                break
+
         is_manifest = (
             ".m3u8" in urlsplit(target).path.lower()
             or "mpegurl" in content_type.lower()
-            or upstream.content[:128].lstrip().startswith(b"#EXTM3U")
+            or bytes(prefix).lstrip().startswith(b"#EXTM3U")
         )
+        forwarded_headers = _media_proxy_headers(upstream)
+
+        async def stream_remaining():
+            try:
+                for chunk in prefix_chunks:
+                    yield chunk
+                async for chunk in iterator:
+                    yield chunk
+            finally:
+                if upstream is not None:
+                    await upstream.aclose()
+
         if not upstream.is_success:
-            forwarded_headers = {"Cache-Control": "no-store"}
-            for header in ("content-range", "accept-ranges", "content-length", "last-modified", "etag"):
-                value = upstream.headers.get(header)
-                if value:
-                    forwarded_headers[header] = value
-            return Response(
-                content=upstream.content,
+            # Keep error responses streamable too; providers sometimes return sizeable HTML pages.
+            return StreamingResponse(
+                stream_remaining(),
                 status_code=upstream.status_code,
                 media_type=content_type,
                 headers=forwarded_headers,
             )
 
         if is_manifest:
+            chunks = list(prefix_chunks)
+            async for chunk in iterator:
+                chunks.append(chunk)
+            await upstream.aclose()
+            body = b"".join(chunks).decode(upstream.encoding or "utf-8", errors="replace")
             rewritten = []
-            for line in upstream.text.splitlines():
+            for line in body.splitlines():
                 stripped = line.strip()
                 if stripped.startswith("#"):
-                    # HLS encryption keys and initialization maps use URI attributes.
+                    # HLS encryption keys and initialization maps may use URI attributes.
                     if 'URI="' in line:
-                        line = re.sub(
-                            r'URI="([^"]+)"',
-                            lambda found: 'URI="' + _proxied_url(
-                                urljoin(target, found.group(1)), effective_referer
-                            ) + '"',
-                            line,
-                        )
+                        def rewrite_uri(found):
+                            absolute = urljoin(target, found.group(1))
+                            if urlsplit(absolute).scheme not in {"http", "https"}:
+                                return found.group(0)
+                            return 'URI="' + _proxied_url(absolute, effective_referer) + '"'
+
+                        line = re.sub(r'URI="([^"]+)"', rewrite_uri, line)
                     rewritten.append(line)
                 elif stripped:
-                    rewritten.append(_proxied_url(urljoin(target, stripped), effective_referer))
+                    absolute = urljoin(target, stripped)
+                    if urlsplit(absolute).scheme in {"http", "https"}:
+                        rewritten.append(_proxied_url(absolute, effective_referer))
+                    else:
+                        rewritten.append(line)
                 else:
                     rewritten.append(line)
             return Response(
@@ -748,21 +823,20 @@ async def local_media_proxy(request: Request, url: str, referer: str = ""):
                 headers={"Cache-Control": "no-store"},
             )
 
-        forwarded_headers = {"Cache-Control": "no-store"}
-        for header in ("content-range", "accept-ranges", "content-length", "last-modified", "etag"):
-            value = upstream.headers.get(header)
-            if value:
-                forwarded_headers[header] = value
-        return Response(
-            content=upstream.content,
+        return StreamingResponse(
+            stream_remaining(),
             status_code=upstream.status_code,
             media_type=content_type,
             headers=forwarded_headers,
         )
     except ValueError as error:
+        if upstream is not None:
+            await upstream.aclose()
         return JSONResponse({"detail": str(error)}, status_code=400)
-    except Exception as error:
-        return JSONResponse({"detail": f"Media proxy failed: {error}"}, status_code=502)
+    except Exception:
+        if upstream is not None:
+            await upstream.aclose()
+        return JSONResponse({"detail": "Media proxy is temporarily unavailable"}, status_code=502)
 
 
 def get_token() -> str:

@@ -4,6 +4,7 @@ on:
   pull_request:
     branches:
       - master
+      - fix/player-embed-pip-background
   workflow_dispatch:
     inputs:
       build_type:
@@ -65,6 +66,15 @@ jobs:
           node-version: 22
           cache: npm
 
+      - name: Restore Next.js build cache
+        uses: actions/cache@v4
+        with:
+          path: .next/cache
+          key: ${{ runner.os }}-nextjs-${{ hashFiles('package-lock.json') }}-${{ github.ref }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-nextjs-${{ hashFiles('package-lock.json') }}-${{ github.ref }}-
+            ${{ runner.os }}-nextjs-${{ hashFiles('package-lock.json') }}-
+
       - name: Setup Python 3.11
         uses: actions/setup-python@v5
         with:
@@ -84,8 +94,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          npm install --package-lock-only --ignore-scripts --no-audit --no-fund
-          npm ci --prefer-offline --no-audit
+          npm ci --prefer-offline --no-audit --no-fund
 
       - name: Resolve Android version
         shell: bash
@@ -253,8 +262,10 @@ jobs:
               raise SystemExit("Double-tap ±10-second seeking wiring missing")
           if "SWIPE_THRESHOLD" not in viewport or "enterNativePlayerFullscreen" not in viewport:
               raise SystemExit("Player swipe/fullscreen wiring missing")
-          if "enterNativePictureInPicture" not in viewport or 'data-player-viewport="true"' not in viewport:
-              raise SystemExit("Native PiP player control or viewport marker is missing")
+          if 'data-player-viewport="true"' not in viewport:
+              raise SystemExit("Player viewport marker is missing")
+          if 'picture-in-picture' not in watch_section:
+              raise SystemExit("Embedded providers must be granted PiP permission")
           persistent_host = Path("src/components/persistent-watch-experience.tsx").read_text(encoding="utf-8")
           watch_page = Path("src/app/anime/watch/page.tsx").read_text(encoding="utf-8")
           layout = Path("src/app/layout.tsx").read_text(encoding="utf-8")
@@ -300,8 +311,11 @@ jobs:
               raise SystemExit("The update gate must remain invisible while checking for an update")
           if 'ACTIVE_PROVIDER_ORDER = ("anixo", "megavid", "tryembed", "cinexstream")' not in local_api_text:
               raise SystemExit("Android active provider allowlist has unexpected servers")
-          if "DISABLED_PROVIDER_NAMES" not in server_map:
-              raise SystemExit("Disabled providers must be excluded from the selectable catalogue")
+          retired_names = ("animeparadise", "megaflix", "nontongo")
+          if any(name in server_map.lower() for name in retired_names):
+              raise SystemExit("Retired providers must not be registered in the selectable catalogue")
+          if any(name in local_api_text.lower() for name in retired_names):
+              raise SystemExit("Retired providers must not be registered in the Android backend")
           if any(provider not in watch_section for provider in ("tryembed", "cinexstream")):
               raise SystemExit("Provider stall watchdog does not cover every enabled embed")
           if "const playerReady =" not in watch_section:
@@ -379,29 +393,31 @@ jobs:
 
       # Test the exact patched Python tree that Chaquopy packages in the APK,
       # not the raw upstream checkout that still contains Python 3.12-only syntax.
-      - name: Smoke test packaged Kuhi providers
+      - name: Smoke test minimal packaged provider set
         env:
           PYTHONPATH: android/app/src/main/python:android-local-backend
         run: |
           python - <<'PY'
+          from pathlib import Path
           import local_api
           from fastapi.testclient import TestClient
           from src.providers import _race
 
-          expected_modules = {
-              "anineko", "anizone", "anikoto", "reanime", "aniwaves",
-              "kaa", "anibd", "animegg", "mkissa", "animeonsen", "animenosub",
-              "anixo", "megavid", "animeparadise",
-              "megaflix", "tryembed", "cinexstream", "nontongo",
-          }
+          expected_modules = {"anixo", "megavid", "tryembed", "cinexstream"}
           providers = _race.providers()
           loaded_names = {name for name, _ in providers}
-          print("Packaged Kuhi providers:", ", ".join(name for name, _ in providers))
-          missing = expected_modules - loaded_names
-          if missing:
-              raise SystemExit(f"Packaged API failed to load required providers: {sorted(missing)}")
+          print("Packaged active providers:", ", ".join(name for name, _ in providers))
+          if loaded_names != expected_modules:
+              raise SystemExit(
+                  f"Expected exactly {sorted(expected_modules)}, got {sorted(loaded_names)}"
+              )
+          provider_dir = Path("android/app/src/main/python/src/providers")
+          retired_modules = {"animeparadise.py", "megaflix.py", "nontongo.py", "animenosub.py"}
+          bundled_retired = sorted(path.name for path in provider_dir.glob("*.py") if path.name in retired_modules)
+          if bundled_retired:
+              raise SystemExit(f"Retired provider modules were bundled: {bundled_retired}")
 
-          assert local_api._episode_number_from_slug("anineko-12") == 12
+          assert local_api._episode_number_from_slug("episode-12") == 12
           assert local_api._episode_number_from_slug("episode-3") == 3
           assert local_api._validated_remote_url("https://example.com/master.m3u8").startswith("https://")
           try:
@@ -444,7 +460,7 @@ jobs:
                   f"{sorted(reported - active_manual)}"
               )
           print(
-              "Packaged API: all 18 adapter modules imported; only four approved "
+              "Packaged API: all four active adapter modules imported; only four approved "
               "manual choices are exposed; health, auth, diagnostics and CORS passed."
           )
           PY

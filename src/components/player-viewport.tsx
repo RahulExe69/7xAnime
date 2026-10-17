@@ -1,11 +1,11 @@
 "use client";
 
-import React, { PointerEvent, ReactNode, useCallback, useEffect, useRef, useState } from "react";
+import React, { PointerEvent, ReactNode, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { App } from "@capacitor/app";
 import { Capacitor } from "@capacitor/core";
 import { usePathname } from "next/navigation";
-import { Maximize2, Minimize2, PictureInPicture, X } from "lucide-react";
-import { enterNativePictureInPicture, enterNativePlayerFullscreen, exitNativePlayerFullscreen } from "@/lib/native-player-fullscreen";
+import { X } from "lucide-react";
+import { enterNativePlayerFullscreen, exitNativePlayerFullscreen } from "@/lib/native-player-fullscreen";
 
 type PlayerViewportProps = {
   children: ReactNode;
@@ -14,6 +14,19 @@ type PlayerViewportProps = {
 };
 
 type GestureStart = { x: number; y: number; at: number };
+type MiniDragGesture = {
+  pointerId: number;
+  startX: number;
+  startY: number;
+  startOffsetX: number;
+  startOffsetY: number;
+  originLeft: number;
+  originTop: number;
+  originWidth: number;
+  originHeight: number;
+  moved: boolean;
+};
+type RectSnapshot = { left: number; top: number; width: number; height: number };
 
 const SWIPE_THRESHOLD = 72;
 const SWIPE_MAX_X_DRIFT = 120;
@@ -29,9 +42,21 @@ export function PlayerViewport({
   const isWatchRoute = pathname === "/anime/watch" || pathname.startsWith("/anime/watch/");
   const isMiniPlayer = !isWatchRoute;
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [miniControlsVisible, setMiniControlsVisible] = useState(false);
+  const miniControlsTimerRef = useRef<number | null>(null);
+  const [miniOffset, setMiniOffset] = useState({ x: 0, y: 0 });
+  const miniOffsetRef = useRef({ x: 0, y: 0 });
+  const [isMiniDragging, setIsMiniDragging] = useState(false);
+  const miniDragRef = useRef<MiniDragGesture | null>(null);
+  const suppressMiniClickRef = useRef(false);
+  const lastRectRef = useRef<RectSnapshot | null>(null);
+  const layoutAnimationRef = useRef<Animation | null>(null);
+  const previousLayoutRef = useRef({ isMiniPlayer, isFullscreen });
   const isFullscreenRef = useRef(false);
   isFullscreenRef.current = isFullscreen;
 
+  // Embedded providers now own their visible fullscreen/PiP controls. These
+  // native helpers remain for the app's existing swipe-to-fullscreen gestures.
   const enterFullscreen = useCallback(async () => {
     if (isFullscreen) return;
     setIsFullscreen(true);
@@ -44,18 +69,275 @@ export function PlayerViewport({
     await exitNativePlayerFullscreen();
   }, [isFullscreen]);
 
-  const toggleFullscreen = useCallback(() => {
-    if (isFullscreen) void exitFullscreen();
-    else void enterFullscreen();
-  }, [enterFullscreen, exitFullscreen, isFullscreen]);
-
-  const enterPictureInPicture = useCallback(() => {
-    void enterNativePictureInPicture();
+  const updateMiniOffset = useCallback((next: { x: number; y: number }) => {
+    const normalized = {
+      x: Number.isFinite(next.x) ? next.x : 0,
+      y: Number.isFinite(next.y) ? next.y : 0,
+    };
+    miniOffsetRef.current = normalized;
+    setMiniOffset(normalized);
   }, []);
+
+  // Keep the most recent on-screen rectangle. The FLIP animation uses it as
+  // the starting geometry when route state turns the persistent player into
+  // a mini-player (or when a mini-player expands back to the page/fullscreen).
+  useEffect(() => {
+    let frame = 0;
+    const capture = () => {
+      const node = rootRef.current;
+      if (node && layoutAnimationRef.current?.playState !== "running") {
+        const rect = node.getBoundingClientRect();
+        lastRectRef.current = {
+          left: rect.left, top: rect.top, width: rect.width, height: rect.height,
+        };
+      }
+      frame = window.requestAnimationFrame(capture);
+    };
+    frame = window.requestAnimationFrame(capture);
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
+
+  useLayoutEffect(() => {
+    const previous = previousLayoutRef.current;
+    const changed = previous.isMiniPlayer !== isMiniPlayer ||
+      previous.isFullscreen !== isFullscreen;
+    previousLayoutRef.current = { isMiniPlayer, isFullscreen };
+    if (!changed) return;
+
+    const node = rootRef.current;
+    if (!node) return;
+    const from = lastRectRef.current;
+    const rect = node.getBoundingClientRect();
+    const to: RectSnapshot = {
+      left: rect.left, top: rect.top, width: rect.width, height: rect.height,
+    };
+    const reducedMotion = document.documentElement.dataset.reducedMotion === "true" ||
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reducedMotion || !from || rect.width < 1 || rect.height < 1) {
+      lastRectRef.current = to;
+      return;
+    }
+
+    const deltaX = from.left - to.left;
+    const deltaY = from.top - to.top;
+    const scaleX = from.width / to.width;
+    const scaleY = from.height / to.height;
+    if (
+      Math.abs(deltaX) < 1 && Math.abs(deltaY) < 1 &&
+      Math.abs(scaleX - 1) < 0.02 && Math.abs(scaleY - 1) < 0.02
+    ) {
+      lastRectRef.current = to;
+      return;
+    }
+
+    layoutAnimationRef.current?.cancel();
+    const animation = node.animate([
+      {
+        transform: `translate3d(${deltaX}px, ${deltaY}px, 0) scale(${scaleX}, ${scaleY})`,
+        borderRadius: previous.isMiniPlayer ? "14px" : "16px",
+      },
+      {
+        transform: "translate3d(0, 0, 0) scale(1, 1)",
+        borderRadius: isMiniPlayer ? "14px" : "16px",
+      },
+    ], {
+      duration: 360,
+      easing: "cubic-bezier(0.22, 1, 0.36, 1)",
+    });
+    layoutAnimationRef.current = animation;
+    void animation.finished.then(() => {
+      if (layoutAnimationRef.current !== animation) return;
+      layoutAnimationRef.current = null;
+      const finalRect = node.getBoundingClientRect();
+      lastRectRef.current = {
+        left: finalRect.left, top: finalRect.top,
+        width: finalRect.width, height: finalRect.height,
+      };
+    }).catch(() => {
+      if (layoutAnimationRef.current === animation) layoutAnimationRef.current = null;
+    });
+    return () => {
+      // Do not cancel here: a navigation can immediately trigger another
+      // layout effect, which explicitly cancels the previous FLIP animation.
+    };
+  }, [isMiniPlayer, isFullscreen]);
+
 
   const dispatchPlayerAction = useCallback((action: "expand-mini-player" | "minimize-player" | "close-mini-player") => {
     if (typeof window !== "undefined") window.dispatchEvent(new Event(`7xanime:${action}`));
   }, []);
+
+  const requestEmbeddedControlsHidden = useCallback(() => {
+    const frame = rootRef.current?.querySelector("iframe");
+    const target = frame?.contentWindow;
+    if (!target) return;
+    // Cross-origin providers expose different control APIs. Send harmless,
+    // common "disable/hide controls" messages where supported; the touch shield
+    // remains the reliable fallback for providers that ignore these requests.
+    const commands = [
+      { event: "controls", enabled: false, visible: false, value: false },
+      { type: "controls", enabled: false, visible: false, value: false },
+      { action: "hide-controls" },
+      { method: "setControls", value: false },
+      { event: "command", func: "setControls", args: [false] },
+      { controls: false },
+    ];
+    for (const command of commands) {
+      try { target.postMessage(command, "*"); } catch { /* provider ignored */ }
+    }
+  }, []);
+
+  const requestEmbeddedControlsVisible = useCallback(() => {
+    const frame = rootRef.current?.querySelector("iframe");
+    const target = frame?.contentWindow;
+    if (!target) return;
+    const commands = [
+      { event: "controls", enabled: true, visible: true, value: true },
+      { type: "controls", enabled: true, visible: true, value: true },
+      { action: "show-controls" },
+      { method: "setControls", value: true },
+      { event: "command", func: "setControls", args: [true] },
+      { controls: true },
+    ];
+    for (const command of commands) {
+      try { target.postMessage(command, "*"); } catch { /* provider ignored */ }
+    }
+  }, []);
+
+  const revealMiniControls = useCallback(() => {
+    if (!isMiniPlayer) return;
+    requestEmbeddedControlsHidden();
+    if (miniControlsTimerRef.current !== null) {
+      window.clearTimeout(miniControlsTimerRef.current);
+    }
+    setMiniControlsVisible(true);
+    miniControlsTimerRef.current = window.setTimeout(() => {
+      setMiniControlsVisible(false);
+      miniControlsTimerRef.current = null;
+    }, 3500);
+  }, [isMiniPlayer, requestEmbeddedControlsHidden]);
+
+  const startMiniDrag = useCallback((event: PointerEvent<HTMLDivElement>) => {
+    if (!isMiniPlayer) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const node = rootRef.current;
+    if (!node) return;
+    const rect = node.getBoundingClientRect();
+    const offset = miniOffsetRef.current;
+    suppressMiniClickRef.current = false;
+    miniDragRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      startOffsetX: offset.x,
+      startOffsetY: offset.y,
+      originLeft: rect.left,
+      originTop: rect.top,
+      originWidth: rect.width,
+      originHeight: rect.height,
+      moved: false,
+    };
+    try { event.currentTarget.setPointerCapture(event.pointerId); } catch {
+      // Pointer capture may be unavailable in older Android WebViews.
+    }
+  }, [isMiniPlayer]);
+
+  const moveMiniPlayer = useCallback((event: PointerEvent<HTMLDivElement>) => {
+    const drag = miniDragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const deltaX = event.clientX - drag.startX;
+    const deltaY = event.clientY - drag.startY;
+    if (!drag.moved && Math.hypot(deltaX, deltaY) < 6) return;
+    if (!drag.moved) setIsMiniDragging(true);
+    drag.moved = true;
+
+    const viewportWidth = document.documentElement.clientWidth || window.innerWidth;
+    const viewportHeight = document.documentElement.clientHeight || window.innerHeight;
+    const left = Math.min(Math.max(drag.originLeft + deltaX, 8), Math.max(8, viewportWidth - drag.originWidth - 8));
+    const top = Math.min(Math.max(drag.originTop + deltaY, 8), Math.max(8, viewportHeight - drag.originHeight - 8));
+    updateMiniOffset({
+      x: drag.startOffsetX + left - drag.originLeft,
+      y: drag.startOffsetY + top - drag.originTop,
+    });
+  }, [updateMiniOffset]);
+
+  const finishMiniDrag = useCallback((event: PointerEvent<HTMLDivElement>) => {
+    const drag = miniDragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    event.stopPropagation();
+    miniDragRef.current = null;
+    if (!drag.moved) {
+      setIsMiniDragging(false);
+      return;
+    }
+
+    suppressMiniClickRef.current = true;
+    setIsMiniDragging(false);
+    const node = rootRef.current;
+    if (node) {
+      const rect = node.getBoundingClientRect();
+      const viewportWidth = document.documentElement.clientWidth || window.innerWidth;
+      const viewportHeight = document.documentElement.clientHeight || window.innerHeight;
+      const snappedLeft = rect.left + rect.width / 2 < viewportWidth / 2
+        ? 12
+        : Math.max(12, viewportWidth - rect.width - 12);
+      const snappedTop = Math.min(Math.max(rect.top, 8), Math.max(8, viewportHeight - rect.height - 8));
+      const offset = miniOffsetRef.current;
+      updateMiniOffset({
+        x: offset.x + snappedLeft - rect.left,
+        y: offset.y + snappedTop - rect.top,
+      });
+    }
+    revealMiniControls();
+    window.setTimeout(() => { suppressMiniClickRef.current = false; }, 350);
+  }, [revealMiniControls, updateMiniOffset]);
+
+  useEffect(() => {
+    if (!isMiniPlayer) {
+      requestEmbeddedControlsVisible();
+      setMiniControlsVisible(false);
+      if (miniControlsTimerRef.current !== null) {
+        window.clearTimeout(miniControlsTimerRef.current);
+        miniControlsTimerRef.current = null;
+      }
+    }
+    return () => {
+      if (miniControlsTimerRef.current !== null) {
+        window.clearTimeout(miniControlsTimerRef.current);
+        miniControlsTimerRef.current = null;
+      }
+    };
+  }, [isMiniPlayer, requestEmbeddedControlsVisible]);
+
+  useEffect(() => {
+    if (!isMiniPlayer) return;
+    const root = rootRef.current;
+    if (!root) return;
+
+    let activeFrame: HTMLIFrameElement | null = null;
+    const handleFrameLoad = () => requestEmbeddedControlsHidden();
+    const attachFrame = () => {
+      const nextFrame = root.querySelector("iframe");
+      if (nextFrame === activeFrame) return;
+      activeFrame?.removeEventListener("load", handleFrameLoad);
+      activeFrame = nextFrame;
+      if (activeFrame) {
+        activeFrame.addEventListener("load", handleFrameLoad);
+        requestEmbeddedControlsHidden();
+      }
+    };
+
+    const observer = new MutationObserver(attachFrame);
+    observer.observe(root, { childList: true, subtree: true });
+    attachFrame();
+    return () => {
+      observer.disconnect();
+      activeFrame?.removeEventListener("load", handleFrameLoad);
+    };
+  }, [isMiniPlayer, requestEmbeddedControlsHidden]);
 
   const handleVerticalSwipe = useCallback((deltaY: number) => {
     if (deltaY < 0) {
@@ -184,77 +466,55 @@ export function PlayerViewport({
       data-player-mini={isMiniPlayer ? "true" : "false"}
       data-player-viewport="true"
       aria-label={title}
+      data-mini-dragging={isMiniDragging ? "true" : "false"}
+      style={{ "--mini-player-offset": isMiniPlayer ? `${miniOffset.x}px ${miniOffset.y}px` : "0px 0px" } as React.CSSProperties}
     >
       <div className="absolute inset-0 h-full w-full">
         {children}
       </div>
 
-      {Capacitor.isNativePlatform() && (
-        <button
-          type="button"
-          onPointerDown={(event) => event.stopPropagation()}
+      {isMiniPlayer && (
+        <div
+          aria-label="Mini-player interaction shield"
+          data-mini-player-interaction-shield="true"
+          className={`absolute inset-0 z-[10001] touch-none select-none bg-transparent ${isMiniDragging ? "cursor-grabbing" : "cursor-grab"}`}
+          onPointerDown={startMiniDrag}
+          onPointerMove={moveMiniPlayer}
+          onPointerUp={finishMiniDrag}
+          onPointerCancel={finishMiniDrag}
           onClick={(event) => {
             event.preventDefault();
             event.stopPropagation();
-            enterPictureInPicture();
+            if (suppressMiniClickRef.current) {
+              suppressMiniClickRef.current = false;
+              return;
+            }
+            dispatchPlayerAction("expand-mini-player");
           }}
-          title="Picture-in-picture"
-          aria-label="Picture-in-picture"
-          className={`absolute right-14 top-2 z-[10002] flex h-10 w-10 items-center justify-center rounded-xl border border-white/15 bg-black/65 text-white shadow-lg backdrop-blur-sm transition hover:bg-black/85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-400 ${isMiniPlayer ? "hidden" : ""}`}
-        >
-          <PictureInPicture size={18} />
-        </button>
+        />
       )}
 
-      <button
-        type="button"
-        onPointerDown={(event) => event.stopPropagation()}
-        onClick={(event) => {
-          event.preventDefault();
-          event.stopPropagation();
-          toggleFullscreen();
-        }}
-        title={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
-        aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
-        className={`absolute right-2 top-2 z-[10002] flex h-10 w-10 items-center justify-center rounded-xl border border-white/15 bg-black/65 text-white shadow-lg backdrop-blur-sm transition hover:bg-black/85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-400 ${isMiniPlayer ? "hidden" : ""}`}
-      >
-        {isFullscreen ? <Minimize2 size={19} /> : <Maximize2 size={19} />}
-      </button>
-
       {isMiniPlayer && (
-        <div className="pointer-events-none absolute inset-x-0 top-0 z-[10003] flex items-start justify-between gap-2 rounded-t-2xl bg-gradient-to-b from-black/90 via-black/35 to-transparent p-2 pb-5">
-          <span className="min-w-0 flex-1 truncate pt-1 text-xs font-semibold text-white drop-shadow">{title.replace(/ video player$/i, "")}</span>
-          <div className="pointer-events-auto flex shrink-0 items-center gap-1">
-            <button
-              type="button"
-              onPointerDown={(event) => event.stopPropagation()}
-              onClick={(event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                dispatchPlayerAction("expand-mini-player");
-              }}
-              aria-label="Return to full player"
-              title="Return to full player"
-              className="grid h-8 w-8 place-items-center rounded-lg border border-white/15 bg-black/65 text-white shadow-md backdrop-blur-sm"
-            >
-              <Maximize2 size={16} />
-            </button>
-            <button
-              type="button"
-              onPointerDown={(event) => event.stopPropagation()}
-              onClick={(event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                dispatchPlayerAction("close-mini-player");
-              }}
-              aria-label="Close mini-player"
-              title="Close mini-player"
-              className="grid h-8 w-8 place-items-center rounded-lg border border-white/15 bg-black/65 text-white shadow-md backdrop-blur-sm"
-            >
-              <X size={16} />
-            </button>
+        <>
+          <div className={`pointer-events-none absolute inset-x-0 top-0 z-[10003] flex items-start justify-between gap-2 rounded-t-2xl bg-gradient-to-b from-black/90 via-black/35 to-transparent p-2 pb-5 transition-opacity duration-200 ${miniControlsVisible ? "opacity-100" : "opacity-0"}`}>
+            <span className="min-w-0 flex-1 truncate pt-1 text-xs font-semibold text-white drop-shadow">{title.replace(/ video player$/i, "")}</span>
           </div>
-        </div>
+          <button
+            type="button"
+            data-mini-player-close="true"
+            onPointerDown={(event) => event.stopPropagation()}
+            onClick={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              dispatchPlayerAction("close-mini-player");
+            }}
+            aria-label="Close mini-player"
+            title="Close mini-player"
+            className="absolute right-1 top-1 z-[10004] grid h-8 w-8 place-items-center rounded-full border-0 bg-transparent p-0 text-white shadow-none drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)] transition-transform hover:scale-110 hover:bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80"
+          >
+            <X size={19} strokeWidth={2.5} />
+          </button>
+        </>
       )}
 
       {/* Cross-origin iframe gestures do not bubble to React. The edge rail
