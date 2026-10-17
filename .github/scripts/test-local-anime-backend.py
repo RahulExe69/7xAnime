@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import unittest
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 from fastapi.testclient import TestClient
 
@@ -334,31 +334,36 @@ class LocalAnimeApiTests(unittest.TestCase):
         asyncio.run(exercise())
 
     def test_media_proxy_forwards_byte_ranges_for_mp4(self) -> None:
-        fake_response = type(
-            "FakeResponse",
-            (),
-            {
-                "is_success": True,
-                "status_code": 206,
-                "headers": {
-                    "content-type": "video/mp4",
-                    "content-range": "bytes 0-3/100",
-                    "accept-ranges": "bytes",
-                    "content-length": "4",
-                },
-                "content": b"test",
-                "text": "test",
-            },
-        )()
-        fake_client = AsyncMock()
-        fake_client.__aenter__.return_value = fake_client
-        fake_client.__aexit__.return_value = None
-        fake_client.get = AsyncMock(return_value=fake_response)
+        class FakeResponse:
+            is_success = True
+            status_code = 206
+            headers = {
+                "content-type": "video/mp4",
+                "content-range": "bytes 0-3/100",
+                "accept-ranges": "bytes",
+                "content-length": "4",
+            }
+            encoding = "utf-8"
 
-        with patch.object(local_api.httpx, "AsyncClient", return_value=fake_client):
+            async def aiter_raw(self):
+                yield b"test"
+
+            async def aclose(self):
+                return None
+
+        fake_response = FakeResponse()
+        fake_client = AsyncMock()
+        fake_client.build_request = Mock(return_value=object())
+        fake_client.send = AsyncMock(return_value=fake_response)
+        target = "https://cdn.example/video.mp4"
+
+        with (
+            patch.object(local_api, "_get_media_http_client", return_value=fake_client),
+            patch.object(local_api, "_validated_public_remote_url", new=AsyncMock(return_value=target)),
+        ):
             response = self.client.get(
                 "/api/proxy",
-                params={"url": "https://cdn.example/video.mp4", "referer": "https://cdn.example/"},
+                params={"url": target, "referer": "https://cdn.example/"},
                 headers={**self.auth, "Range": "bytes=0-3"},
             )
 
@@ -366,8 +371,9 @@ class LocalAnimeApiTests(unittest.TestCase):
         self.assertEqual(response.content, b"test")
         self.assertEqual(response.headers.get("content-range"), "bytes 0-3/100")
         self.assertEqual(response.headers.get("accept-ranges"), "bytes")
-        request_headers = fake_client.get.await_args.kwargs["headers"]
+        request_headers = fake_client.build_request.call_args.kwargs["headers"]
         self.assertEqual(request_headers["Range"], "bytes=0-3")
+        fake_client.send.assert_awaited_once()
 
     def test_player_media_format_filter_accepts_hls_mp4_and_embed_but_not_dash(self) -> None:
         streams = [
