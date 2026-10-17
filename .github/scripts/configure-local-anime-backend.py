@@ -546,11 +546,8 @@ def copy_python_source() -> None:
         shutil.rmtree(destination_src)
     shutil.copytree(source_dir / "src", destination_src)
 
-    # Copy the independently authored extra adapters into the packaged provider tree.
-    # AniXo and Megavid are manual-only embed servers; local_api.py excludes them
-    # from Auto racing so a constructed iframe URL cannot masquerade as playback.
-    # Keep only the four manually supported embed adapters. MegaPlay is a
-    # dedicated iframe in the frontend and does not need a Python adapter.
+    # Copy only the four supported embed adapters into the packaged provider tree.
+    # MegaPlay is a dedicated frontend iframe and does not need a Python adapter.
     extra_providers = {
         "anixo": "android-local-backend/extra-providers/anixo.py",
         "megavid": "android-local-backend/extra-providers/megavid.py",
@@ -563,42 +560,6 @@ def copy_python_source() -> None:
             fail(f"The extra {provider_name} provider adapter is missing.")
         shutil.copy2(extra_provider, destination_src / "providers" / f"{provider_name}.py")
 
-    # The upstream race waits up to eight seconds after finding a winning stream,
-    # only to collect optional latency measurements. That tail delay is noticeable
-    # on mobile, so cancel slower competitors almost immediately after a winner.
-    race_file = destination_src / "providers" / "_race.py"
-    race_text = race_file.read_text(encoding="utf-8")
-
-    # Register the added adapter only in the copied, packaged provider tree.
-    ranking_match = re.search(r"(?s)RANKING\s*=\s*\[(.*?)\]", race_text)
-    if not ranking_match:
-        fail("Could not locate Kuhi's provider ranking.")
-    # Retire Kuhi's broad provider pool. Only these four embed adapters are
-    # registered; MegaPlay is the dedicated frontend fallback, not a Kuhi module.
-    ranking_block = '"anixo", "megavid", "tryembed", "cinexstream"'
-    race_text = race_text[:ranking_match.start(1)] + ranking_block + race_text[ranking_match.end(1):]
-
-    slow_cleanup = "await asyncio.wait(pending, timeout=8.0)"
-    if slow_cleanup in race_text:
-        race_text = race_text.replace(slow_cleanup, "await asyncio.wait(pending, timeout=0.2)", 1)
-    elif "await asyncio.wait(pending, timeout=0.2)" not in race_text:
-        fail("Could not locate the upstream stream-race cleanup wait.")
-
-    # A failed stream race must also fail fast enough for the UI to try the next
-    # provider or Server 1. Successful providers still return as soon as one wins.
-    # Provider extraction can perform several network/decryption steps. Eight seconds
-    # caused healthy modules to be reported as failures before extraction completed.
-    # Keep Kuhi's standalone routes consistent with the mobile adapter's
-    # provider budget. The mobile wrapper enforces its own per-provider timeout.
-    old_watch_timeout = "WATCH_TIMEOUT = 75.0"
-    if old_watch_timeout in race_text:
-        race_text = race_text.replace(old_watch_timeout, "WATCH_TIMEOUT = 45.0", 1)
-    elif "WATCH_TIMEOUT = 8.0" in race_text:
-        race_text = race_text.replace("WATCH_TIMEOUT = 8.0", "WATCH_TIMEOUT = 45.0", 1)
-    elif "WATCH_TIMEOUT = 22.0" in race_text:
-        race_text = race_text.replace("WATCH_TIMEOUT = 22.0", "WATCH_TIMEOUT = 45.0", 1)
-    elif "WATCH_TIMEOUT = 45.0" not in race_text:
-        fail("Could not locate the upstream stream provider timeout.")
     race_file.write_text(race_text, encoding="utf-8")
 
     # Keep the Kuhi API's catalogue/context helpers, but do not package its
