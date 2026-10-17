@@ -323,7 +323,7 @@ async def local_provider_status():
         "loadedCount": len(available),
         "providerCount": len(ACTIVE_PROVIDER_ALLOWLIST),
         "providers": providers,
-        "note": "Module-loaded status is not a live guarantee for every anime or episode. Attempt metrics are collected as you select or play providers. AniXo, Megavid, TryEmbed, and CinexStream remain manual-only until device playback is verified. HLS, MP4, and embed URLs are supported; DASH-only results are skipped until a DASH engine is available.",
+        "note": "Only AniXo, Megavid, TryEmbed, and CinexStream are packaged as provider adapters. Module-loaded status is not a live guarantee for every anime or episode; attempt metrics are collected as you select or play providers. These four adapters construct cross-origin embeds, while MegaPlay is the dedicated frontend Server 1 fallback.",
     }
 
 
