@@ -406,6 +406,7 @@ class LocalAnimeApiTests(unittest.TestCase):
                 return None
 
         fake_response = RedirectResponse()
+        fake_response.aclose = AsyncMock()
         fake_client = AsyncMock()
         fake_client.build_request = Mock(return_value=object())
         fake_client.send = AsyncMock(return_value=fake_response)
