@@ -70,11 +70,11 @@ Open `http://localhost:3000`. The stack runs the 7xAnime web app, Miruro API (po
 
 More details, optional Google OAuth setup, and the Android HTTPS endpoint requirements are in [docs/SELF_HOSTING.md](docs/SELF_HOSTING.md). The bundled Miruro API may be blocked by Cloudflare or the hosting provider's IP range, so verify it from the actual deployment before relying on it. The candidate provider API audit and integration decisions are tracked in [docs/PROVIDER_RESEARCH.md](docs/PROVIDER_RESEARCH.md).
 
-## Manual playback candidates
+## Playback servers
 
-The Android local backend exposes manual server choices for AniXo, Megavid, AnimeParadise, MegaFlix, TryEmbed, CinexStream, and NontonGo, alongside the dedicated MegaPlay Server 1 iframe. The four Yomi-derived adapters construct documented embed URLs rather than extracting media themselves. Manual candidates stay out of Auto until verified on a real Android device. See [server notes](docs/SERVERS.md) and the [provider research log](docs/PROVIDER_RESEARCH.md).
+7xAnime supports exactly five standard playback choices: **MegaPlay (Server 1), AniXo, Megavid, TryEmbed, and CinexStream**. MegaPlay is the default Android iframe; the other four are manual embed routes. AnimeParadise, MegaFlix, NontonGo, AnimeNoSub, and the legacy Kuhi provider pool are retired and are not packaged as active providers. See [the server guide](docs/SERVERS.md) for the maintained allowlist and retirement notes.
 
-The shared Android ad-filter engine, known-domain fallback, popup blocking, permission denial, and JavaScript-dialog suppression run for all configured embedded providers—not only Megavid. Provider-served first-party ads or cosmetic HTML overlays may still escape network filtering because those layers are owned by the cross-origin player. Stream resolution retries the selected route twice, and event-reporting embeds are watched for stalled playback; after retries fail, 7xAnime moves to another configured server. MegaPlay fallback renders without waiting for the background request.
+The Android APK retains only the small shared Kuhi API/catalogue infrastructure needed by the current backend; its unrelated provider adapters are pruned at build time. The four embed providers are cross-origin, so provider-owned player controls and overlays cannot always be customized or removed by the parent app.
 
 ## Player experience marathon
 
