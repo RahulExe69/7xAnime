@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
+import Image from "next/image";
 import { App } from "@capacitor/app";
 import { Capacitor } from "@capacitor/core";
 import { ArrowDownToLine, CheckCircle2, Download, ExternalLink, LoaderCircle, ShieldAlert, Sparkles, TriangleAlert } from "lucide-react";
@@ -223,7 +224,7 @@ export default function ForceUpdateGate() {
         <header className="shrink-0 border-b border-white/[0.08] px-4 pb-4 pt-[calc(env(safe-area-inset-top)+0.85rem)] sm:px-6">
           <div className="flex items-center gap-3">
             <div className="grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-2xl border border-white/[0.08] bg-black/35 p-1.5">
-              <img src="/brand/7xanime-icon.png" alt="" className="h-full w-full object-contain" />
+              <Image src="/brand/7xanime-icon.png" alt="" width={48} height={48} className="h-full w-full object-contain" unoptimized />
             </div>
             <div className="min-w-0 flex-1">
               <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.18em] text-[#ff9fbe]">7xAnime · Official release</p>
