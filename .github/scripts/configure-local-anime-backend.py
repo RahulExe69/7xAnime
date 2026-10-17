@@ -723,38 +723,76 @@ def install_player_swipe_observer(main_activity: Path) -> None:
             private float startX;
             private float startY;
             private long startAt;
+            private long lastDispatchAt;
+            private boolean trackingPlayerGesture;
+            private int gestureToken;
+
+            private String makeEvent(String phase, float x, float y, float density, long elapsed) {
+                final float cssStartX = startX / density;
+                final float cssStartY = startY / density;
+                final float cssX = x / density;
+                final float cssY = y / density;
+                final float dx = (x - startX) / density;
+                final float dy = (y - startY) / density;
+                return "(function(){window.dispatchEvent(new CustomEvent('7xanime:native-player-swipe-progress',{detail:{"
+                    + "phase:'" + phase + "',"
+                    + "startX:" + cssStartX + ",startY:" + cssStartY + ","
+                    + "currentX:" + cssX + ",currentY:" + cssY + ","
+                    + "deltaX:" + dx + ",deltaY:" + dy + ",elapsed:" + elapsed
+                    + "}}));})();";
+            }
+
+            private void dispatch(String phase, MotionEvent event, float density) {
+                final String script = makeEvent(phase, event.getX(), event.getY(), density,
+                    Math.max(0L, event.getEventTime() - startAt));
+                webView.post(() -> webView.evaluateJavascript(script, null));
+            }
 
             @Override
             public boolean onTouch(View view, MotionEvent event) {
+                final float density = view.getResources().getDisplayMetrics().density;
                 if (event.getActionMasked() == MotionEvent.ACTION_DOWN) {
                     startX = event.getX();
                     startY = event.getY();
                     startAt = event.getEventTime();
+                    lastDispatchAt = startAt;
+                    trackingPlayerGesture = false;
+                    final int token = ++gestureToken;
+                    final float cssX = startX / density;
+                    final float cssY = startY / density;
+                    // The JS hit test lets native code observe only gestures that
+                    // start over the active player; ordinary page scrolling isn't
+                    // sent through evaluateJavascript on every move.
+                    webView.evaluateJavascript("(function(){var t=document.elementFromPoint("
+                        + cssX + "," + cssY + ");return !!(t&&t.tagName==='IFRAME'&&t.closest('[data-player-viewport=true]'));})()",
+                        value -> {
+                            if (token == gestureToken && value != null && value.equals("true")) {
+                                trackingPlayerGesture = true;
+                                webView.post(() -> webView.evaluateJavascript(
+                                    makeEvent("start", startX, startY, density, 0L), null));
+                            }
+                        });
                     return false;
                 }
-                if (event.getActionMasked() != MotionEvent.ACTION_UP) return false;
-
-                float deltaX = event.getX() - startX;
-                float deltaY = event.getY() - startY;
-                long elapsed = event.getEventTime() - startAt;
-                float density = view.getResources().getDisplayMetrics().density;
-                if (Math.abs(deltaY) < 72f * density
-                    || Math.abs(deltaX) > 120f * density
-                    || elapsed > 900L) {
+                if (event.getActionMasked() == MotionEvent.ACTION_MOVE) {
+                    if (trackingPlayerGesture && event.getEventTime() - lastDispatchAt >= 16L) {
+                        lastDispatchAt = event.getEventTime();
+                        dispatch("move", event, density);
+                    }
                     return false;
                 }
-
-                final float cssX = startX / density;
-                final float cssY = startY / density;
-                final float cssDeltaY = deltaY / density;
-                String script = "(function(){"
-                    + "var target=document.elementFromPoint(" + cssX + "," + cssY + ");"
-                    + "if(target&&target.tagName==='IFRAME'&&target.closest('[data-player-viewport=true]')){"
-                    + "window.dispatchEvent(new CustomEvent('7xanime:native-player-swipe',{detail:{deltaY:"
-                    + cssDeltaY + "}}));"
-                    + "}"
-                    + "})();";
-                webView.post(() -> webView.evaluateJavascript(script, null));
+                if (event.getActionMasked() == MotionEvent.ACTION_UP) {
+                    if (trackingPlayerGesture) dispatch("end", event, density);
+                    trackingPlayerGesture = false;
+                    gestureToken++; // Invalidate a late ACTION_DOWN hit-test callback.
+                    return false;
+                }
+                if (event.getActionMasked() == MotionEvent.ACTION_CANCEL) {
+                    if (trackingPlayerGesture) dispatch("cancel", event, density);
+                    trackingPlayerGesture = false;
+                    gestureToken++;
+                    return false;
+                }
                 return false;
             }
         });

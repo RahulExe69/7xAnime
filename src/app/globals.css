@@ -203,3 +203,9 @@ html.sevenx-pip-mode [data-player-viewport="true"] {
     width: min(360px, calc(100vw - 48px)) !important;
   }
 }
+
+
+/* Do not expose the Chromium native PiP affordance on any accessible video element. */
+video::-webkit-media-controls-picture-in-picture-button {
+  display: none !important;
+}

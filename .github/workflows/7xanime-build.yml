@@ -264,18 +264,20 @@ jobs:
               raise SystemExit("Player swipe/fullscreen wiring missing")
           if 'data-player-viewport="true"' not in viewport:
               raise SystemExit("Player viewport marker is missing")
-          if 'picture-in-picture' not in watch_section:
-              raise SystemExit("Embedded providers must be granted PiP permission")
+          if 'allow="autoplay; fullscreen; picture-in-picture; encrypted-media"' in watch_section:
+              raise SystemExit("Embedded provider iframes must not be granted Picture-in-Picture permission")
+          if "disablePictureInPicture" not in viewport or "disablepictureinpicture" not in viewport:
+              raise SystemExit("Accessible HTML5 video elements must explicitly disable Picture-in-Picture")
           persistent_host = Path("src/components/persistent-watch-experience.tsx").read_text(encoding="utf-8")
           watch_page = Path("src/app/anime/watch/page.tsx").read_text(encoding="utf-8")
           layout = Path("src/app/layout.tsx").read_text(encoding="utf-8")
           css = Path("src/app/globals.css").read_text(encoding="utf-8")
           if "PersistentWatchExperience" not in layout:
               raise SystemExit("Persistent player host is not mounted from the root layout")
-          if "MotionEvent.ACTION_UP" not in main_activity:
-              raise SystemExit("Native embedded-player swipe observation is not installed")
-          if "7xanime:native-player-swipe" not in viewport:
-              raise SystemExit("Embedded-player swipe events are not handled in the viewport")
+          if "MotionEvent.ACTION_MOVE" not in main_activity or "MotionEvent.ACTION_UP" not in main_activity:
+              raise SystemExit("Native continuous embedded-player swipe observation is not installed")
+          if "7xanime:native-player-swipe-progress" not in viewport or "7xanime:native-player-swipe-progress" not in main_activity:
+              raise SystemExit("Finger-following embedded-player swipe events are not wired end-to-end")
           if 'data-persistent-watch-player="true"' not in persistent_host or "lastWatchHrefRef" not in persistent_host:
               raise SystemExit("Persistent player session/restore routing is missing")
           for action in ("expand-mini-player", "minimize-player", "close-mini-player"):
