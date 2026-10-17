@@ -655,7 +655,8 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
     queryFn: async () => (await api.get<LocalProviderStatus>("/api/diagnostics/providers")).data,
     enabled: isLocalBackendEnabled(),
     staleTime: 1000 * 15,
-    refetchInterval: isLocalBackendEnabled() ? 5000 : false,
+    // Diagnostics are shared by the chooser and debug panel; refresh less often than player progress events.
+    refetchInterval: isLocalBackendEnabled() ? 15000 : false,
     refetchOnWindowFocus: false,
     retry: 0,
   });
