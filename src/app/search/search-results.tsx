@@ -55,7 +55,7 @@ function AnimeResultCard({ anime }: { anime: IAnime }) {
     <article className="group min-w-0 overflow-hidden rounded-2xl border border-white/[0.09] bg-[#19070d] shadow-[0_8px_22px_rgba(0,0,0,0.16)] transition hover:border-[#ff3b72]/45 hover:shadow-[0_10px_24px_rgba(255,59,114,0.10)]">
       <Link href={ROUTES.animeDetails(anime.id)} className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#ff3b72]" aria-label={`View ${anime.name} details`}>
         <div className="relative aspect-[2/3] w-full overflow-hidden bg-[#210b14]">
-          <Image src={anime.poster || "/brand/7xanime-mark.svg"} alt={anime.name} fill sizes="(max-width: 640px) 46vw, (max-width: 1024px) 28vw, 220px" className="object-cover transition-transform duration-200 group-hover:scale-[1.025]" />
+          {anime.poster ? <Image src={anime.poster} alt={anime.name} fill sizes="(max-width: 640px) 46vw, (max-width: 1024px) 28vw, 220px" className="object-cover transition-transform duration-200 group-hover:scale-[1.025]" /> : <div aria-hidden="true" className="absolute inset-0 bg-gradient-to-br from-[#351021] via-[#1b0a17] to-[#100b18]" />}
           <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-[#100309]/65 to-transparent" />
           {score && <span className="absolute right-2 top-2 inline-flex items-center gap-1 rounded-lg border border-white/10 bg-[#0a0306]/90 px-2 py-1 text-xs font-extrabold text-white shadow backdrop-blur"><span className="text-amber-300">★</span>{score}</span>}
         </div>
