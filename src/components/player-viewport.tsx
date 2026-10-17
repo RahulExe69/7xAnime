@@ -1,6 +1,6 @@
 "use client";
 
-import React, { PointerEvent, ReactNode, useCallback, useEffect, useRef, useState } from "react";
+import React, { PointerEvent, ReactNode, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { App } from "@capacitor/app";
 import { Capacitor } from "@capacitor/core";
 import { usePathname } from "next/navigation";
@@ -14,6 +14,19 @@ type PlayerViewportProps = {
 };
 
 type GestureStart = { x: number; y: number; at: number };
+type MiniDragGesture = {
+  pointerId: number;
+  startX: number;
+  startY: number;
+  startOffsetX: number;
+  startOffsetY: number;
+  originLeft: number;
+  originTop: number;
+  originWidth: number;
+  originHeight: number;
+  moved: boolean;
+};
+type RectSnapshot = { left: number; top: number; width: number; height: number };
 
 const SWIPE_THRESHOLD = 72;
 const SWIPE_MAX_X_DRIFT = 120;
@@ -31,8 +44,187 @@ export function PlayerViewport({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [miniControlsVisible, setMiniControlsVisible] = useState(false);
   const miniControlsTimerRef = useRef<number | null>(null);
+  const [miniOffset, setMiniOffset] = useState({ x: 0, y: 0 });
+  const miniOffsetRef = useRef({ x: 0, y: 0 });
+  const [isMiniDragging, setIsMiniDragging] = useState(false);
+  const miniDragRef = useRef<MiniDragGesture | null>(null);
+  const suppressMiniClickRef = useRef(false);
+  const lastRectRef = useRef<RectSnapshot | null>(null);
+  const layoutAnimationRef = useRef<Animation | null>(null);
+  const previousLayoutRef = useRef({ isMiniPlayer, isFullscreen });
   const isFullscreenRef = useRef(false);
   isFullscreenRef.current = isFullscreen;
+
+  const updateMiniOffset = useCallback((next: { x: number; y: number }) => {
+    const normalized = {
+      x: Number.isFinite(next.x) ? next.x : 0,
+      y: Number.isFinite(next.y) ? next.y : 0,
+    };
+    miniOffsetRef.current = normalized;
+    setMiniOffset(normalized);
+  }, []);
+
+  // Keep the most recent on-screen rectangle. The FLIP animation uses it as
+  // the starting geometry when route state turns the persistent player into
+  // a mini-player (or when a mini-player expands back to the page/fullscreen).
+  useEffect(() => {
+    let frame = 0;
+    const capture = () => {
+      const node = rootRef.current;
+      if (node && layoutAnimationRef.current?.playState !== "running") {
+        const rect = node.getBoundingClientRect();
+        lastRectRef.current = {
+          left: rect.left, top: rect.top, width: rect.width, height: rect.height,
+        };
+      }
+      frame = window.requestAnimationFrame(capture);
+    };
+    frame = window.requestAnimationFrame(capture);
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
+
+  useLayoutEffect(() => {
+    const previous = previousLayoutRef.current;
+    const changed = previous.isMiniPlayer !== isMiniPlayer ||
+      previous.isFullscreen !== isFullscreen;
+    previousLayoutRef.current = { isMiniPlayer, isFullscreen };
+    if (!changed) return;
+
+    const node = rootRef.current;
+    if (!node) return;
+    const from = lastRectRef.current;
+    const rect = node.getBoundingClientRect();
+    const to: RectSnapshot = {
+      left: rect.left, top: rect.top, width: rect.width, height: rect.height,
+    };
+    const reducedMotion = document.documentElement.dataset.reducedMotion === "true" ||
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reducedMotion || !from || rect.width < 1 || rect.height < 1) {
+      lastRectRef.current = to;
+      return;
+    }
+
+    const deltaX = from.left - to.left;
+    const deltaY = from.top - to.top;
+    const scaleX = from.width / to.width;
+    const scaleY = from.height / to.height;
+    if (
+      Math.abs(deltaX) < 1 && Math.abs(deltaY) < 1 &&
+      Math.abs(scaleX - 1) < 0.02 && Math.abs(scaleY - 1) < 0.02
+    ) {
+      lastRectRef.current = to;
+      return;
+    }
+
+    layoutAnimationRef.current?.cancel();
+    const animation = node.animate([
+      {
+        transform: `translate3d(${deltaX}px, ${deltaY}px, 0) scale(${scaleX}, ${scaleY})`,
+        borderRadius: previous.isMiniPlayer ? "14px" : "16px",
+      },
+      {
+        transform: "translate3d(0, 0, 0) scale(1, 1)",
+        borderRadius: isMiniPlayer ? "14px" : "16px",
+      },
+    ], {
+      duration: 360,
+      easing: "cubic-bezier(0.22, 1, 0.36, 1)",
+    });
+    layoutAnimationRef.current = animation;
+    void animation.finished.then(() => {
+      if (layoutAnimationRef.current !== animation) return;
+      layoutAnimationRef.current = null;
+      const finalRect = node.getBoundingClientRect();
+      lastRectRef.current = {
+        left: finalRect.left, top: finalRect.top,
+        width: finalRect.width, height: finalRect.height,
+      };
+    }).catch(() => {
+      if (layoutAnimationRef.current === animation) layoutAnimationRef.current = null;
+    });
+    return () => {
+      // Do not cancel here: a navigation can immediately trigger another
+      // layout effect, which explicitly cancels the previous FLIP animation.
+    };
+  }, [isMiniPlayer, isFullscreen]);
+
+  const startMiniDrag = useCallback((event: PointerEvent<HTMLDivElement>) => {
+    if (!isMiniPlayer) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const node = rootRef.current;
+    if (!node) return;
+    const rect = node.getBoundingClientRect();
+    const offset = miniOffsetRef.current;
+    suppressMiniClickRef.current = false;
+    miniDragRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      startOffsetX: offset.x,
+      startOffsetY: offset.y,
+      originLeft: rect.left,
+      originTop: rect.top,
+      originWidth: rect.width,
+      originHeight: rect.height,
+      moved: false,
+    };
+    try { event.currentTarget.setPointerCapture(event.pointerId); } catch {
+      // Pointer capture may be unavailable in older Android WebViews.
+    }
+  }, [isMiniPlayer]);
+
+  const moveMiniPlayer = useCallback((event: PointerEvent<HTMLDivElement>) => {
+    const drag = miniDragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const deltaX = event.clientX - drag.startX;
+    const deltaY = event.clientY - drag.startY;
+    if (!drag.moved && Math.hypot(deltaX, deltaY) < 6) return;
+    if (!drag.moved) setIsMiniDragging(true);
+    drag.moved = true;
+
+    const viewportWidth = document.documentElement.clientWidth || window.innerWidth;
+    const viewportHeight = document.documentElement.clientHeight || window.innerHeight;
+    const left = Math.min(Math.max(drag.originLeft + deltaX, 8), Math.max(8, viewportWidth - drag.originWidth - 8));
+    const top = Math.min(Math.max(drag.originTop + deltaY, 8), Math.max(8, viewportHeight - drag.originHeight - 8));
+    updateMiniOffset({
+      x: drag.startOffsetX + left - drag.originLeft,
+      y: drag.startOffsetY + top - drag.originTop,
+    });
+  }, [updateMiniOffset]);
+
+  const finishMiniDrag = useCallback((event: PointerEvent<HTMLDivElement>) => {
+    const drag = miniDragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    event.stopPropagation();
+    miniDragRef.current = null;
+    if (!drag.moved) {
+      setIsMiniDragging(false);
+      return;
+    }
+
+    suppressMiniClickRef.current = true;
+    setIsMiniDragging(false);
+    const node = rootRef.current;
+    if (node) {
+      const rect = node.getBoundingClientRect();
+      const viewportWidth = document.documentElement.clientWidth || window.innerWidth;
+      const viewportHeight = document.documentElement.clientHeight || window.innerHeight;
+      const snappedLeft = rect.left + rect.width / 2 < viewportWidth / 2
+        ? 12
+        : Math.max(12, viewportWidth - rect.width - 12);
+      const snappedTop = Math.min(Math.max(rect.top, 8), Math.max(8, viewportHeight - rect.height - 8));
+      const offset = miniOffsetRef.current;
+      updateMiniOffset({
+        x: offset.x + snappedLeft - rect.left,
+        y: offset.y + snappedTop - rect.top,
+      });
+    }
+    revealMiniControls();
+    window.setTimeout(() => { suppressMiniClickRef.current = false; }, 350);
+  }, [revealMiniControls, updateMiniOffset]);
 
   const enterFullscreen = useCallback(async () => {
     if (isFullscreen) return;
@@ -280,6 +472,8 @@ export function PlayerViewport({
       data-player-mini={isMiniPlayer ? "true" : "false"}
       data-player-viewport="true"
       aria-label={title}
+      data-mini-dragging={isMiniDragging ? "true" : "false"}
+      style={{ "--mini-player-offset": isMiniPlayer ? `${miniOffset.x}px ${miniOffset.y}px` : "0px 0px" } as React.CSSProperties}
     >
       <div className="absolute inset-0 h-full w-full">
         {children}
@@ -289,10 +483,18 @@ export function PlayerViewport({
         <div
           aria-label="Mini-player interaction shield"
           data-mini-player-interaction-shield="true"
-          className="absolute inset-0 z-[10001] cursor-pointer bg-transparent"
+          className={`absolute inset-0 z-[10001] touch-none select-none bg-transparent ${isMiniDragging ? "cursor-grabbing" : "cursor-grab"}`}
+          onPointerDown={startMiniDrag}
+          onPointerMove={moveMiniPlayer}
+          onPointerUp={finishMiniDrag}
+          onPointerCancel={finishMiniDrag}
           onClick={(event) => {
             event.preventDefault();
             event.stopPropagation();
+            if (suppressMiniClickRef.current) {
+              suppressMiniClickRef.current = false;
+              return;
+            }
             revealMiniControls();
           }}
         />
