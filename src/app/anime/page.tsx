@@ -1,5 +1,6 @@
 "use client";
 import React, { Suspense, useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import Image from "next/image";
 
 import parse from "html-react-parser";
@@ -11,7 +12,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import WatchButton from "@/components/watch-button";
 import { IAnime } from "@/types/anime";
 import AnimeCarousel from "@/components/anime-carousel";
-import AnimeEpisodes from "@/components/anime-episodes";
+const AnimeEpisodes = dynamic(() => import("@/components/anime-episodes"), {
+  loading: () => (
+    <div role="status" className="py-8 text-center text-sm text-zinc-500">
+      Loading episodes…
+    </div>
+  ),
+});
 import CharacterCard from "@/components/common/character-card";
 import { ROUTES } from "@/constants/routes";
 import WatchTrailer from "@/components/watch-trailer";
