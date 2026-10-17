@@ -678,7 +678,7 @@ def _validated_remote_url(value: str) -> str:
     except ValueError:
         address = None  # Domain name rather than a literal IP address.
     if address is not None and not address.is_global:
-        raise ValueError("Local or reserved IP targets are not allowed")
+        raise ValueError("Local or private IP targets are not allowed")
     if parts.username or parts.password:
         raise ValueError("Credential-bearing media URLs are not allowed")
     return value
