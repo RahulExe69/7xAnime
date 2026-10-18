@@ -1733,7 +1733,7 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
   // already suspended outside the foreground (unless native PiP is active).
   const playerControls = (
     <>
-    <div className="flex w-full flex-col gap-3 rounded-2xl border border-white/[0.07] bg-[#101018] p-3 sm:p-4>
+    <div className="flex w-full flex-col gap-3 rounded-2xl border border-white/[0.07] bg-[#101018] p-3 sm:p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-1.5 rounded-xl border border-white/[0.08] bg-black/20 p-1">
           <Button size="sm" variant="ghost" disabled={nativeCatalogueComplete && !hasSub} onClick={() => handleCategoryChange("sub")} className={`h-8 rounded-lg px-3 text-xs font-bold transition ${!isHindiMode && activeCategory === "sub" ? "bg-[#ff3b72] text-white hover:bg-[#ff56ad]" : "text-zinc-400 hover:text-white"}`}>
