@@ -72,7 +72,7 @@ More details, optional Google OAuth setup, and the Android HTTPS endpoint requir
 
 ## Playback servers
 
-7xAnime supports exactly seven standard playback choices: **MegaPlay (Server 1), AniXo, Megavid, TryEmbed, CinexStream, SupaPlay, and VidPlus**. MegaPlay is the default Android iframe; the other six are manual embed routes. SupaPlay's `sub`/`dub` and VidPlus's `dub` toggle are generic, not verified Hindi-specific audio. AnimeParadise, MegaFlix, NontonGo, AnimeNoSub, and the legacy Kuhi provider pool are retired and are not packaged as active providers. See [the server guide](docs/SERVERS.md) for the maintained allowlist and retirement notes.
+7xAnime supports exactly seven standard playback choices: **MegaPlay (Server 1), AniXo, Megavid, TryEmbed, CinexStream, SupaPlay, and VidPlus**. MegaPlay is the default Android iframe; the other six are manual embed routes. SupaPlay's `sub`/`dub` is generic. VidPlus requests its documented `server=hindi` selection in dub mode, but the resulting audio is not yet verified as Hindi. AnimeParadise, MegaFlix, NontonGo, AnimeNoSub, and the legacy Kuhi provider pool are retired and are not packaged as active providers. See [the server guide](docs/SERVERS.md) for the maintained allowlist and retirement notes.
 
 The Android APK retains only the small shared Kuhi API/catalogue infrastructure needed by the current backend; its unrelated provider adapters are pruned at build time. The six embed providers are cross-origin, so provider-owned player controls and overlays cannot always be customized or removed by the parent app.
 
