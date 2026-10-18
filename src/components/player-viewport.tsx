@@ -295,8 +295,15 @@ export function PlayerViewport({
     const previous = previousLayoutRef.current;
     const changed = previous.isMiniPlayer !== isMiniPlayer ||
       previous.isFullscreen !== isFullscreen;
+
+    // The mini-player swipe requests fullscreen and route expansion in one
+    // gesture. If React commits the fullscreen state one render before the
+    // watch route, keep the finger-following transform alive until both states
+    // agree, avoiding a snap back to mini size between the two commits.
+    const waitingForExpandedWatchRoute =
+      previous.isMiniPlayer && isMiniPlayer && isFullscreen && swipePreviewActiveRef.current;
     previousLayoutRef.current = { isMiniPlayer, isFullscreen };
-    if (!changed) return;
+    if (waitingForExpandedWatchRoute || !changed) return;
 
     const node = rootRef.current;
     if (!node) return;
