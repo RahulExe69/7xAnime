@@ -27,8 +27,8 @@ The six active adapters are iframe routes, not independent direct-media extracto
 The following provider adapters were removed from the supported list and are pruned from the Android APK:
 
 - **AnimeParadise** — removed; its direct HLS/signed-link integration was not part of the supported server set.
-- **MegaFlix** — removed; not part of the desired active five.
-- **NontonGo** — removed; not part of the desired active five.
+- **MegaFlix** — removed; not part of the supported active server list.
+- **NontonGo** — removed; not part of the supported active server list.
 - **AnimeNoSub** — removed; unrelated embed/catalogue adapter.
 - **Legacy Kuhi providers** such as AniNeko, AniZone, AniKoto, ReAnime, AniWaves, KAA, AniBD, AnimeGG, Mkissa, and AnimeOnsen — not packaged or selectable.
 
@@ -36,7 +36,7 @@ Do not add retired providers back to `src/lib/server-map.ts`, `ACTIVE_PROVIDER_O
 
 ## Hindi dub
 
-Hindi dub remains a separate feature using the community `ZeroTwo-Py/anime-api` catalogue through the fixed `/hindi/search` and `/hindi/stream` routes. Its third-party embeds are separate from the five standard SUB/ENGLISH servers; do not mix Hindi server numbering with the standard server list.
+Hindi dub remains a separate feature using the community `ZeroTwo-Py/anime-api` catalogue through the fixed `/hindi/search` and `/hindi/stream` routes. Its third-party embeds are separate from the seven standard playback choices; do not mix Hindi-mode server numbering with the standard server list. SupaPlay and VidPlus are not yet confirmed as Hindi sources.
 
 ## Testing checklist
 
