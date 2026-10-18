@@ -13,22 +13,17 @@ type WatchLocationDetail = {
   href?: string;
 };
 
-export function PersistentWatchExperience({ children }: PersistentWatchExperienceProps) {
-  const pathname = usePathname() || ROUTES.HOME;
-  const router = useRouter();
+function WatchRouteScrollReset({ isWatchRoute }: { isWatchRoute: boolean }) {
   const searchParams = useSearchParams();
-  const isWatchRoute = pathname === ROUTES.WATCH || pathname.startsWith(`${ROUTES.WATCH}/`);
   const watchLocationKey = isWatchRoute
     ? `${searchParams.get("anime") || ""}:${searchParams.get("episode") || ""}:${searchParams.get("ep") || ""}`
     : "";
-  const [hasPlayerSession, setHasPlayerSession] = useState(isWatchRoute);
-  const lastWatchHrefRef = useRef<string>(ROUTES.WATCH);
-  const lastBrowsePathRef = useRef<string>(ROUTES.HOME);
 
   // Next.js can restore the previous browse-page scroll offset both when
   // entering the watch route and when changing episodes on the same pathname.
   // Include the watch query identity so each newly opened episode starts with
-  // its player visible. The persistent player is hosted in the root layout.
+  // its player visible. This hook is isolated under Suspense to keep static
+  // pages buildable while still responding to client-side route changes.
   useLayoutEffect(() => {
     if (!isWatchRoute) return;
 
@@ -43,6 +38,17 @@ export function PersistentWatchExperience({ children }: PersistentWatchExperienc
     const frame = window.requestAnimationFrame(resetScrollPosition);
     return () => window.cancelAnimationFrame(frame);
   }, [isWatchRoute, watchLocationKey]);
+
+  return null;
+}
+
+export function PersistentWatchExperience({ children }: PersistentWatchExperienceProps) {
+  const pathname = usePathname() || ROUTES.HOME;
+  const router = useRouter();
+  const isWatchRoute = pathname === ROUTES.WATCH || pathname.startsWith(`${ROUTES.WATCH}/`);
+  const [hasPlayerSession, setHasPlayerSession] = useState(isWatchRoute);
+  const lastWatchHrefRef = useRef<string>(ROUTES.WATCH);
+  const lastBrowsePathRef = useRef<string>(ROUTES.HOME);
 
   useEffect(() => {
     if (isWatchRoute) {
@@ -86,6 +92,9 @@ export function PersistentWatchExperience({ children }: PersistentWatchExperienc
 
   return (
     <div className="persistent-watch-experience" data-player-mode={playerMode}>
+      <Suspense fallback={null}>
+        <WatchRouteScrollReset isWatchRoute={isWatchRoute} />
+      </Suspense>
       <div data-persistent-route-content="true">
         {!isWatchRoute ? children : null}
       </div>
