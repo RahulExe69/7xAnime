@@ -1,7 +1,7 @@
 # Hindi AnimeHeaven Provider — Design Specification
 
 **Date:** 2026-10-18  
-**Status:** Design awaiting review; no runtime implementation approved yet  
+**Status:** Historical AnimeHeaven design; no runtime implementation approved. The current candidate selection is superseded by [HINDI_DUB_PROVIDER_EVALUATION.md](../../HINDI_DUB_PROVIDER_EVALUATION.md): WatchAnimeWorld / AnimeWorldIndia is the next local-native evaluation lead, but remains HOLD until site-term, episode-identity, Hindi-evidence, and playback gates pass.  
 **Working branch:** feat/hindi-animeheaven-provider  
 **Repository:** RahulExe69/7xAnime
 
