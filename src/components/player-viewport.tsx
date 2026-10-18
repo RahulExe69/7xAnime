@@ -726,7 +726,7 @@ export function PlayerViewport({
     }
   }, [applyPlayerPreview, applySwipeContentProgress]);
 
-  const commitSwipeGesture = useCallback((session: NativeSwipeSession, deltaX: number, deltaY: number) => {
+  const commitSwipeGesture = useCallback((session: NativeSwipeSession, deltaX: number) => {
     const canCommit = session.axis === "vertical" &&
       session.direction !== null &&
       Math.abs(deltaX) <= SWIPE_MAX_X_DRIFT &&
@@ -889,7 +889,7 @@ export function PlayerViewport({
       const deltaX = event.clientX - drag.startX;
       const deltaY = event.clientY - drag.startY;
       updateSwipePreview(drag.swipeSession, deltaX, deltaY, event.timeStamp);
-      commitSwipeGesture(drag.swipeSession, deltaX, deltaY);
+      commitSwipeGesture(drag.swipeSession, deltaX);
       window.setTimeout(() => { suppressMiniClickRef.current = false; }, 350);
       return;
     }
@@ -959,7 +959,7 @@ export function PlayerViewport({
       nativeSwipeRef.current = null;
       if (detail.phase === "end") {
         updateSwipePreview(session, deltaX, deltaY, detail.elapsed);
-        commitSwipeGesture(session, deltaX, deltaY);
+        commitSwipeGesture(session, deltaX);
       } else if (session.previewing) {
         settlePreviewToOrigin(node);
       } else {
@@ -996,7 +996,7 @@ export function PlayerViewport({
     const deltaX = event.clientX - session.startX;
     const deltaY = event.clientY - session.startY;
     updateSwipePreview(session, deltaX, deltaY, event.timeStamp);
-    commitSwipeGesture(session, deltaX, deltaY);
+    commitSwipeGesture(session, deltaX);
   }, [commitSwipeGesture, updateSwipePreview]);
 
   const cancelGesture = useCallback(() => {
@@ -1037,7 +1037,7 @@ export function PlayerViewport({
       const deltaX = event.clientX - session.startX;
       const deltaY = event.clientY - session.startY;
       updateSwipePreview(session, deltaX, deltaY, event.timeStamp);
-      commitSwipeGesture(session, deltaX, deltaY);
+      commitSwipeGesture(session, deltaX);
     }
   };
 
