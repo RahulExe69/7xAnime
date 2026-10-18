@@ -15,8 +15,10 @@ const AnimeEpisodes = dynamic(() => import("@/components/anime-episodes"), {
 import { useGetEpisodeData } from "@/query/get-episode-data";
 import { useQuery } from "react-query";
 import { getHindiDubStreams } from "@/lib/hindi-dub";
-import { ArrowLeft, Captions, Mic, AlertCircle } from "lucide-react";
+import { ArrowLeft, Captions, Mic, AlertCircle, ChevronDown, ChevronUp, Sparkles } from "lucide-react";
 import Image from "next/image";
+import AnimeCard from "@/components/anime-card";
+import { ROUTES } from "@/constants/routes";
 import parse from "html-react-parser";
 import Link from "next/link";
 import { getProviderDisplayName, getServerProviderTitle, isProviderSelectable, ACTIVE_EMBED_PROVIDER_ORDER } from "@/lib/server-map";
@@ -217,6 +219,7 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
   const episodeIdParam = isWatchRoute ? liveEpisodeIdParam : lastWatchParams?.episodeId || "";
   const { selectedEpisode, setSelectedEpisode, anime: storeAnime } = useAnimeStore();
   const { data: fetchedAnimeDetails } = useGetAnimeDetails(animeIdParam);
+  const [showFullAnimeDetails, setShowFullAnimeDetails] = useState(false);
   const storedDetailsMatch = storeAnime?.anime?.info?.id === animeIdParam ||
     Number(storeAnime?.anime?.info?.anilistId) === Number(animeIdParam);
   const metadataCandidate = storedDetailsMatch ? storeAnime : fetchedAnimeDetails ?? storeAnime;
@@ -229,6 +232,16 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
   const anime = isWatchRoute
     ? metadataCandidate ?? storeAnime
     : watchAnimeRef.current ?? metadataCandidate ?? storeAnime;
+  const watchNextRecommendations = useMemo(() => {
+    const candidates = [...(anime?.recommendedAnimes ?? []), ...(anime?.relatedAnimes ?? [])];
+    const seen = new Set<string>();
+    return candidates.filter((item) => {
+      const id = String(item.id || "");
+      if (!id || id === String(animeIdParam) || seen.has(id) || !item.poster) return false;
+      seen.add(id);
+      return true;
+    }).slice(0, 12);
+  }, [anime?.recommendedAnimes, anime?.relatedAnimes, animeIdParam]);
 
   const { data: allEpisodesData, isLoading: isEpisodesLoading } = useGetAllEpisodes(animeIdParam);
   const [preferredCategory, setPreferredCategory] = useState<"sub" | "dub">("dub");
@@ -1870,46 +1883,100 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
         </details>
       )}
     </div>
-    {anime?.anime?.info && (
-      <section id="anime-details" aria-labelledby="anime-details-title" className="rounded-2xl border border-white/[0.07] bg-[#101018] p-3 sm:p-5">
-        <div className="flex items-start gap-4">
-          {anime.anime.info.poster && (
-            <Image src={anime.anime.info.poster} alt={anime.anime.info.name || "Anime poster"} width={88} height={132} unoptimized className="h-[132px] w-[88px] shrink-0 rounded-xl border border-white/10 object-cover" />
-          )}
-          <div className="min-w-0 flex-1 space-y-2">
-            <h2 id="anime-details-title" className="text-lg font-extrabold leading-tight text-white sm:text-xl">{anime.anime.info.name}</h2>
-            <div className="flex flex-wrap gap-1.5 text-[11px] font-semibold text-zinc-300">
-              {anime.anime.info.stats.type && <span className="rounded-lg border border-white/10 bg-white/[0.04] px-2 py-1">{anime.anime.info.stats.type}</span>}
-              {anime.anime.moreInfo.status && <span className="rounded-lg border border-white/10 bg-white/[0.04] px-2 py-1">{anime.anime.moreInfo.status}</span>}
-              {anime.anime.moreInfo.premiered && anime.anime.moreInfo.premiered !== "N/A" && <span className="rounded-lg border border-white/10 bg-white/[0.04] px-2 py-1">{anime.anime.moreInfo.premiered}</span>}
-              {anime.anime.info.stats.rating && anime.anime.info.stats.rating !== "N/A" && <span className="rounded-lg border border-amber-300/20 bg-amber-300/[0.06] px-2 py-1 text-amber-200">★ {anime.anime.info.stats.rating}</span>}
-            </div>
-            {!!anime.anime.moreInfo.genres?.length && (
-              <div className="flex flex-wrap gap-1.5">
-                {anime.anime.moreInfo.genres.slice(0, 6).map((genre) => <span key={genre} className="rounded-full bg-[#ff3b72]/10 px-2 py-1 text-[10px] font-semibold text-[#ff9fbe]">{genre}</span>)}
-              </div>
-            )}
-          </div>
+    <section id="episode-list" aria-label="Anime episodes" className="scroll-mt-4 rounded-2xl border border-white/[0.07] bg-[#101018] p-3 sm:p-4">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#ff9fbe]">Episodes</p>
+          <p className="mt-1 text-xs text-zinc-500">Search by title, jump straight to a number, or browse episode ranges.</p>
         </div>
-        <div className="mt-4 border-t border-white/[0.06] pt-3">
-          <h3 className="mb-1.5 text-sm font-bold text-white">Synopsis</h3>
-          <div className="text-sm leading-6 text-zinc-300">{anime.anime.info.description ? parse(anime.anime.info.description) : "No synopsis available."}</div>
-          {!!anime.anime.moreInfo.studios && anime.anime.moreInfo.studios !== "N/A" && (
-            <p className="mt-3 text-xs text-zinc-500"><span className="font-semibold text-zinc-400">Studio:</span> {anime.anime.moreInfo.studios}</p>
+        <span className="shrink-0 rounded-lg border border-[#ff3b72]/25 bg-[#ff3b72]/10 px-2.5 py-1.5 text-xs font-bold text-[#ff9fbe]">Now playing · Ep {currentEpNumber}</span>
+      </div>
+      <AnimeEpisodes animeId={animeIdParam} />
+    </section>
+    {anime?.anime?.info && (
+      <section id="anime-details" aria-labelledby="anime-details-title" className="relative isolate overflow-hidden rounded-2xl border border-white/[0.08] bg-[#100b13]">
+        <div className="absolute inset-0 -z-20 bg-gradient-to-br from-[#3d1026] via-[#17101d] to-[#0b0b12]" />
+        {!!anime.anime.info.bannerImage && (
+          <Image src={anime.anime.info.bannerImage} alt="" fill unoptimized sizes="(max-width: 768px) 100vw, 1100px" className="absolute inset-0 -z-10 h-full w-full object-cover opacity-35" />
+        )}
+        <div className="absolute inset-0 -z-10 bg-gradient-to-r from-[#0a050b]/95 via-[#0a050b]/80 to-[#0a050b]/55" />
+        <div className="space-y-4 p-4 sm:p-6">
+          <div className="flex items-start gap-4 sm:gap-5">
+            <div className="relative aspect-[2/3] w-[94px] shrink-0 overflow-hidden rounded-xl border border-white/15 bg-black/30 shadow-xl sm:w-[132px]">
+              {anime.anime.info.poster && <Image src={anime.anime.info.poster} alt={anime.anime.info.name || "Anime poster"} fill unoptimized sizes="132px" className="object-cover" />}
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="mb-1 text-[10px] font-extrabold uppercase tracking-[0.18em] text-[#ff9fbe]">Anime details</p>
+                  <h2 id="anime-details-title" className="text-xl font-black leading-tight text-white sm:text-2xl">{anime.anime.info.name}</h2>
+                </div>
+                <button type="button" aria-expanded={showFullAnimeDetails} aria-controls="full-anime-details" onClick={() => setShowFullAnimeDetails((expanded) => !expanded)} className="inline-flex shrink-0 items-center gap-1 rounded-xl border border-white/15 bg-black/30 px-2.5 py-2 text-[11px] font-bold text-white transition hover:border-[#ff3b72]/50 hover:bg-[#ff3b72]/15 sm:px-3">
+                  {showFullAnimeDetails ? "Less" : "Details"}
+                  {showFullAnimeDetails ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                </button>
+              </div>
+              <div className="mt-2 flex flex-wrap gap-1.5 text-[10px] font-semibold text-zinc-200 sm:text-[11px]">
+                {anime.anime.info.stats.type && <span className="rounded-lg border border-white/15 bg-black/25 px-2 py-1">{anime.anime.info.stats.type}</span>}
+                {anime.anime.moreInfo.status && anime.anime.moreInfo.status !== "N/A" && <span className="rounded-lg border border-white/15 bg-black/25 px-2 py-1">{anime.anime.moreInfo.status}</span>}
+                {anime.anime.moreInfo.premiered && anime.anime.moreInfo.premiered !== "N/A" && <span className="rounded-lg border border-white/15 bg-black/25 px-2 py-1">{anime.anime.moreInfo.premiered}</span>}
+                {anime.anime.info.stats.rating && anime.anime.info.stats.rating !== "N/A" && <span className="rounded-lg border border-amber-300/20 bg-amber-300/10 px-2 py-1 text-amber-200">★ {anime.anime.info.stats.rating}</span>}
+                {anime.anime.info.stats.episodes?.sub > 0 && <span className="rounded-lg border border-white/15 bg-black/25 px-2 py-1">{anime.anime.info.stats.episodes.sub} eps</span>}
+              </div>
+              {!!anime.anime.moreInfo.genres?.length && (
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {anime.anime.moreInfo.genres.slice(0, showFullAnimeDetails ? undefined : 5).map((genre) => <span key={genre} className="rounded-full bg-[#ff3b72]/15 px-2.5 py-1 text-[10px] font-semibold text-[#ffb5cb]">{genre}</span>)}
+                </div>
+              )}
+            </div>
+          </div>
+          <div className="border-t border-white/10 pt-3">
+            <h3 className="mb-1.5 text-xs font-extrabold uppercase tracking-[0.12em] text-zinc-300">Synopsis</h3>
+            <div className={`text-sm leading-6 text-zinc-200/90 ${showFullAnimeDetails ? "" : "line-clamp-3 max-h-[4.5rem] overflow-hidden"}`}>
+              {anime.anime.info.description ? parse(anime.anime.info.description) : "No synopsis available."}
+            </div>
+          </div>
+          {showFullAnimeDetails && (
+            <div id="full-anime-details" className="grid grid-cols-1 gap-3 border-t border-white/10 pt-4 sm:grid-cols-2 lg:grid-cols-3">
+              {[
+                ["Japanese title", anime.anime.moreInfo.japanese],
+                ["Alternative titles", anime.anime.moreInfo.synonyms],
+                ["Aired", anime.anime.moreInfo.aired],
+                ["Premiered", anime.anime.moreInfo.premiered],
+                ["Status", anime.anime.moreInfo.status],
+                ["Duration", anime.anime.moreInfo.duration || anime.anime.info.stats.duration],
+                ["Score", anime.anime.moreInfo.malscore || anime.anime.info.stats.rating],
+                ["Studio", anime.anime.moreInfo.studios],
+                ["Producers", anime.anime.moreInfo.producers?.join(", ")],
+              ].filter(([, value]) => !!value && value !== "N/A").map(([label, value]) => (
+                <div key={String(label)} className="min-w-0 rounded-xl border border-white/[0.08] bg-black/20 p-3">
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-zinc-500">{label}</p>
+                  <p className="mt-1 break-words text-xs leading-5 text-zinc-200">{value}</p>
+                </div>
+              ))}
+            </div>
           )}
         </div>
       </section>
     )}
-    <section id="episode-list" aria-label="Anime episodes" className="scroll-mt-4 rounded-2xl border border-white/[0.07] bg-[#101018] p-3 sm:p-4">
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <div>
-          <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#ff9fbe]">Continue watching</p>
-          <p className="mt-1 text-xs text-zinc-500">Select an episode to keep watching from here.</p>
+    {watchNextRecommendations.length > 0 && (
+      <section aria-labelledby="watch-next-title" className="space-y-3 rounded-2xl border border-white/[0.07] bg-[#101018] p-3 sm:p-4">
+        <div className="flex items-start gap-3">
+          <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-[#ff3b72]/20 bg-[#ff3b72]/10 text-[#ff9fbe]"><Sparkles className="h-4 w-4" /></div>
+          <div className="min-w-0">
+            <h2 id="watch-next-title" className="text-base font-extrabold text-white sm:text-lg">Watch next</h2>
+            <p className="mt-0.5 text-xs text-zinc-500">Similar and related anime picked from the catalogue.</p>
+          </div>
         </div>
-        <span className="shrink-0 rounded-lg border border-[#ff3b72]/25 bg-[#ff3b72]/10 px-2.5 py-1.5 text-xs font-bold text-[#ff9fbe]">Episode {currentEpNumber}</span>
-      </div>
-      <AnimeEpisodes animeId={animeIdParam} />
-    </section>
+        <div className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-2 [scrollbar-width:thin]">
+          {watchNextRecommendations.map((item) => (
+            <div key={item.id} className="w-[9.5rem] shrink-0 sm:w-[10.5rem]">
+              <AnimeCard animeId={item.id} href={ROUTES.animeDetails(item.id)} poster={item.poster} title={item.name} subTitle={item.jname} episodes={item.episodes?.sub || item.episodes?.dub || null} format={item.type} score={"rating" in item && item.rating ? Number(item.rating) : null} variant="sm" className="!max-w-none" />
+            </div>
+          ))}
+        </div>
+      </section>
+    )}
     </>
   );
   const playerHeader = (
