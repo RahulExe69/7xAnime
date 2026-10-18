@@ -721,20 +721,6 @@ export function PlayerViewport({
     dispatchPlayerAction, enterFullscreen, settlePreviewToOrigin,
   ]);
 
-  const handleVerticalSwipe = useCallback((deltaY: number) => {
-    if (deltaY < 0) {
-      if (isMiniPlayer) dispatchPlayerAction("expand-mini-player");
-      else if (!isFullscreen) void enterFullscreen();
-      return;
-    }
-    if (isFullscreen) {
-      setIsFullscreen(false);
-      void exitNativePlayerFullscreen();
-      dispatchPlayerAction("minimize-player");
-    } else if (isMiniPlayer) dispatchPlayerAction("close-mini-player");
-    else dispatchPlayerAction("minimize-player");
-  }, [dispatchPlayerAction, enterFullscreen, isFullscreen, isMiniPlayer]);
-
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return;
     const handleNativeSwipeProgress = (event: Event) => {
