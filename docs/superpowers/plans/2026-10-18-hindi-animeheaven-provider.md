@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-18-hindi-animeheaven-provider-design.md`
 
-**Execution status (2026-10-18):** AnimeHeaven, DesiDubAnime, Renime-API, and HiAnime/Aniwatch reached **NO-GO**; Senshi remains unqualified. No reviewed candidate satisfies the plan's deployment/usage and episode-specific Hindi-evidence requirements. Runtime tasks 2–6 remain blocked. See `docs/HINDI_DUB_PROVIDER_EVALUATION.md` for the evidence record.
+**Execution status (2026-10-18):** AnimeHeaven, DesiDubAnime, Renime-API, and HiAnime/Aniwatch reached **NO-GO**; Senshi remains unqualified. Tatakai API is a new **HOLD** pending contract, usage, and episode-language verification. Runtime tasks 2–6 remain blocked until a candidate clears the gate. See `docs/HINDI_DUB_PROVIDER_EVALUATION.md` for the evidence record.
 
 ## Global Constraints
 
@@ -185,4 +185,15 @@ The next candidate review also reached NO-GO:
 - **Reopen criteria:** A canonical provider/API, a documented/authorized deployment or an explicitly approved self-hosting plan, a usage basis covering the upstream source, and episode-specific Hindi evidence; then proceed with bounded resolution and separate playback verification.
 
 See `docs/HINDI_DUB_PROVIDER_EVALUATION.md` for the candidate-by-candidate records.
+
+## Candidate checkpoint — Tatakai API (2026-10-18)
+
+A stronger lead surfaced during the wider candidate search: the public [Tatakai API](https://api.tatakai.me/) homepage advertises standard REST integration and `GET /api/v1/hindidubbed/search`. However, the indexed SDK/source docs disagree on the exact route prefix (`hindidubbed` versus `animehindidubbed`) and a detailed deployed response schema could not be verified. The repository page also reports MIT while its README claims MPL-2.0 and says not to use the API independently; upstream media usage remains subject to third-party terms.
+
+- **Decision: HOLD, not GO and not proof of outage.** The deployed contract, independent-client usage expectations, and episode-level Hindi metadata have not been confirmed.
+- **Network limit:** API page documents a live host, but web retrieval of the API route failed and local DNS could not resolve it. Treat endpoint reachability as unverified rather than down.
+- **Ruling:** Do not guess the API path or write an adapter to an unconfirmed contract. Seek the current published schema/maintainer guidance, then test one known episode and its explicit Hindi signal. Runtime Tasks 2–6 remain blocked until that gate passes.
+- **No runtime files, provider registries, tests, builds, PRs, or merges were changed/executed by this checkpoint.**
+
+Full evidence and reopening criteria are in `docs/HINDI_DUB_PROVIDER_EVALUATION.md`.
 
