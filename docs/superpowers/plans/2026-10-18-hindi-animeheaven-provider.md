@@ -58,22 +58,20 @@ Expected output: a justified GO or NO-GO, not a provider button.
 ### Task 2: Add focused test coverage for Hindi-source normalization
 
 **Files:**
-- Create: `src/lib/hindi-provider-normalization.mjs` (only if a small pure module is the cleanest fit for Node's built-in test runner)
-- Create: matching TypeScript declaration file if production TypeScript imports the helper
+- Create: `src/lib/hindi-provider-normalization.mjs`
+- Create: `src/lib/hindi-provider-normalization.d.ts`
 - Create: `tests/hindi-provider-normalization.test.mjs`
-- Modify only if needed: `package.json` test script
 
 **Interfaces:**
-- Produce pure, network-free helpers for validating URL/source identity and normalizing candidate data.
-- Keep the helper independent of React, Axios, and app-level imports so the Node built-in test runner can exercise real behavior without adding a large framework.
+- Export pure, network-free helpers for validating HTTPS URLs, source identity, Hindi-language evidence, and candidate normalization.
+- Keep the helper independent of React, Axios, and app-level imports so the Node built-in test runner can exercise the same production logic without new dependencies.
+- The declaration file must match the actual .mjs exports exactly and provide the TypeScript types consumed by the existing resolver.
 
-- [ ] **Step 1: Write failing tests** with Node's `node:test` and `node:assert/strict` for valid candidate normalization, malformed responses, generic-dub rejection, invalid schemes, and duplicate URL/source identity.
+- [ ] **Step 1: Write failing tests** with Node's `node:test` and `node:assert/strict` for valid candidate normalization, malformed responses, generic-dub rejection, invalid schemes, unsafe URLs, and duplicate URL/source identity.
 - [ ] **Step 2: Run the focused tests** with `node --test tests/hindi-provider-normalization.test.mjs`. Expected: FAIL because the new helpers are not implemented.
-- [ ] **Step 3: Implement the minimal pure helpers** in `src/lib/hindi-provider-normalization.mjs`, with explicit result types in the declaration file if required.
+- [ ] **Step 3: Implement the minimal pure helpers** in `src/lib/hindi-provider-normalization.mjs` and mirror their exact signatures in its declaration file.
 - [ ] **Step 4: Re-run the focused tests**. Expected: PASS with assertions on normalized records and rejection conditions.
 - [ ] **Step 5: Commit** as `test: cover Hindi provider normalization contracts`.
-
-If inspection shows the repository's existing tooling already supports a simpler maintained TypeScript test runner, use it instead of creating the optional .mjs/declaration split; document that choice in the task commit.
 
 ### Task 3: Add a disabled-by-default AnimeHeaven adapter
 
@@ -85,13 +83,15 @@ If inspection shows the repository's existing tooling already supports a simpler
 
 **Interfaces:**
 - `getAnimeHeavenHindiStreams(titles: string[], episode: number): Promise<HindiDubStream[]>`
+- Each returned stream includes `sourceId: "community-hindi" | "animeheaven"`, `sourceLabel: string`, and `languageEvidence: "hindi-catalogue-contract" | "explicit-hindi-metadata"`. AnimeHeaven may return a stream only when its confirmed response has explicit Hindi-specific evidence; a generic `dub` value must be rejected.
 - The adapter returns an empty list with a sanitized internal outcome when disabled or when candidate resolution fails; it must not throw into the primary watch path.
 - Request JSON through a small injectable request function so tests can use deterministic fixtures and production can use the existing Axios/network conventions.
-- The adapter may run only when a fixed, validated API base has been explicitly configured and Task 1 established a permitted deployment.
+- Read the base only from the exact configured public API setting selected after Task 1; validate HTTPS and host, and remain disabled if the setting is absent or invalid.
+- Keep resolver/adapter calls bounded by timeouts, candidate counts, and response-size limits; revalidate redirect targets in any server-side request path.
 
-- [ ] **Step 1: Write failing adapter tests** for disabled configuration, title lookup, correct episode mapping, Hindi-specific evidence, invalid payload, HTTP error, timeout, non-HTTPS API base, unsafe result URL, and strict-source response behavior. Include one near-match title and one wrong episode case.
+- [ ] **Step 1: Write failing adapter tests** for disabled configuration, title lookup, correct episode mapping, explicit Hindi evidence, invalid payload, HTTP error, timeout, non-HTTPS API base, unsafe result URL, redirect to a private/loopback destination where server-side fetch is used, oversized response, and strict-source response behavior. Include one near-match title and one wrong episode case.
 - [ ] **Step 2: Run the focused tests** and verify failure is caused by the missing adapter behavior, not test/setup errors.
-- [ ] **Step 3: Implement the minimum adapter** using only the confirmed route parameters and response fields from Task 1. Keep the request count bounded, apply finite timeouts, bound the candidate count, and avoid logging raw upstream bodies or signed URLs.
+- [ ] **Step 3: Implement the minimum adapter** using only the confirmed route parameters and response fields from Task 1. Keep the request count bounded, apply finite timeouts and response limits, bound the candidate count, validate URLs, and avoid logging raw upstream bodies or signed URLs.
 - [ ] **Step 4: Re-run focused tests** and ensure each test passes; verify a source error becomes a local failure result instead of rejecting the main watch query.
 - [ ] **Step 5: Commit** as `feat: add isolated AnimeHeaven Hindi adapter`.
 
@@ -106,8 +106,8 @@ Do not create a generic proxy route. Add a FastAPI fixed-route proxy only if evi
 
 **Interfaces:**
 - Preserve the current export signature `getHindiDubStreams(titles: string[], episode: number)`.
-- Merge candidates from the current Hindi catalogue and the new adapter into the existing `HindiDubStream[]` shape, using optional source identity fields only where needed for UI labeling.
-- Keep `matchedTitle` meaningful for the current source and avoid presenting source-specific matching data as a global match.
+- Extend `HindiDubStream` with required `sourceId`, `sourceLabel`, and `languageEvidence` fields; set explicit fixed values for results from the existing Hindi-specialized catalogue and preserve the upstream-confirmed evidence for AnimeHeaven.
+- Merge candidates into the same `HindiDubStream[]` array shape. Keep `matchedTitle` meaningful for the current source and avoid presenting source-specific matching data as a global match.
 
 - [ ] **Step 1: Write failing orchestration tests**: a timeout or invalid response from AnimeHeaven does not suppress a valid existing Hindi candidate; a valid distinct candidate is included; identical URLs/underlying sources collapse to one option; results for the wrong episode are excluded.
 - [ ] **Step 2: Run the focused tests** and verify the expected failures.
@@ -133,6 +133,8 @@ Do not create a generic proxy route. Add a FastAPI fixed-route proxy only if evi
 - [ ] **Step 5: Commit** as `feat: label Hindi playback sources accurately`.
 
 ### Task 6: Final regression review and evidence record
+
+**Rollback check:** Confirm every new runtime path is behind the explicit validated configuration and can be disabled by removing that setting. If review uncovers a provider-specific regression, revert the adapter/resolver/UI commits as a unit; the existing catalogue and five standard servers must continue to work.
 
 **Files:**
 - Modify: `docs/HINDI_DUB_PROVIDER_EVALUATION.md`
