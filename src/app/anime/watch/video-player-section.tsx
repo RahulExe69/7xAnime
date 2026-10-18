@@ -1314,14 +1314,14 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
       }
       const failed = eventNames.some((name) => name.includes("error") || name === "failed")
         || statusNames.includes("error");
-      const explicitPauseEvent = eventNames.some((name) =>
+      const explicitPauseEvent = !queryStateResponse && (eventNames.some((name) =>
         name === "pause" || name === "paused" || name.endsWith(":pause") ||
         name.endsWith(":paused") || name.endsWith("-pause") || name.endsWith("-paused")
-      ) || statusNames.includes("paused");
-      const explicitPlayEvent = eventNames.some((name) =>
+      ) || statusNames.includes("paused"));
+      const explicitPlayEvent = !queryStateResponse && (eventNames.some((name) =>
         name === "play" || name === "playing" || name.endsWith(":play") ||
         name.endsWith(":playing") || name.endsWith("-play") || name.endsWith("-playing")
-      ) || statusNames.includes("playing");
+      ) || statusNames.includes("playing"));
       const reportedPaused = explicitPauseEvent || reportsPausedByBoolean || queryReportsPaused;
       const reportedPlaying = explicitPlayEvent || reportsPlayingByBoolean || queryReportsPlaying;
       if (explicitPauseEvent) embedProviderPauseEventsRef.current = true;
