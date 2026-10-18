@@ -274,6 +274,12 @@ jobs:
               raise SystemExit("Tapping the mini-player must restore the watch page from pointer-up")
           if 'data-player-viewport="true"' not in viewport:
               raise SystemExit("Player viewport marker is missing")
+          if 'Playback paused because 7xAnime is in the background' in watch_section:
+              raise SystemExit("Backgrounding the app must not unmount the active player")
+          if 'const requestExternalPlayerPlay' not in watch_section or 'backgroundPlaybackRef' not in watch_section:
+              raise SystemExit("App lifecycle must preserve and resume the existing player session")
+          if 'if (snapshot.embedWasPlaying)' not in watch_section or 'directVideos.forEach((video) => video.pause())' not in watch_section:
+              raise SystemExit("Background pause/resume must preserve the user's prior playback intent")
           if 'allow="autoplay; fullscreen; picture-in-picture; encrypted-media"' in watch_section:
               raise SystemExit("Embedded provider iframes must not be granted Picture-in-Picture permission")
           if "disablePictureInPicture" not in viewport or "disablepictureinpicture" not in viewport:
