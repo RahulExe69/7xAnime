@@ -60,7 +60,7 @@ Expected output: a justified GO or NO-GO, not a provider button.
 
 **Files:**
 - Create: `src/lib/hindi-provider-normalization.mjs`
-- Create: `src/lib/hindi-provider-normalization.d.ts`
+- Create: `src/lib/hindi-provider-normalization.d.mts`
 - Create: `tests/hindi-provider-normalization.test.mjs`
 
 **Interfaces:**
@@ -73,13 +73,13 @@ Expected output: a justified GO or NO-GO, not a provider button.
 - [ ] **Step 2: Run the focused tests** with `node --test tests/hindi-provider-normalization.test.mjs`. Expected: FAIL because the new helpers are not implemented.
 - [ ] **Step 3: Implement the minimal pure helpers** in `src/lib/hindi-provider-normalization.mjs` and mirror their exact signatures in its declaration file.
 - [ ] **Step 4: Re-run the focused tests**. Expected: PASS with assertions on normalized records and rejection conditions.
-- [ ] **Step 5: Commit** as `test: cover Hindi provider normalization contracts`.
+- [ ] **Step 5: Commit** as `feat: add tested Hindi provider normalization helpers`.
 
 ### Task 3: Add a disabled-by-default AnimeHeaven adapter
 
 **Files:**
 - Create: `src/lib/hindi-providers/animeheaven.mjs`
-- Create: `src/lib/hindi-providers/animeheaven.d.ts`
+- Create: `src/lib/hindi-providers/animeheaven.d.mts`
 - Create: `tests/hindi-animeheaven.test.mjs`
 - Modify configuration docs only after Task 1 confirms the endpoint and terms
 
@@ -145,14 +145,12 @@ Do not create a generic proxy route. If qualification proves direct requests can
 - Modify: `docs/SERVERS.md` only if the new source has genuinely passed support criteria, and keep it in a separate Hindi section
 - Read-only regression targets: `src/lib/server-map.ts`, `android-local-backend/local_api.py`, `.github/scripts/configure-local-anime-backend.py`
 
-- [ ] **Step 1: Write a failing regression test** in `tests/standard-server-regression.test.mjs` using Node's built-in test runner. Assert the frontend and Python registry contain exactly `anixo`, `megavid`, `tryembed`, and `cinexstream`; assert the Android packaging list matches those four; assert MegaPlay remains Server 1/default/fallback and no Hindi-only source is registered in the standard list.
-- [ ] **Step 2: Run the regression test** with `node --test tests/standard-server-regression.test.mjs`. Expected: FAIL only if a listed invariant is violated.
-- [ ] **Step 3: Implement the minimum regression assertion** using read-only file inspection and explicit expected values; do not edit production registries to satisfy the test.
-- [ ] **Step 4: Re-run the regression test**. Expected: PASS on the unmodified standard provider list.
-- [ ] **Step 5: Record evidence states separately** in `docs/HINDI_DUB_PROVIDER_EVALUATION.md`: API responds, episode resolves, Hindi confirmed, and playback verified. Set playback verified only after physical-device test.
-- [ ] **Step 6: Run the full relevant test suite**: `node --test tests/hindi-provider-normalization.test.mjs tests/hindi-animeheaven.test.mjs tests/standard-server-regression.test.mjs`, `npm run lint`, `npx tsc --noEmit` where compatible with repository settings, and `python .github/scripts/test-local-anime-backend.py` if Python backend files or contracts changed. Record any pre-existing failures by name.
-- [ ] **Step 7: Review final diff** against the spec, verify the standard server map/order/build packaging remain unchanged, and commit as `test: verify Hindi provider isolation and record evidence`.
-- [ ] **Step 8: Open a PR** from `feat/hindi-animeheaven-provider` to `master`, with test results, endpoint evidence and explicit statement that physical Android playback is unverified unless a device test actually occurred.
+- [ ] **Step 1: Write the regression assertion** in `tests/standard-server-regression.test.mjs` using Node's built-in test runner. Assert the frontend and Python registry contain exactly `anixo`, `megavid`, `tryembed`, and `cinexstream`; assert the Android packaging list matches those four; assert MegaPlay remains Server 1/default/fallback and no Hindi-only source is registered in the standard list.
+- [ ] **Step 2: Run the regression test** with `node --test tests/standard-server-regression.test.mjs`. Expected: PASS against the current standard registry. If it fails, stop and investigate the pre-existing mismatch instead of editing the production registries to make the test pass.
+- [ ] **Step 3: Record evidence states separately** in `docs/HINDI_DUB_PROVIDER_EVALUATION.md`: API responds, episode resolves, Hindi confirmed, and playback verified. Set playback verified only after physical-device test.
+- [ ] **Step 4: Run the full relevant test suite**: `node --test tests/hindi-provider-normalization.test.mjs tests/hindi-animeheaven.test.mjs tests/standard-server-regression.test.mjs`, `npm run lint`, `npx tsc --noEmit` where compatible with repository settings, and `python .github/scripts/test-local-anime-backend.py` if Python backend files or contracts changed. Record any pre-existing failures by name.
+- [ ] **Step 5: Review final diff** against the spec, verify the standard server map/order/build packaging remain unchanged, and commit as `test: verify Hindi provider isolation and record evidence`.
+- [ ] **Step 6: Open a PR** from `feat/hindi-animeheaven-provider` to `master`, with test results, endpoint evidence and explicit statement that physical Android playback is unverified unless a device test actually occurred.
 
 ## Final implementation report
 
