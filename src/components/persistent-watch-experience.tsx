@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, type ReactNode, useEffect, useRef, useState } from "react";
+import { Suspense, type ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import VideoPlayerSection from "@/app/anime/watch/video-player-section";
 import { ROUTES } from "@/constants/routes";
@@ -20,6 +20,24 @@ export function PersistentWatchExperience({ children }: PersistentWatchExperienc
   const [hasPlayerSession, setHasPlayerSession] = useState(isWatchRoute);
   const lastWatchHrefRef = useRef<string>(ROUTES.WATCH);
   const lastBrowsePathRef = useRef<string>(ROUTES.HOME);
+
+  // Next.js can restore the previous browse-page scroll offset when entering
+  // the persistent watch route. The player is hosted in the root layout, so
+  // force a top-of-watch-page starting position on route entry before paint.
+  useLayoutEffect(() => {
+    if (!isWatchRoute) return;
+
+    const resetScrollPosition = () => {
+      window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+    };
+
+    resetScrollPosition();
+    // A second pass wins over scroll restoration scheduled by route navigation.
+    const frame = window.requestAnimationFrame(resetScrollPosition);
+    return () => window.cancelAnimationFrame(frame);
+  }, [isWatchRoute]);
 
   useEffect(() => {
     if (isWatchRoute) {
