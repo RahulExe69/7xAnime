@@ -5,6 +5,9 @@ on:
     branches:
       - master
       - fix/player-embed-pip-background
+  push:
+    branches:
+      - feat/hindi-animeheaven-provider
   workflow_dispatch:
     inputs:
       build_type:
@@ -40,7 +43,7 @@ concurrency:
 
 jobs:
   debug-apk:
-    if: github.event_name == 'pull_request' || inputs.build_type == 'debug'
+    if: github.event_name == 'pull_request' || inputs.build_type == 'debug' || (github.event_name == 'push' && contains(github.event.head_commit.message, '[debug-build]'))
     name: Build Debug APK
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -339,26 +342,29 @@ jobs:
               raise SystemExit("Embedded players are not asked to resume after loading")
           if 'status === "checking") return null' not in update_gate:
               raise SystemExit("The update gate must remain invisible while checking for an update")
-          if 'ACTIVE_PROVIDER_ORDER = ("anixo", "megavid", "tryembed", "cinexstream", "supaplay", "vidplus")' not in local_api_text:
+          if 'ACTIVE_PROVIDER_ORDER = ("anixo", "megavid", "cinexstream", "supaplay")' not in local_api_text:
               raise SystemExit("Android active provider allowlist has unexpected servers")
-          retired_names = ("animeparadise", "megaflix", "nontongo")
+          retired_names = ("animeparadise", "megaflix", "nontongo", "tryembed", "vidplus")
           if any(name in server_map.lower() for name in retired_names):
               raise SystemExit("Retired providers must not be registered in the selectable catalogue")
           if any(name in local_api_text.lower() for name in retired_names):
               raise SystemExit("Retired providers must not be registered in the Android backend")
-          if any(provider not in watch_section for provider in ("tryembed", "cinexstream")):
-              raise SystemExit("An event-aware provider is missing from the stall watchdog")
+          if "cinexstream" not in watch_section or "tryembed" in watch_section.lower() or "vidplus" in watch_section.lower():
+              raise SystemExit("Active player code must only include supported providers")
           if "const playerReady =" not in watch_section:
               raise SystemExit("Ready-page events must be distinguished from actual playback")
           if 'supaplay: ["supaplay.fun"]' not in watch_section:
               raise SystemExit("SupaPlay embed origin is missing from player event validation")
-          if 'vidplus: ["player.vidplus.to", "player2.vidplus.pro"]' not in watch_section:
-              raise SystemExit("VidPlus redirect host is missing from player event validation")
           navigation_client = Path("android-local-backend/StreamingNavigationWebViewClient.java").read_text(encoding="utf-8")
-          if any(host not in navigation_client for host in ('"supaplay.fun"', '"player.vidplus.to"', '"player2.vidplus.pro"')):
-              raise SystemExit("SupaPlay or VidPlus iframe failure handling is missing from the native WebView host list")
-          if 'observedEmbedProvider === "tryembed" ? 8000 : 18000' not in watch_section:
-              raise SystemExit("TryEmbed interstitial timeout is missing")
+          if '"supaplay.fun"' not in navigation_client or "tryembed.us.cc" in navigation_client or "vidplus" in navigation_client.lower():
+              raise SystemExit("Native embed host list must exclude retired providers and retain SupaPlay")
+          if 'const watchedProviders = ["megaplay", "anixo", "megavid", "cinexstream"]' not in watch_section:
+              raise SystemExit("Playback watchdog must be limited to known event-reporting active embeds")
+          if 'id="episode-list"' not in watch_section or "AnimeEpisodes animeId={animeIdParam}" not in watch_section:
+              raise SystemExit("Watch page no longer exposes its episode selector")
+          viewport = Path("src/components/player-viewport.tsx").read_text(encoding="utf-8")
+          if "transitionOriginRef" not in viewport or 'transformOrigin = "bottom right"' not in viewport:
+              raise SystemExit("Mini-player expansion/collapse must animate from its actual anchored position")
           if "Blocked navigation to known advertising host" not in nav:
               raise SystemExit("Known ad-network document navigation is not blocked")
 
@@ -445,7 +451,7 @@ jobs:
           from fastapi.testclient import TestClient
           from src.providers import _race
 
-          expected_modules = {"anixo", "megavid", "tryembed", "cinexstream", "supaplay", "vidplus"}
+          expected_modules = {"anixo", "megavid", "cinexstream", "supaplay"}
           providers = _race.providers()
           loaded_names = {name for name, _ in providers}
           print("Packaged active providers:", ", ".join(name for name, _ in providers))
@@ -454,7 +460,7 @@ jobs:
                   f"Expected exactly {sorted(expected_modules)}, got {sorted(loaded_names)}"
               )
           provider_dir = Path("android/app/src/main/python/src/providers")
-          retired_modules = {"animeparadise.py", "megaflix.py", "nontongo.py", "animenosub.py"}
+          retired_modules = {"animeparadise.py", "megaflix.py", "nontongo.py", "animenosub.py", "tryembed.py", "vidplus.py"}
           bundled_retired = sorted(path.name for path in provider_dir.glob("*.py") if path.name in retired_modules)
           if bundled_retired:
               raise SystemExit(f"Retired provider modules were bundled: {bundled_retired}")
@@ -491,7 +497,7 @@ jobs:
               assert status.status_code == 200, status.text
               reported = {item["id"] for item in status.json()["providers"] if item["moduleLoaded"]}
               active_manual = {
-                  "anixo", "megavid", "tryembed", "cinexstream", "supaplay", "vidplus",
+                  "anixo", "megavid", "cinexstream", "supaplay",
               }
               assert active_manual <= reported, (
                   "Diagnostics do not list all approved manual providers: "
@@ -502,7 +508,7 @@ jobs:
                   f"{sorted(reported - active_manual)}"
               )
           print(
-              "Packaged API: all six active adapter modules imported; only six approved "
+              "Packaged API: all four active adapter modules imported; only four approved "
               "manual choices are exposed; health, auth, diagnostics and CORS passed."
           )
           PY
