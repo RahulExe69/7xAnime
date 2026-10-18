@@ -48,9 +48,9 @@ LOCAL_ROUTE_TIMEOUT = 80.0
 # Active provider order drives deterministic server numbering and diagnostics.
 # Newly added sources remain manual-only until real-device playback is verified.
 # The allowlist is the complete active set; the build prunes every other adapter.
-ACTIVE_PROVIDER_ORDER = ("anixo", "megavid", "tryembed", "cinexstream", "supaplay")
+ACTIVE_PROVIDER_ORDER = ("anixo", "megavid", "tryembed", "cinexstream", "supaplay", "vidplus")
 ACTIVE_PROVIDER_ALLOWLIST = set(ACTIVE_PROVIDER_ORDER)
-MANUAL_EMBED_ONLY_PROVIDERS = {"anixo", "megavid", "tryembed", "cinexstream", "supaplay"}
+MANUAL_EMBED_ONLY_PROVIDERS = {"anixo", "megavid", "tryembed", "cinexstream", "supaplay", "vidplus"}
 _LOCAL_CONTEXT_CACHE: dict[int, tuple[float, dict]] = {}
 # Asyncio primitives are event-loop-bound. Keep in-flight work and locks scoped
 # to the current loop so isolated test loops cannot reuse a task from another loop.
@@ -323,7 +323,7 @@ async def local_provider_status():
         "loadedCount": len(available),
         "providerCount": len(ACTIVE_PROVIDER_ALLOWLIST),
         "providers": providers,
-        "note": "Only AniXo, Megavid, TryEmbed, CinexStream, and SupaPlay are packaged as provider adapters. Module-loaded status is not a live guarantee for every anime or episode; attempt metrics are collected as you select or play providers. These five adapters construct cross-origin embeds, while MegaPlay is the dedicated frontend Server 1 fallback.",
+        "note": "Only AniXo, Megavid, TryEmbed, CinexStream, SupaPlay, and VidPlus are packaged as provider adapters. Module-loaded status is not a live guarantee for every anime or episode; attempt metrics are collected as you select or play providers. These six adapters construct cross-origin embeds, while MegaPlay is the dedicated frontend Server 1 fallback.",
     }
 
 
@@ -447,7 +447,7 @@ async def legacy_watch_route(provider: str, anilist_id: int, audio: str, episode
                 "provider": "auto",
                 "requestedProvider": "auto",
                 "providerStatus": "auto_disabled",
-                "providerError": "The legacy Kuhi Auto race is disabled. Use MegaPlay Server 1 or choose one of the five supported embed servers.",
+                "providerError": "The legacy Kuhi Auto race is disabled. Use MegaPlay Server 1 or choose one of the six supported embed servers.",
                 "streams": [],
                 "subtitles": [],
             }
