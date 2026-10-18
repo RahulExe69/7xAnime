@@ -17,10 +17,6 @@ type MiniDragGesture = {
   pointerId: number;
   startX: number;
   startY: number;
-  startAt: number;
-  lastAt: number;
-  lastDeltaY: number;
-  velocityY: number;
   startOffsetX: number;
   startOffsetY: number;
   originLeft: number;
@@ -498,10 +494,6 @@ export function PlayerViewport({
       pointerId: event.pointerId,
       startX: event.clientX,
       startY: event.clientY,
-      startAt: event.timeStamp,
-      lastAt: event.timeStamp,
-      lastDeltaY: 0,
-      velocityY: 0,
       startOffsetX: offset.x,
       startOffsetY: offset.y,
       originLeft: rect.left,
@@ -523,13 +515,6 @@ export function PlayerViewport({
     event.stopPropagation();
     const deltaX = event.clientX - drag.startX;
     const deltaY = event.clientY - drag.startY;
-    const sampleDeltaY = deltaY - drag.lastDeltaY;
-    const sampleElapsed = event.timeStamp - drag.lastAt;
-    if (sampleElapsed > 0 && Math.abs(sampleDeltaY) >= 0.5) {
-      drag.velocityY = Math.max(-4500, Math.min(4500, (sampleDeltaY / sampleElapsed) * 1000));
-    }
-    drag.lastAt = event.timeStamp;
-    drag.lastDeltaY = deltaY;
     if (!drag.moved && Math.hypot(deltaX, deltaY) < SWIPE_TOUCH_SLOP) return;
     if (!drag.moved) setIsMiniDragging(true);
     drag.moved = true;
@@ -567,14 +552,18 @@ export function PlayerViewport({
     const cancelled = event.type === "pointercancel";
     const deltaX = event.clientX - drag.startX;
     const deltaY = event.clientY - drag.startY;
-    const finalDeltaY = deltaY - drag.lastDeltaY;
-    const finalElapsed = event.timeStamp - drag.lastAt;
-    if (finalElapsed > 0 && Math.abs(finalDeltaY) >= 0.5) {
-      drag.velocityY = Math.max(-4500, Math.min(4500, (finalDeltaY / finalElapsed) * 1000));
+    if (cancelled) {
+      setIsMiniDragging(false);
+      return;
     }
 
-    if (cancelled || !drag.moved || drag.mode === "pending") {
+    if (!drag.moved || drag.mode === "pending") {
+      // Some Android WebViews suppress click after a prevented pointer-down.
+      // Commit the tap on pointer-up and suppress any duplicate synthetic click.
       setIsMiniDragging(false);
+      suppressMiniClickRef.current = true;
+      dispatchPlayerAction("expand-mini-player");
+      window.setTimeout(() => { suppressMiniClickRef.current = false; }, 350);
       return;
     }
 
@@ -597,7 +586,7 @@ export function PlayerViewport({
     }
     revealMiniControls();
     window.setTimeout(() => { suppressMiniClickRef.current = false; }, 350);
-  }, [revealMiniControls, updateMiniOffset]);
+  }, [dispatchPlayerAction, revealMiniControls, updateMiniOffset]);
 
   useEffect(() => {
     if (!isMiniPlayer) {
