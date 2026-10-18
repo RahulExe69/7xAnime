@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-18-hindi-animeheaven-provider-design.md`
 
-**Execution status (2026-10-18):** The AnimeHeaven gate and the follow-up DesiDubAnime/Renime candidate sweep reached **NO-GO**. No reviewed candidate currently satisfies deployment/usage permission and episode-specific Hindi-evidence requirements. Runtime tasks 2–6 are intentionally blocked. See `docs/HINDI_DUB_PROVIDER_EVALUATION.md` for the full evidence record and reopening criteria.
+**Execution status (2026-10-18):** AnimeHeaven, DesiDubAnime, Renime-API, and HiAnime/Aniwatch reached **NO-GO**; Senshi remains unqualified. No reviewed candidate satisfies the plan's deployment/usage and episode-specific Hindi-evidence requirements. Runtime tasks 2–6 remain blocked. See `docs/HINDI_DUB_PROVIDER_EVALUATION.md` for the evidence record.
 
 ## Global Constraints
 
@@ -174,4 +174,15 @@ The AnimeHeaven gate remained NO-GO, so a bounded next-candidate sweep was recor
 - The live Android playback status for all these candidates remains **unverified**. Existing Hindi playback and the five standard provider definitions remain untouched.
 
 See `docs/HINDI_DUB_PROVIDER_EVALUATION.md` for the evidence record and source links.
+
+## Continuation checkpoint — HiAnime and Senshi qualification (2026-10-18)
+
+The next candidate review also reached NO-GO:
+
+- **HiAnime/Aniwatch API — NO-GO:** The reviewed [VoidX3D/hianime-api](https://github.com/VoidX3D/hianime-api) repository has an MIT code license and documents self-hosting, but its README says the former hosted showcase was misused and recommends a personal deployment. Its contract distinguishes generic subbed/dubbed categories, not episode-specific Hindi audio. A code license is not permission from the upstream site.
+- **Senshi — unqualified / NO-GO:** Searches surfaced Anivault-Scraper and forks, not a separate documented Senshi API with a known authorized deployment. The existing Anivault qualification blockers still apply.
+- **Ruling:** Keep Tasks 2–6 blocked. There is no evidence-supported source to integrate without weakening the Hindi truthfulness or permission gates. Do not infer a Hindi label from `dub`, self-deploy an unapproved scraper, or use an unknown public instance.
+- **Reopen criteria:** A canonical provider/API, a documented/authorized deployment or an explicitly approved self-hosting plan, a usage basis covering the upstream source, and episode-specific Hindi evidence; then proceed with bounded resolution and separate playback verification.
+
+See `docs/HINDI_DUB_PROVIDER_EVALUATION.md` for the candidate-by-candidate records.
 
