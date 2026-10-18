@@ -21,23 +21,21 @@ The supplied findings describe four different kinds of work, not four ready-to-u
 
 ### Standard playback providers
 
-The supported standard server choices now remain exactly seven (SupaPlay and VidPlus have generic dub selectors but are not yet verified as Hindi-specific sources):
+The supported standard server choices now remain exactly five (SupaPlay has a generic dub selector and is not yet verified as a Hindi-specific source):
 
 1. MegaPlay — Server 1 and the default/final fallback.
 2. AniXo.
 3. Megavid.
-4. TryEmbed.
-5. CinexStream.
-6. SupaPlay.
-7. VidPlus.
+4. CinexStream.
+5. SupaPlay.
 
 See [SERVERS.md](SERVERS.md), the source of truth for the active list and Android packaging allowlist. MegaPlay and its fallback role are not two different providers.
 
-The Android local Python backend packages the existing shared catalogue/context code and only the six existing extra adapters (AniXo, Megavid, TryEmbed, CinexStream, SupaPlay, VidPlus). The other legacy Kuhi adapters are intentionally pruned.
+The Android local Python backend packages the existing shared catalogue/context code and only the four active extra adapters (AniXo, Megavid, CinexStream, SupaPlay). The other legacy Kuhi adapters are intentionally pruned.
 
 ### Existing Hindi route
 
-[SERVERS.md](SERVERS.md) documents an existing separate Hindi-dub feature using the community ZeroTwo-Py/anime-api catalogue through the /hindi/search and /hindi/stream routes. This route is distinct from the seven standard playback choices.
+[SERVERS.md](SERVERS.md) documents an existing separate Hindi-dub feature using the community ZeroTwo-Py/anime-api catalogue through the /hindi/search and /hindi/stream routes. This route is distinct from the five standard playback choices.
 
 Before any future work, inspect the current implementation and tests. Do not assume this route is healthy or replaceable solely from a README claim. Do not rename it, overwrite it, or silently route it through a new candidate.
 
@@ -207,8 +205,8 @@ Never collapse these into a single “working” label.
 
 1. **Separate branch and PR.** Keep provider experiments isolated from player gestures/lifecycle work and from documentation. Base future work on current master, not an old provider branch.
 2. **No default enablement.** A candidate starts disabled/research-only. Add it to a runtime registry only after review and explicit acceptance.
-3. **Preserve the seven-server list.** Do not renumber standard servers or make a Hindi candidate look like a duplicate standard server. SupaPlay and VidPlus are not confirmed Hindi-specific sources; Hindi selection remains separate and available only when actually confirmed for the episode.
-4. **Do not change existing providers.** No edits to MegaPlay, AniXo, Megavid, TryEmbed, or CinexStream while testing a new candidate unless a separate, justified fix is required.
+3. **Preserve the five-server list.** Do not renumber standard servers or make a Hindi candidate look like a duplicate standard server. SupaPlay is not a confirmed Hindi-specific source; Hindi selection remains separate and available only when actually confirmed for the episode.
+4. **Do not change existing providers.** No edits to MegaPlay, AniXo, Megavid, CinexStream, or SupaPlay while testing a new candidate unless a separate, justified fix is required.
 5. **No false language badges.** Do not label a title or episode “Hindi” based on catalogue metadata, a series-level guess, or the mere presence of a dub/sub selector.
 6. **Strict manual choice.** A manual selection must not silently return another provider's stream. Any fallback must be explicit and observable.
 7. **Bounded network work.** Use timeouts, bounded concurrency, safe redirects, response-size limits, and sanitized errors. Do not expose tokens, cookies, signed URLs, or private headers in logs.
