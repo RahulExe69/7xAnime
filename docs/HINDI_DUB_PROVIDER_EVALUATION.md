@@ -37,7 +37,7 @@ The Android local Python backend packages the existing shared catalogue/context 
 
 ### Existing Hindi route
 
-[SERVERS.md](SERVERS.md) documents an existing separate Hindi-dub feature using the community ZeroTwo-Py/anime-api catalogue through the /hindi/search and /hindi/stream routes. This route is distinct from the five standard SUB/ENGLISH playback choices.
+[SERVERS.md](SERVERS.md) documents an existing separate Hindi-dub feature using the community ZeroTwo-Py/anime-api catalogue through the /hindi/search and /hindi/stream routes. This route is distinct from the seven standard playback choices.
 
 Before any future work, inspect the current implementation and tests. Do not assume this route is healthy or replaceable solely from a README claim. Do not rename it, overwrite it, or silently route it through a new candidate.
 
@@ -248,7 +248,7 @@ No live endpoint probes, code porting, provider registration, dependency changes
 2. A confirmable route contract and an episode-specific signal that identifies Hindi rather than just “dub.”
 3. A safe, bounded sample resolution for one known episode, followed later by physical Android playback verification.
 
-Until those facts are available, leave the current Hindi catalogue and the five standard servers unchanged. Revisit this candidate only after an authorized deployment and source-language evidence are available. This is a qualification failure, not proof that AnimeHeaven itself is offline.
+Until those facts are available, leave the current Hindi catalogue and the seven standard servers unchanged. Revisit this candidate only after an authorized deployment and source-language evidence are available. This is a qualification failure, not proof that AnimeHeaven itself is offline.
 
 ## Follow-up qualification gate — DesiDubAnime API and Renime-API (2026-10-18)
 
@@ -277,7 +277,7 @@ Until those facts are available, leave the current Hindi catalogue and the five 
 
 ### Current ruling
 
-Keep the existing ZeroTwo-Py Hindi catalogue and the five standard servers unchanged. Neither candidate advances to runtime tasks. Do not guess a hosted base URL, use a public deployment without authorization, or silently create a new scraping service. A new self-hosted architecture requires an explicit decision and a fresh review of applicable upstream terms before implementation.
+Keep the existing ZeroTwo-Py Hindi catalogue and the seven standard servers unchanged. Neither candidate advances to runtime tasks. Do not guess a hosted base URL, use a public deployment without authorization, or silently create a new scraping service. A new self-hosted architecture requires an explicit decision and a fresh review of applicable upstream terms before implementation.
 
 ## Follow-up qualification gate — HiAnime and Senshi (2026-10-18)
 
@@ -303,7 +303,7 @@ Keep the existing ZeroTwo-Py Hindi catalogue and the five standard servers uncha
 
 ### Current candidate status
 
-AnimeHeaven via Anivault-Scraper, DesiDubAnime API, Renime-API, and HiAnime/Aniwatch API are not approved for runtime integration; Senshi remains unqualified because no separate authorized integration was identified. Preserve the existing Hindi catalogue and five standard providers. A source must pass the same deployment/permission and episode-level Hindi gate regardless of how popular its scraper is.
+AnimeHeaven via Anivault-Scraper, DesiDubAnime API, Renime-API, and HiAnime/Aniwatch API are not approved for runtime integration; Senshi remains unqualified because no separate authorized integration was identified. Preserve the existing Hindi catalogue and seven standard providers. A source must pass the same deployment/permission and episode-level Hindi gate regardless of how popular its scraper is.
 
 ## Candidate qualification — Tatakai API (2026-10-18)
 
@@ -334,7 +334,7 @@ AnimeHeaven via Anivault-Scraper, DesiDubAnime API, Renime-API, and HiAnime/Aniw
 3. A bounded sample for one known series/episode, with stable episode identity and explicit `Hindi`/`hi`-specific audio evidence—not merely `dub`.
 4. Later physical-device playback verification before the source can be labelled playback-verified.
 
-**Ruling:** Keep this candidate as the top follow-up lead, but leave it disabled and do not implement a speculative adapter. Preserve the existing ZeroTwo-Py catalogue and five standard servers. This HOLD is different from “the API is offline” or “the candidate has no Hindi catalogue”; it means the integration contract and episode proof are still incomplete.
+**Ruling:** Keep this candidate as the top follow-up lead, but leave it disabled and do not implement a speculative adapter. Preserve the existing ZeroTwo-Py catalogue and seven standard servers. This HOLD is different from “the API is offline” or “the candidate has no Hindi catalogue”; it means the integration contract and episode proof are still incomplete.
 
 ## Candidate qualification — AnimeWorldIndia API family (2026-10-18)
 
@@ -362,7 +362,7 @@ AnimeHeaven via Anivault-Scraper, DesiDubAnime API, Renime-API, and HiAnime/Aniw
 
 ### Ruling
 
-Neither AnimeWorldIndia implementation clears the gate. Keep the current ZeroTwo-Py Hindi source and five standard providers unchanged. Tatakai remains the strongest follow-up lead because its public docs show a Hindi route and a separate WatchAnimeWorld response schema with `language`/`langCode`, but Tatakai is still **HOLD** until the deployed response contract, independent-client usage expectations, and known-episode language mapping are verified. This sweep does not prove any candidate is offline.
+Neither AnimeWorldIndia implementation clears the gate. Keep the current ZeroTwo-Py Hindi source and seven standard providers unchanged. Tatakai remains the strongest follow-up lead because its public docs show a Hindi route and a separate WatchAnimeWorld response schema with `language`/`langCode`, but Tatakai is still **HOLD** until the deployed response contract, independent-client usage expectations, and known-episode language mapping are verified. This sweep does not prove any candidate is offline.
 
 ## Candidate qualification — Anivexa API and Zangetsu provider manifest (2026-10-18)
 
@@ -394,7 +394,7 @@ Neither AnimeWorldIndia implementation clears the gate. Keep the current ZeroTwo
 
 The [Muse India channel](https://www.youtube.com/channel/UCYYhAzgWuxPauRXdPpLAX3Q) is listed by YouTube as verified and describes itself as publishing copyrighted, legal anime content free on YouTube. Its public channel metadata includes a Hindi-dub anime section. See the [channel result](https://www.youtube.com/channel/UCYYhAzgWuxPauRXdPpLAX3Q), YouTube's [official embedded-player guidance](https://support.google.com/youtube/answer/171780), the [YouTube Data API Services Terms](https://developers.google.com/youtube/terms/api-services-terms-of-service), and the [official video-feed format reference](https://developers.google.com/youtube/data/guides/push_notifications).
 
-**Preferred design:** use official YouTube video IDs and the official embedded player only. Do not download, unwrap, proxy, or extract direct video streams. Keep it as an optional source in the existing Hindi selector; do not touch the five standard SUB/ENGLISH servers.
+**Preferred design:** use official YouTube video IDs and the official embedded player only. Do not download, unwrap, proxy, or extract direct video streams. Keep it as an optional source in the existing Hindi selector; do not touch the seven standard playback choices.
 
 A no-key local-backend discovery experiment should use the channel feed URL documented by YouTube's current push-notification guide:
 
@@ -435,5 +435,5 @@ The code license covers the scraper code, **not** the underlying streamed shows 
 - **AnimeSalt / AnimixStream via Zangetsu manifest — research only:** technical multi-audio claims are interesting, but no reusable plugin license or 7xAnime API contract was established. Do not copy/port the manifest scripts.
 - **AnimeHeaven/Anivault-Scraper, DesiDubAnime API, Renime-API, HiAnime/Aniwatch API, Anivexa, and unspecified Senshi integrations — NO-GO or unqualified** under the previous audit.
 
-Keep the current ZeroTwo-Py Hindi catalogue and five standard providers unchanged. No candidate has cleared the gate; this does not establish that any site/API is offline.
+Keep the current ZeroTwo-Py Hindi catalogue and seven standard providers unchanged. No candidate has cleared the gate; this does not establish that any site/API is offline.
 
