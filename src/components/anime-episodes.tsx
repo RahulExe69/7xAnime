@@ -28,6 +28,7 @@ const AnimeEpisodes = ({ animeId }: Props) => {
   const [query, setQuery] = useState("");
   const [selectedRange, setSelectedRange] = useState("1-50");
   const [jumpTo, setJumpTo] = useState("");
+  const [jumpTarget, setJumpTarget] = useState<number | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
   const ranges = useMemo(() => {
@@ -44,6 +45,7 @@ const AnimeEpisodes = ({ animeId }: Props) => {
   }, [ranges, selectedRange]);
 
   const visibleEpisodes = useMemo(() => {
+    if (jumpTarget !== null) return episodes.filter((episode) => Number(episode.number) === jumpTarget);
     const search = query.trim().toLocaleLowerCase();
     if (search) {
       // Search the complete catalogue, not only the currently selected range.
@@ -61,7 +63,7 @@ const AnimeEpisodes = ({ animeId }: Props) => {
       const number = Number(episode.number) || index + 1;
       return number >= start && number <= end;
     });
-  }, [episodes, query, ranges, selectedRange]);
+  }, [episodes, jumpTarget, query, ranges, selectedRange]);
 
   const handleJump = () => {
     const target = Number(jumpTo);
@@ -71,9 +73,10 @@ const AnimeEpisodes = ({ animeId }: Props) => {
       return target >= start && target <= end;
     });
     if (range) setSelectedRange(range);
-    setQuery(String(target));
+    setQuery("");
+    setJumpTarget(target);
     requestAnimationFrame(() => {
-      listRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      document.getElementById(`episode-option-${target}`)?.scrollIntoView({ behavior: "smooth", block: "nearest" });
     });
   };
 
@@ -89,7 +92,7 @@ const AnimeEpisodes = ({ animeId }: Props) => {
             )}
           </div>
           {ranges.length > 1 && (
-            <Select value={selectedRange} onValueChange={(value) => { setSelectedRange(value); setQuery(""); }}>
+            <Select value={selectedRange} onValueChange={(value) => { setSelectedRange(value); setQuery(""); setJumpTarget(null); }}>
               <SelectTrigger aria-label="Episode range" className="h-9 w-full rounded-xl border-white/10 bg-white/[0.04] text-xs text-zinc-200 sm:w-[170px]">
                 <SelectValue placeholder="Choose episodes" />
               </SelectTrigger>
@@ -108,7 +111,7 @@ const AnimeEpisodes = ({ animeId }: Props) => {
             <Search aria-hidden="true" className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
             <Input
               value={query}
-              onChange={(event) => setQuery(event.target.value)}
+              onChange={(event) => { setJumpTarget(null); setQuery(event.target.value); }}
               placeholder="Search any episode number or title…"
               aria-label="Search all episodes"
               className="h-10 w-full rounded-xl border-white/10 bg-white/[0.04] pl-9 text-sm text-white placeholder:text-zinc-500"
@@ -159,9 +162,9 @@ const AnimeEpisodes = ({ animeId }: Props) => {
           <div key={index} className={cn("h-12 w-full animate-pulse rounded-lg bg-white/[0.045]")} />
         ))}
       </div>
-      {query.trim() && (
-        <button type="button" onClick={() => setQuery("")} className="text-xs font-semibold text-[#ff9fbe] hover:text-white">
-          Clear search and return to selected range
+      {(query.trim() || jumpTarget !== null) && (
+        <button type="button" onClick={() => { setQuery(""); setJumpTarget(null); }} className="text-xs font-semibold text-[#ff9fbe] hover:text-white">
+          Clear filter and return to selected range
         </button>
       )}
     </div>
