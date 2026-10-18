@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, Mock, patch
 from fastapi.testclient import TestClient
 
 import local_api
-from src.providers import anixo, cinexstream, megavid, tryembed
+from src.providers import anixo, cinexstream, megavid, supaplay, tryembed
 
 
 class LocalAnimeApiTests(unittest.TestCase):
@@ -169,7 +169,7 @@ class LocalAnimeApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200, response.text)
         payload = response.json()
         self.assertEqual(payload["loadedCount"], 1)
-        self.assertEqual(payload["providerCount"], 4)
+        self.assertEqual(payload["providerCount"], 5)
         self.assertEqual(payload["providers"][0]["status"], "recent_attempt_succeeded")
         self.assertEqual(payload["providers"][1]["status"], "module_unavailable")
         self.assertIn("not a live guarantee", payload["note"])
@@ -451,6 +451,58 @@ class LocalAnimeApiTests(unittest.TestCase):
             self.assertEqual(len(anixo_episodes["episodes"]["dub"]), 12)
             self.assertEqual(len(megavid_episodes["episodes"]["sub"]), 12)
             self.assertEqual(anixo_episodes["episodes"]["sub"][2]["id"], "watch/anixo/21/sub/anixo-3")
+
+        asyncio.run(exercise())
+
+    def test_supaplay_builds_documented_anilist_embed_routes_without_network(self) -> None:
+        context = {
+            "media": {"id": 21, "episodes": 12, "title": {"english": "Test Series"}},
+            "anizip": None,
+        }
+
+        async def exercise() -> None:
+            sub_stream = await supaplay.watch(21, "sub", 2, context)
+            dub_stream = await supaplay.watch(21, "dub", 7, context)
+            self.assertEqual(sub_stream[0]["url"], "https://supaplay.fun/stream/ani/21/2/sub")
+            self.assertEqual(dub_stream[0]["url"], "https://supaplay.fun/stream/ani/21/7/dub")
+            self.assertEqual(sub_stream[0]["type"], "embed")
+            self.assertEqual(dub_stream[0]["server"], "SupaPlay")
+            self.assertEqual(dub_stream[0]["upstream"], "supaplay")
+            self.assertEqual(dub_stream[0]["referer"], "https://supaplay.fun/")
+
+            episodes = await supaplay.get_episodes(21, context)
+            self.assertEqual(len(episodes["episodes"]["sub"]), 12)
+            self.assertEqual(len(episodes["episodes"]["dub"]), 12)
+            self.assertEqual(
+                episodes["episodes"]["dub"][6]["id"],
+                "watch/supaplay/21/dub/supaplay-7",
+            )
+
+        asyncio.run(exercise())
+
+    def test_manual_supaplay_route_skips_slow_metadata_context(self) -> None:
+        async def exercise() -> None:
+            with (
+                patch.object(local_api.provider_race, "providers", return_value=[("supaplay", supaplay)]),
+                patch.object(
+                    local_api, "_get_local_provider_context",
+                    new=AsyncMock(side_effect=AssertionError("manual embeds must not wait on metadata")),
+                ) as context_lookup,
+                patch.object(local_api.provider_race, "record_latency"),
+            ):
+                response = self.client.get(
+                    "/watch/supaplay/21/dub/supaplay-43",
+                    headers=self.auth,
+                )
+
+            self.assertEqual(response.status_code, 200, response.text)
+            payload = response.json()
+            self.assertEqual(payload["providerStatus"], "ok")
+            self.assertEqual(
+                payload["streams"][0]["url"],
+                "https://supaplay.fun/stream/ani/21/43/dub",
+            )
+            context_lookup.assert_not_awaited()
 
         asyncio.run(exercise())
 
