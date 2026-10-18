@@ -172,7 +172,6 @@ html.sevenx-pip-mode [data-player-viewport="true"] {
 [data-persistent-watch-player][data-player-mode="mini"] [data-player-viewport="true"] {
   translate: var(--mini-player-offset, 0px 0px);
   transition: translate 220ms cubic-bezier(0.22, 1, 0.36, 1);
-  will-change: transform, translate;
   position: fixed !important;
   inset: auto 12px calc(88px + env(safe-area-inset-bottom)) auto !important;
   width: min(58vw, 360px) !important;
@@ -209,3 +208,4 @@ html.sevenx-pip-mode [data-player-viewport="true"] {
 video::-webkit-media-controls-picture-in-picture-button {
   display: none !important;
 }
+
