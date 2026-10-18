@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-18-hindi-animeheaven-provider-design.md`
 
-**Execution status (2026-10-18):** This plan's original AnimeHeaven path remains **NO-GO** because no licensed/reachable endpoint with episode-level Hindi evidence has been established. The latest local-backend reassessment is tracked in [HINDI_DUB_PROVIDER_EVALUATION.md](../../HINDI_DUB_PROVIDER_EVALUATION.md): WatchAnimeWorld / AnimeWorldIndia is now the best **local-native evaluation lead**, but still **HOLD**, not approved for runtime integration. Do not execute AnimeHeaven-specific implementation tasks 2–6 for the alternate candidate. First qualify the current site's terms, redirects, episode mapping, explicit Hindi evidence, and embed playback. No runtime files or build configuration should change until that separate gate passes.
+**Execution status (2026-10-18):** This AnimeHeaven plan is historical and blocked. The latest evaluation now prefers a limited official-source path: Muse India's verified YouTube channel, using official video IDs and the embedded player only. The channel feed has not been live-tested in this environment, and feed coverage may be too shallow for back-catalogue episodes. Do not run AnimeHeaven tasks 2–6 or make runtime changes. Follow the new qualification plan in `docs/superpowers/plans/2026-10-18-muse-india-official-hindi-source.md`.
 
 ## Global Constraints
 
