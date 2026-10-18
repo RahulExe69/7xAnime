@@ -234,6 +234,10 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
     let disposed = false;
     let appListener: { remove: () => Promise<void> } | null = null;
 
+    const clearLifecycleResumeTimers = () => {
+      lifecycleResumeTimersRef.current.forEach((timer) => window.clearTimeout(timer));
+      lifecycleResumeTimersRef.current = [];
+    };
     const onPipMode = (event: Event) => {
       const detail = (event as CustomEvent<{ active?: boolean }>).detail;
       setNativePipActive(detail?.active === true);
@@ -242,39 +246,116 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
 
     void App.addListener("appStateChange", ({ isActive }) => {
       if (isActive) {
-        // Resume only media that this lifecycle handler paused. A player that
-        // the user had already paused stays paused, and the iframe is not rebuilt.
+        appIsActiveRef.current = true;
+        // A known-playing and a known-paused embed need different recovery paths.
+        // In particular, the pause event emitted by our background pause command
+        // must not become a permanent user-pause flag after the app returns.
         const snapshot = backgroundPlaybackRef.current;
-        if (snapshot.embedWasPlaying) {
-          const frame = externalEmbedFrameRef.current;
-          if (frame) requestExternalPlayerPlay(frame);
+        const frame = externalEmbedFrameRef.current;
+        clearLifecycleResumeTimers();
+
+        if (frame && (snapshot.embedWasPlaying || snapshot.embedWasPaused)) {
+          const resumeMode = snapshot.embedWasPlaying ? "playing" : "paused";
+          const resumeStartedAt = Date.now();
+          const sourceAtResume = frame.src;
+          backgroundResumeModeRef.current = resumeMode;
+          backgroundResumeStartedAtRef.current = resumeStartedAt;
+          embedPlaybackStateRef.current = resumeMode;
+          pauseAfterEmbedRecoveryRef.current = resumeMode === "paused";
+          lastEmbedSignalAtRef.current = 0;
+          lastEmbedProgressAtRef.current = 0;
+          embedLoadStartedAtRef.current = resumeStartedAt;
+          if (resumeMode === "playing") {
+            embedHasObservedPlaybackRef.current = true;
+            requestExternalPlayerPlay(frame);
+          } else {
+            requestExternalPlayerPause(frame);
+          }
+
+          // Some providers ignore the first postMessage after WebView resume.
+          // Retry state/play-or-pause commands briefly while keeping the same
+          // iframe mounted; only rebuild it if it never responds at all.
+          for (const delay of [400, 1100, 2200]) {
+            const timer = window.setTimeout(() => {
+              if (externalEmbedFrameRef.current !== frame ||
+                  frame.src !== sourceAtResume ||
+                  !appIsActiveRef.current ||
+                  backgroundResumeStartedAtRef.current !== resumeStartedAt) return;
+              if (backgroundResumeModeRef.current === "playing") {
+                requestExternalPlayerPlay(frame);
+              } else if (backgroundResumeModeRef.current === "paused") {
+                requestExternalPlayerPause(frame);
+              }
+              requestExternalPlayerState(frame);
+            }, delay);
+            lifecycleResumeTimersRef.current.push(timer);
+          }
+
+          const recoveryTimer = window.setTimeout(() => {
+            if (externalEmbedFrameRef.current !== frame ||
+                frame.src !== sourceAtResume ||
+                !appIsActiveRef.current ||
+                backgroundResumeStartedAtRef.current !== resumeStartedAt ||
+                backgroundResumeModeRef.current !== resumeMode) return;
+            // A provider that produces no state/progress response after foreground
+            // was often left as a white iframe by Android. Recreate only that
+            // unresponsive frame; requestEmbedResume restores its saved position
+            // and the resume mode keeps a previously paused episode paused.
+            setPlayerRetryKey((previous) => previous + 1);
+          }, 4800);
+          lifecycleResumeTimersRef.current.push(recoveryTimer);
         }
+
         snapshot.directVideos.forEach((video) => {
           if (!video.isConnected) return;
           void video.play().catch(() => {
             // Autoplay policy may require a manual tap after returning from background.
           });
         });
-        backgroundPlaybackRef.current = { embedWasPlaying: false, directVideos: [] };
+        backgroundPlaybackRef.current = {
+          embedWasPlaying: false,
+          embedWasPaused: false,
+          directVideos: [],
+        };
         setAppIsActive(true);
         return;
       }
 
+      appIsActiveRef.current = false;
+      clearLifecycleResumeTimers();
       const pipActive = document.documentElement.classList.contains("sevenx-pip-mode");
       setNativePipActive(pipActive);
       if (!pipActive) {
         const frame = externalEmbedFrameRef.current;
-        // Only resume an embed when we positively observed it playing before
-        // backgrounding; an unknown state must not override a user's manual pause.
+        // Save the freshest known position before Android suspends the WebView.
+        const latestProgress = lastEmbedProgressRef.current;
+        if (latestProgress) saveLocalWatchProgress(latestProgress);
+
         const embedWasPlaying = !!frame && embedPlaybackStateRef.current === "playing";
+        const embedWasPaused = !!frame && embedPlaybackStateRef.current === "paused";
+        backgroundPlaybackRef.current = { embedWasPlaying, embedWasPaused, directVideos: [] };
+        backgroundResumeModeRef.current = embedWasPlaying
+          ? "playing"
+          : embedWasPaused
+            ? "paused"
+            : null;
+        if (frame && embedWasPlaying) {
+          // Record our own pause before asking the provider to pause.
+          backgroundResumeStartedAtRef.current = Date.now();
+          requestExternalPlayerPause(frame);
+        }
         const directVideos = Array.from(document.querySelectorAll("video"))
           .filter((video) => !video.paused && video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA);
-        backgroundPlaybackRef.current = { embedWasPlaying, directVideos };
-        if (frame && embedWasPlaying) requestExternalPlayerPause(frame);
+        backgroundPlaybackRef.current.directVideos = directVideos;
         directVideos.forEach((video) => video.pause());
       } else {
         // Do not interfere with an explicitly active native Picture-in-picture session.
-        backgroundPlaybackRef.current = { embedWasPlaying: false, directVideos: [] };
+        backgroundResumeModeRef.current = null;
+        backgroundPlaybackRef.current = {
+          embedWasPlaying: false,
+          embedWasPaused: false,
+          directVideos: [],
+        };
       }
       setAppIsActive(false);
     }).then((listener) => {
@@ -286,6 +367,7 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
 
     return () => {
       disposed = true;
+      clearLifecycleResumeTimers();
       window.removeEventListener("7xanime:pip-mode", onPipMode);
       if (appListener) void appListener.remove();
     };
@@ -353,10 +435,15 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
   const [selectedHindiServer, setSelectedHindiServer] = useState<number>(0);
   const [appIsActive, setAppIsActive] = useState(true);
   const [nativePipActive, setNativePipActive] = useState(false);
+  const appIsActiveRef = useRef(true);
+  const backgroundResumeModeRef = useRef<"playing" | "paused" | null>(null);
+  const backgroundResumeStartedAtRef = useRef(0);
+  const lifecycleResumeTimersRef = useRef<number[]>([]);
   const backgroundPlaybackRef = useRef<{
     embedWasPlaying: boolean;
+    embedWasPaused: boolean;
     directVideos: HTMLVideoElement[];
-  }>({ embedWasPlaying: false, directVideos: [] });
+  }>({ embedWasPlaying: false, embedWasPaused: false, directVideos: [] });
   const [manualProviderPlaybackFailed, setManualProviderPlaybackFailed] = useState(false);
   const [fallbackPlaybackFailed, setFallbackPlaybackFailed] = useState(false);
   const [playbackSourceIndex, setPlaybackSourceIndex] = useState(0);
@@ -417,8 +504,10 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
     // Restore the last position and query playback state whenever an embed is
     // loaded. Some providers return pause/play state only after initialization,
     // so state probes continue even when there is no saved position to seek to.
-    const shouldRemainPaused = pauseAfterEmbedRecoveryRef.current ||
-      embedPlaybackStateRef.current === "paused";
+    const resumeModeAtLoad = backgroundResumeModeRef.current;
+    const shouldRemainPaused = resumeModeAtLoad === "paused" ||
+      (resumeModeAtLoad !== "playing" &&
+        (pauseAfterEmbedRecoveryRef.current || embedPlaybackStateRef.current === "paused"));
 
     embedResumeTimersRef.current.forEach((timer) => window.clearTimeout(timer));
     embedResumeTimersRef.current = [];
@@ -435,9 +524,16 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
         // Read the current refs at dispatch time, not the values captured when
         // these timers were queued. A play/timeupdate event must cancel pause
         // restoration, while a pause-state response must prevent a resume seek.
-        const remainPaused = pauseAfterEmbedRecoveryRef.current ||
-          embedPlaybackStateRef.current === "paused";
+        const activeResumeMode = backgroundResumeModeRef.current;
+        const remainPaused = activeResumeMode === "paused" ||
+          (activeResumeMode !== "playing" &&
+            (pauseAfterEmbedRecoveryRef.current || embedPlaybackStateRef.current === "paused"));
         if (remainPaused) {
+          // A paused player recovered after app background still needs its saved
+          // position restored, but must never be switched into playback.
+          if (activeResumeMode === "paused" && resumeTime !== null) {
+            requestExternalPlayerSeek(frameAtSchedule, resumeTime);
+          }
           requestExternalPlayerPause(frameAtSchedule);
         } else if (resumeTime !== null) {
           requestExternalPlayerSeek(frameAtSchedule, resumeTime);
@@ -455,6 +551,10 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
 
   useEffect(() => {
     // Paused/playing state belongs to an episode, not to the next one.
+    lifecycleResumeTimersRef.current.forEach((timer) => window.clearTimeout(timer));
+    lifecycleResumeTimersRef.current = [];
+    backgroundResumeModeRef.current = null;
+    backgroundResumeStartedAtRef.current = 0;
     embedPlaybackStateRef.current = "unknown";
     pauseAfterEmbedRecoveryRef.current = false;
     lastEmbedMediaTimeRef.current = null;
@@ -1406,11 +1506,35 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
       if (queryStateResponse && (reportedPaused || reportedPlaying)) {
         lastEmbedStateReplyAtRef.current = Date.now();
       }
-      if (reportedPaused) {
+      const now = Date.now();
+      const lifecyclePauseEcho = reportedPaused &&
+        backgroundResumeModeRef.current === "playing" &&
+        (!appIsActiveRef.current || now - backgroundResumeStartedAtRef.current < 2500);
+      const foregroundPauseMustWin = backgroundResumeModeRef.current === "paused" &&
+        (reportedPlaying || progressIndicatesPlaying);
+
+      if (lifecyclePauseEcho) {
+        // This is the pause acknowledgement for the app's own background command,
+        // not a deliberate user pause. Reassert play only after the app is visible.
+        lastEmbedSignalAtRef.current = now;
+        if (appIsActiveRef.current) {
+          const activeFrame = externalEmbedFrameRef.current;
+          if (activeFrame) requestExternalPlayerPlay(activeFrame);
+        }
+      } else if (foregroundPauseMustWin) {
+        // The provider may wake itself when Android resumes. The last known user
+        // state was paused, so keep it paused until we receive a paused response.
+        lastEmbedSignalAtRef.current = now;
+        const activeFrame = externalEmbedFrameRef.current;
+        if (activeFrame) requestExternalPlayerPause(activeFrame);
+      } else if (reportedPaused) {
         embedPlaybackStateRef.current = "paused";
         pauseAfterEmbedRecoveryRef.current = true;
-        lastEmbedSignalAtRef.current = Date.now();
-        lastEmbedProgressAtRef.current = Date.now();
+        lastEmbedSignalAtRef.current = now;
+        lastEmbedProgressAtRef.current = now;
+        if (backgroundResumeModeRef.current === "paused") {
+          backgroundResumeModeRef.current = null;
+        }
         const pausedFrame = externalEmbedFrameRef.current;
         if (pausedFrame) requestExternalPlayerPause(pausedFrame);
       } else if (reportedPlaying || progressIndicatesPlaying) {
@@ -1420,8 +1544,11 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
         embedPlaybackStateRef.current = "playing";
         pauseAfterEmbedRecoveryRef.current = false;
         embedHasObservedPlaybackRef.current = true;
-        lastEmbedSignalAtRef.current = Date.now();
-        if (reportedPlaying) lastEmbedProgressAtRef.current = Date.now();
+        lastEmbedSignalAtRef.current = now;
+        if (reportedPlaying) lastEmbedProgressAtRef.current = now;
+        if (backgroundResumeModeRef.current === "playing") {
+          backgroundResumeModeRef.current = null;
+        }
       }
 
       // Providers disagree on which field carries the ended signal and how
