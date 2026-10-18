@@ -130,7 +130,6 @@ export function PlayerViewport({
   const applySwipeContentProgress = useCallback((
     rawProgress: number,
     direction: "collapse" | "expand" | "restore",
-    _anchorTarget?: RectSnapshot | null,
   ) => {
     // Keep page content in place and fade it with the player's gesture.
     // Moving/scaling every sibling toward the mini-player corner made the
