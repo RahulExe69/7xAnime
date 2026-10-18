@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, type ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import VideoPlayerSection from "@/app/anime/watch/video-player-section";
 import { ROUTES } from "@/constants/routes";
 
@@ -16,14 +16,19 @@ type WatchLocationDetail = {
 export function PersistentWatchExperience({ children }: PersistentWatchExperienceProps) {
   const pathname = usePathname() || ROUTES.HOME;
   const router = useRouter();
+  const searchParams = useSearchParams();
   const isWatchRoute = pathname === ROUTES.WATCH || pathname.startsWith(`${ROUTES.WATCH}/`);
+  const watchLocationKey = isWatchRoute
+    ? `${searchParams.get("anime") || ""}:${searchParams.get("episode") || ""}:${searchParams.get("ep") || ""}`
+    : "";
   const [hasPlayerSession, setHasPlayerSession] = useState(isWatchRoute);
   const lastWatchHrefRef = useRef<string>(ROUTES.WATCH);
   const lastBrowsePathRef = useRef<string>(ROUTES.HOME);
 
-  // Next.js can restore the previous browse-page scroll offset when entering
-  // the persistent watch route. The player is hosted in the root layout, so
-  // force a top-of-watch-page starting position on route entry before paint.
+  // Next.js can restore the previous browse-page scroll offset both when
+  // entering the watch route and when changing episodes on the same pathname.
+  // Include the watch query identity so each newly opened episode starts with
+  // its player visible. The persistent player is hosted in the root layout.
   useLayoutEffect(() => {
     if (!isWatchRoute) return;
 
@@ -37,7 +42,7 @@ export function PersistentWatchExperience({ children }: PersistentWatchExperienc
     // A second pass wins over scroll restoration scheduled by route navigation.
     const frame = window.requestAnimationFrame(resetScrollPosition);
     return () => window.cancelAnimationFrame(frame);
-  }, [isWatchRoute]);
+  }, [isWatchRoute, watchLocationKey]);
 
   useEffect(() => {
     if (isWatchRoute) {
