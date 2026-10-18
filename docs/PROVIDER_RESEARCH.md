@@ -3,6 +3,10 @@
 
 > **Current status (2026-10-17):** This file records historical research, not the active runtime provider list. The only standard playback choices are MegaPlay, AniXo, Megavid, TryEmbed, and CinexStream. AnimeParadise, MegaFlix, NontonGo, AnimeNoSub, and the legacy Kuhi provider pool have been retired/pruned. Do not use old integration notes below as permission to re-enable them; see [SERVERS.md](SERVERS.md) for the current source of truth.
 
+
+
+> Focused follow-up: [Hindi-dub provider research and integration plan](HINDI_DUB_PROVIDER_EVALUATION.md) documents the HiAnime/MegaCloud, regional-source, Consumet/Anify, and ID-mapping candidates. It is research-only and does not change the active provider allowlist.
+
 **Audit date:** 2026-10-09  
 **Scope:** The eight entries supplied in the Gemini prompt, plus overlap with 7xAnime's bundled Kuhi providers.  
 **Meaning of “functional”:** repository source/build status, project-maintainer statements, and documented routes. A working repository or imported module does **not** prove a particular stream endpoint works for a given episode. Live provider reachability changes frequently; endpoint probes that did not produce a response are explicitly marked *unverified* rather than being called down or up.
