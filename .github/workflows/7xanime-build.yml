@@ -262,8 +262,24 @@ jobs:
               raise SystemExit("Double-tap ±10-second seeking wiring missing")
           if "SWIPE_THRESHOLD" not in viewport or "enterNativePlayerFullscreen" not in viewport:
               raise SystemExit("Player swipe/fullscreen wiring missing")
+          if 'session.isFullscreen && session.direction === "collapse" && deltaY > 0 && session.inlineTarget' not in viewport:
+              raise SystemExit("Fullscreen swipe-down must return to the inline watch page before minimising")
+          if 'session.isFullscreen ? session.inlineTarget : session.miniTarget' not in viewport:
+              raise SystemExit("Fullscreen exit and inline minimisation targets must remain state-specific")
+          if 'direction === "restore" ? progress : 1 - progress' not in viewport:
+              raise SystemExit("Fullscreen exit must reveal surrounding watch-page content with gesture progress")
+          if 'mode: "pending" | "drag" | "expand"' in viewport or "getMiniExpandTarget" in viewport or 'drag.mode === "expand"' in viewport:
+              raise SystemExit("Mini-player upward drag must not act as a tap-to-restore shortcut")
+          if 'dispatchPlayerAction("expand-mini-player")' not in viewport or 'if (!drag.moved || drag.mode === "pending")' not in viewport:
+              raise SystemExit("Tapping the mini-player must restore the watch page from pointer-up")
           if 'data-player-viewport="true"' not in viewport:
               raise SystemExit("Player viewport marker is missing")
+          if 'Playback paused because 7xAnime is in the background' in watch_section:
+              raise SystemExit("Backgrounding the app must not unmount the active player")
+          if 'const requestExternalPlayerPlay' not in watch_section or 'backgroundPlaybackRef' not in watch_section:
+              raise SystemExit("App lifecycle must preserve and resume the existing player session")
+          if 'if (snapshot.embedWasPlaying)' not in watch_section or 'directVideos.forEach((video) => video.pause())' not in watch_section:
+              raise SystemExit("Background pause/resume must preserve the user's prior playback intent")
           if 'allow="autoplay; fullscreen; picture-in-picture; encrypted-media"' in watch_section:
               raise SystemExit("Embedded provider iframes must not be granted Picture-in-Picture permission")
           if "disablePictureInPicture" not in viewport or "disablepictureinpicture" not in viewport:
@@ -291,6 +307,16 @@ jobs:
               raise SystemExit("Background playback stop / PiP lifecycle handling is missing")
           if "getLocalWatchProgress" not in watch_section or "requestEmbedResume" not in watch_section:
               raise SystemExit("Cross-server watch-progress resume handling is missing")
+          if "requestExternalPlayerState" not in watch_section or "getPaused" not in watch_section:
+              raise SystemExit("Common embedded-player pause-state probing is missing")
+          if "source.eventName" not in watch_section or "lastEmbedMediaTimeRef" not in watch_section:
+              raise SystemExit("Provider event-envelope and playback-intent normalization is missing")
+          if '"player-ready"' not in watch_section or "progressIndicatesPlaying" not in watch_section:
+              raise SystemExit("Provider ready aliases and progress-based resume intent are missing")
+          if "embedHasObservedPlaybackRef" not in watch_section or "canDistinguishPauseFromStall" not in watch_section:
+              raise SystemExit("The embed watchdog must distinguish unknown pause state from a silent stall")
+          if 'observedEmbedProvider === "anixo"' not in watch_section or "only explicit error messages trigger reconnection" not in watch_section:
+              raise SystemExit("Pause-safe watchdog recovery policy is missing")
           if "onEpisodeEnded?: () => void" not in player_component or 'art.on("video:ended"' not in player_component:
               raise SystemExit("Native video-ended callback is missing")
           if "advanceToNextEpisode" not in watch_section or "episode-" not in watch_section:

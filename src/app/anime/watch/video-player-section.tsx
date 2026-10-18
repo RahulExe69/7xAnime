@@ -74,28 +74,43 @@ const updateEpisodeUrl = (episodeId: string, episodeNumber: number) => {
 // player-message protocols for a seek, without reading or modifying their page.
 // Providers with no remote seek API ignore these messages; direct media playback
 // uses ArtPlayer's native seek/resume path instead.
+const PLAYER_JS_VERSION = "0.0.11";
+
+// Embed providers do not share one control protocol. Keep commands conservative
+// (pause/seek/state only) and send common object and JSON envelopes; unsupported
+// protocols are ignored by the provider.
 const requestExternalPlayerSeek = (frame: HTMLIFrameElement, seconds: number) => {
   const target = frame.contentWindow;
   if (!target || !Number.isFinite(seconds) || seconds < 1) return;
   const time = Math.max(0, Math.floor(seconds));
-  const commands = [
+  const objectCommands = [
     { event: "seek", time, currentTime: time },
     { type: "seek", time, currentTime: time },
     { action: "seek", time, currentTime: time },
     { event: "command", func: "seekTo", args: [time, true] },
+    { func: "seekTo", args: [time, true] },
     { method: "seekTo", value: time },
   ];
-  for (const command of commands) {
+  for (const command of objectCommands) {
     try { target.postMessage(command, "*"); } catch { /* provider ignored */ }
+  }
+
+  const protocolCommands = [
+    { context: "player.js", version: PLAYER_JS_VERSION, method: "setCurrentTime", value: time, listener: "7xanime-resume-seek" },
+    { eventName: "postmessage:do:seek", data: { position: time } },
+    { method: "seek", params: { time, position: time } },
+  ];
+  for (const command of protocolCommands) {
+    try { target.postMessage(JSON.stringify(command), "*"); } catch { /* provider ignored */ }
   }
 };
 
-// Third-party embeds have no universal pause API, so recovery uses several
-// common postMessage shapes. Unsupported messages are safely ignored by providers.
+// Third-party embeds have no universal pause API. Try the existing generic
+// commands plus the common Player.js, eventName, and method/params protocols.
 const requestExternalPlayerPause = (frame: HTMLIFrameElement) => {
   const target = frame.contentWindow;
   if (!target) return;
-  const commands = [
+  const objectCommands = [
     { event: "pause" },
     { type: "pause" },
     { action: "pause" },
@@ -104,8 +119,70 @@ const requestExternalPlayerPause = (frame: HTMLIFrameElement) => {
     { event: "command", func: "pauseVideo", args: [] },
     { func: "pauseVideo", args: [] },
   ];
-  for (const command of commands) {
+  for (const command of objectCommands) {
     try { target.postMessage(command, "*"); } catch { /* provider ignored */ }
+  }
+
+  const protocolCommands = [
+    { context: "player.js", version: PLAYER_JS_VERSION, method: "pause" },
+    { eventName: "postmessage:do:pause" },
+    { method: "pause", params: {} },
+  ];
+  for (const command of protocolCommands) {
+    try { target.postMessage(JSON.stringify(command), "*"); } catch { /* provider ignored */ }
+  }
+  try { target.postMessage("pause", "*"); } catch { /* provider ignored */ }
+};
+
+// Resume commands are best-effort because cross-origin providers expose different
+// APIs. The iframe is deliberately kept mounted across app background/foreground.
+const requestExternalPlayerPlay = (frame: HTMLIFrameElement) => {
+  const target = frame.contentWindow;
+  if (!target) return;
+  const objectCommands = [
+    { event: "play" },
+    { type: "play" },
+    { action: "play" },
+    { method: "play" },
+    { command: "play" },
+    { event: "command", func: "playVideo", args: [] },
+    { func: "playVideo", args: [] },
+  ];
+  for (const command of objectCommands) {
+    try { target.postMessage(command, "*"); } catch { /* provider ignored */ }
+  }
+  const protocolCommands = [
+    { context: "player.js", version: PLAYER_JS_VERSION, method: "play" },
+    { eventName: "postmessage:do:play" },
+    { method: "play", params: {} },
+  ];
+  for (const command of protocolCommands) {
+    try { target.postMessage(JSON.stringify(command), "*"); } catch { /* provider ignored */ }
+  }
+  try { target.postMessage("play", "*"); } catch { /* provider ignored */ }
+};
+
+// Query common state APIs so a silent pause is not mistaken for a stalled
+// stream. This is best-effort: many third-party embeds expose events only.
+const requestExternalPlayerState = (frame: HTMLIFrameElement) => {
+  const target = frame.contentWindow;
+  if (!target) return;
+  const objectCommands = [
+    { event: "getPaused" },
+    { type: "getPaused" },
+    { action: "getPaused" },
+    { method: "getPaused", params: {} },
+  ];
+  for (const command of objectCommands) {
+    try { target.postMessage(command, "*"); } catch { /* provider ignored */ }
+  }
+
+  const protocolCommands = [
+    { context: "player.js", version: PLAYER_JS_VERSION, method: "getPaused", listener: "7xanime-paused-state" },
+    { eventName: "postmessage:get:isplaying" },
+  ];
+  for (const command of protocolCommands) {
+    try { target.postMessage(JSON.stringify(command), "*"); } catch { /* provider ignored */ }
   }
 };
 
@@ -165,14 +242,40 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
 
     void App.addListener("appStateChange", ({ isActive }) => {
       if (isActive) {
+        // Resume only media that this lifecycle handler paused. A player that
+        // the user had already paused stays paused, and the iframe is not rebuilt.
+        const snapshot = backgroundPlaybackRef.current;
+        if (snapshot.embedWasPlaying) {
+          const frame = externalEmbedFrameRef.current;
+          if (frame) requestExternalPlayerPlay(frame);
+        }
+        snapshot.directVideos.forEach((video) => {
+          if (!video.isConnected) return;
+          void video.play().catch(() => {
+            // Autoplay policy may require a manual tap after returning from background.
+          });
+        });
+        backgroundPlaybackRef.current = { embedWasPlaying: false, directVideos: [] };
         setAppIsActive(true);
         return;
       }
 
-      // PiP mode is marked before Android backgrounds the Activity. Keep the
-      // player mounted only when the app really entered its floating-player mode.
       const pipActive = document.documentElement.classList.contains("sevenx-pip-mode");
       setNativePipActive(pipActive);
+      if (!pipActive) {
+        const frame = externalEmbedFrameRef.current;
+        // Only resume an embed when we positively observed it playing before
+        // backgrounding; an unknown state must not override a user's manual pause.
+        const embedWasPlaying = !!frame && embedPlaybackStateRef.current === "playing";
+        const directVideos = Array.from(document.querySelectorAll("video"))
+          .filter((video) => !video.paused && video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA);
+        backgroundPlaybackRef.current = { embedWasPlaying, directVideos };
+        if (frame && embedWasPlaying) requestExternalPlayerPause(frame);
+        directVideos.forEach((video) => video.pause());
+      } else {
+        // Do not interfere with an explicitly active native Picture-in-picture session.
+        backgroundPlaybackRef.current = { embedWasPlaying: false, directVideos: [] };
+      }
       setAppIsActive(false);
     }).then((listener) => {
       if (disposed) void listener.remove();
@@ -250,6 +353,10 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
   const [selectedHindiServer, setSelectedHindiServer] = useState<number>(0);
   const [appIsActive, setAppIsActive] = useState(true);
   const [nativePipActive, setNativePipActive] = useState(false);
+  const backgroundPlaybackRef = useRef<{
+    embedWasPlaying: boolean;
+    directVideos: HTMLVideoElement[];
+  }>({ embedWasPlaying: false, directVideos: [] });
   const [manualProviderPlaybackFailed, setManualProviderPlaybackFailed] = useState(false);
   const [fallbackPlaybackFailed, setFallbackPlaybackFailed] = useState(false);
   const [playbackSourceIndex, setPlaybackSourceIndex] = useState(0);
@@ -277,6 +384,13 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
   const pauseAfterEmbedRecoveryRef = useRef(false);
   const externalEmbedFrameRef = useRef<HTMLIFrameElement | null>(null);
   const embedResumeTimersRef = useRef<number[]>([]);
+  const lastEmbedMediaTimeRef = useRef<{ key: string; seconds: number } | null>(null);
+  const lastEmbedStateProbeAtRef = useRef(0);
+  const lastEmbedProgressAtRef = useRef(0);
+  const lastEmbedStateReplyAtRef = useRef(0);
+  const embedHasObservedPlaybackRef = useRef(false);
+  const embedProviderPauseEventsRef = useRef(false);
+  const embedStateQuerySupportedRef = useRef(false);
 
   const requestEmbedResume = useCallback(() => {
     if (!isLocalBackendEnabled()) return;
@@ -300,14 +414,11 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
       progress.current < progress.duration - 15
       ? progress.current
       : null;
-    // A deliberate pause must survive recovery and a newly loaded embed. There
-    // is no standard cross-origin pause API, so retry common commands while the
-    // provider initializes; never send a play/autoplay command. When paused,
-    // avoid seeking (which can wake some embeds) and keep reasserting pause for
-    // longer than the providers' usual delayed startup/autoplay window.
+    // Restore the last position and query playback state whenever an embed is
+    // loaded. Some providers return pause/play state only after initialization,
+    // so state probes continue even when there is no saved position to seek to.
     const shouldRemainPaused = pauseAfterEmbedRecoveryRef.current ||
       embedPlaybackStateRef.current === "paused";
-    if (resumeTime === null && !shouldRemainPaused) return;
 
     embedResumeTimersRef.current.forEach((timer) => window.clearTimeout(timer));
     embedResumeTimersRef.current = [];
@@ -315,26 +426,23 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
     const sourceAtSchedule = frame.src;
     const delays = shouldRemainPaused
       ? [0, 500, 1300, 2800, 5000, 8000, 12000]
-      : [0, 500, 1300, 2800];
+      : [0, 500, 1300, 2800, 5000];
     for (const delay of delays) {
       const timer = window.setTimeout(() => {
         if (externalEmbedFrameRef.current !== frameAtSchedule ||
             frameAtSchedule.src !== sourceAtSchedule) return;
-        if (shouldRemainPaused) {
-          // A user can resume playback while delayed pause retries are queued.
-          // Respect that newer explicit playing state rather than pausing again.
-          if (pauseAfterEmbedRecoveryRef.current || embedPlaybackStateRef.current === "paused") {
-            requestExternalPlayerPause(frameAtSchedule);
-          }
-          return;
-        }
-        if (
-          embedPlaybackStateRef.current !== "paused" &&
-          !pauseAfterEmbedRecoveryRef.current &&
-          resumeTime !== null
-        ) {
+
+        // Read the current refs at dispatch time, not the values captured when
+        // these timers were queued. A play/timeupdate event must cancel pause
+        // restoration, while a pause-state response must prevent a resume seek.
+        const remainPaused = pauseAfterEmbedRecoveryRef.current ||
+          embedPlaybackStateRef.current === "paused";
+        if (remainPaused) {
+          requestExternalPlayerPause(frameAtSchedule);
+        } else if (resumeTime !== null) {
           requestExternalPlayerSeek(frameAtSchedule, resumeTime);
         }
+        requestExternalPlayerState(frameAtSchedule);
       }, delay);
       embedResumeTimersRef.current.push(timer);
     }
@@ -349,7 +457,14 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
     // Paused/playing state belongs to an episode, not to the next one.
     embedPlaybackStateRef.current = "unknown";
     pauseAfterEmbedRecoveryRef.current = false;
-  }, [activeEpisodeId]);
+    lastEmbedMediaTimeRef.current = null;
+    lastEmbedStateProbeAtRef.current = 0;
+    lastEmbedProgressAtRef.current = 0;
+    lastEmbedStateReplyAtRef.current = 0;
+    embedHasObservedPlaybackRef.current = false;
+    embedProviderPauseEventsRef.current = false;
+    embedStateQuerySupportedRef.current = false;
+  }, [activeEpisodeId, playbackSourceIndex]);
 
   const flushLatestEmbedProgress = useCallback(() => {
     const latest = lastEmbedProgressRef.current;
@@ -793,21 +908,32 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
 
       if (!data || typeof data !== "object") return;
 
-      // Extract currentTime and duration from time/watching-log events
+      // Providers differ on whether progress fields are top-level or wrapped in
+      // a data/detail object. Read both shapes so a recovered embed can resume
+      // from the last known position even when its message envelope differs.
+      const nestedData = data.data && typeof data.data === "object"
+        ? data.data as Record<string, unknown>
+        : data.detail && typeof data.detail === "object"
+          ? data.detail as Record<string, unknown>
+          : {};
+      const messagePayload = { ...nestedData, ...data };
       let currentTime: number | null = null;
       let duration: number | null = null;
 
-      if (typeof data.currentTime === "number") {
-        currentTime = data.currentTime;
-      } else if (typeof data.time === "number") {
-        currentTime = data.time;
+      if (typeof messagePayload.currentTime === "number") {
+        currentTime = messagePayload.currentTime;
+      } else if (typeof messagePayload.time === "number") {
+        currentTime = messagePayload.time;
+      } else if (typeof messagePayload.position === "number") {
+        currentTime = messagePayload.position;
       }
 
-      if (typeof data.duration === "number") {
-        duration = data.duration;
+      if (typeof messagePayload.duration === "number") {
+        duration = messagePayload.duration;
       }
 
-      const isComplete = data.event === "complete";
+      const isComplete = String(messagePayload.event ?? messagePayload.type ?? "")
+        .trim().toLowerCase().replace(/[_\s]+/g, "-") === "complete";
 
       if (currentTime !== null && duration !== null && duration > 0) {
         const progress = {
@@ -1195,28 +1321,107 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
           .replace(/([a-z0-9])([A-Z])/g, "$1-$2")
           .toLowerCase()
           .replace(/[\s_]+/g, "-");
-      const eventNames = [payload.event, payload.type, payload.action, payload.name, payload.status]
+      const nestedPayloads = [payload.data, payload.detail, payload.payload]
+        .filter((value): value is Record<string, unknown> =>
+          !!value && typeof value === "object" && !Array.isArray(value),
+        );
+      const fields = (source: Record<string, unknown>) => [
+        source.event, source.eventName, source.event_name, source.type,
+        source.action, source.name, source.status, source.state,
+        source.playbackState, source.playerState,
+      ];
+      const eventNames = [payload, ...nestedPayloads]
+        .flatMap(fields)
         .map(normalizeEventName)
-        .filter(Boolean);
+        .filter((name): name is string => name.length > 0);
       const eventType = eventNames[0] || "";
-      const status = normalizeEventName(payload.status);
-      const failed = eventType.includes("error") || status === "error";
-      const reportedPaused = eventNames.some((name) =>
-        name === "pause" || name === "paused" || name.endsWith(":pause") || name.endsWith(":paused")
-      ) || status === "paused";
-      const reportedPlaying = eventNames.some((name) =>
-        name === "play" || name === "playing" || name.endsWith(":play") || name.endsWith(":playing")
-      ) || status === "playing";
+      const statusNames = [payload.status, payload.state, payload.playbackState, payload.playerState,
+        ...nestedPayloads.flatMap((item) => [item.status, item.state, item.playbackState, item.playerState])]
+        .map(normalizeEventName)
+        .filter((name): name is string => name.length > 0);
+      const pausedQueryNames = ["get-paused", "getpaused", "paused-state"];
+      const playingQueryNames = ["get-is-playing", "getisplaying", "is-playing", "isplaying"];
+      const isPausedQueryResponse = eventNames.some((name) => pausedQueryNames.includes(name)) ||
+        payload.context === "player.js" && eventNames.some((name) => name.includes("paused"));
+      const isPlayingQueryResponse = eventNames.some((name) => playingQueryNames.includes(name)) ||
+        payload.context === "player.js" && eventNames.some((name) => name.includes("playing"));
+      const queryStateResponse = isPausedQueryResponse || isPlayingQueryResponse;
+      const pausedFlags = [
+        payload.paused, payload.isPaused, payload.is_paused,
+        ...nestedPayloads.flatMap((item) => [item.paused, item.isPaused, item.is_paused]),
+      ];
+      const playingFlags = [
+        payload.playing, payload.isPlaying,
+        ...nestedPayloads.flatMap((item) => [item.playing, item.isPlaying]),
+      ];
+      const reportsPausedByBoolean = pausedFlags.some((value) => value === true) ||
+        ((isPausedQueryResponse || isPlayingQueryResponse) && playingFlags.some((value) => value === false));
+      const reportsPlayingByBoolean = playingFlags.some((value) => value === true);
+      const queryValue = payload.value ?? payload.result ??
+        nestedPayloads.map((item) => item.value ?? item.result).find((value) => value !== undefined);
+      const queryReportsPaused = (isPausedQueryResponse && queryValue === true) ||
+        (isPlayingQueryResponse && queryValue === false);
+      const queryReportsPlaying = (isPausedQueryResponse && queryValue === false) ||
+        (isPlayingQueryResponse && queryValue === true);
+      const hasExplicitStateValue = pausedFlags.some((value) => typeof value === "boolean") ||
+        playingFlags.some((value) => typeof value === "boolean") ||
+        typeof queryValue === "boolean";
+      if (queryStateResponse && hasExplicitStateValue) {
+        embedStateQuerySupportedRef.current = true;
+        lastEmbedStateReplyAtRef.current = Date.now();
+      }
+      const failed = eventNames.some((name) => name.includes("error") || name === "failed")
+        || statusNames.includes("error");
+      const explicitPauseEvent = !queryStateResponse && (eventNames.some((name) =>
+        name === "pause" || name === "paused" || name.endsWith(":pause") ||
+        name.endsWith(":paused") || name.endsWith("-pause") || name.endsWith("-paused")
+      ) || statusNames.includes("paused"));
+      const explicitPlayEvent = !queryStateResponse && (eventNames.some((name) =>
+        name === "play" || name === "playing" || name.endsWith(":play") ||
+        name.endsWith(":playing") || name.endsWith("-play") || name.endsWith("-playing")
+      ) || statusNames.includes("playing"));
+      const reportedPaused = explicitPauseEvent || reportsPausedByBoolean || queryReportsPaused;
+      const reportedPlaying = explicitPlayEvent || reportsPlayingByBoolean || queryReportsPlaying;
+      if (explicitPauseEvent) embedProviderPauseEventsRef.current = true;
+      const positionValue = [
+        payload.currentTime, payload.time, payload.position,
+        ...nestedPayloads.flatMap((item) => [item.currentTime, item.time, item.position]),
+      ].find((value) => typeof value === "number" && Number.isFinite(value));
+      const progressKey = observedEmbedProvider + "|" + activeEpisodeId + "|" + playbackSourceIndex;
+      const previousTime = lastEmbedMediaTimeRef.current;
+      const advancedTime = typeof positionValue === "number" && previousTime?.key === progressKey &&
+        positionValue > previousTime.seconds + 0.2;
+      if (typeof positionValue === "number") {
+        lastEmbedMediaTimeRef.current = { key: progressKey, seconds: positionValue };
+      }
+      const progressEvent = eventNames.some((name) =>
+        ["time", "timeupdate", "progress", "watching-log", "on-time", "on-timeupdate"].includes(name)
+      );
+      const progressIndicatesPlaying = progressEvent && typeof positionValue === "number" &&
+        positionValue > 0 && (advancedTime || previousTime?.key !== progressKey);
+      if (progressEvent && typeof positionValue === "number" &&
+          (advancedTime || previousTime?.key !== progressKey)) {
+        lastEmbedProgressAtRef.current = Date.now();
+      }
+      if (queryStateResponse && (reportedPaused || reportedPlaying)) {
+        lastEmbedStateReplyAtRef.current = Date.now();
+      }
       if (reportedPaused) {
         embedPlaybackStateRef.current = "paused";
         pauseAfterEmbedRecoveryRef.current = true;
         lastEmbedSignalAtRef.current = Date.now();
+        lastEmbedProgressAtRef.current = Date.now();
         const pausedFrame = externalEmbedFrameRef.current;
         if (pausedFrame) requestExternalPlayerPause(pausedFrame);
-      } else if (reportedPlaying) {
+      } else if (reportedPlaying || progressIndicatesPlaying) {
+        // A number of embed players report time/progress while playing but do not
+        // emit a separate play event. Treat an advancing media clock as renewed
+        // play intent so stale delayed-pause retries cannot pause it again.
         embedPlaybackStateRef.current = "playing";
         pauseAfterEmbedRecoveryRef.current = false;
+        embedHasObservedPlaybackRef.current = true;
         lastEmbedSignalAtRef.current = Date.now();
+        if (reportedPlaying) lastEmbedProgressAtRef.current = Date.now();
       }
 
       // Providers disagree on which field carries the ended signal and how
@@ -1242,15 +1447,22 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
         return;
       }
 
-      const playerReady = ["ready", "loadedmetadata", "loaded"].includes(eventType) || status === "ready";
+      // CinexStream documents "player_ready" rather than "ready"; normalize all
+      // ready aliases so resume/state restoration runs on every supported embed.
+      const playerReady = ["ready", "loadedmetadata", "loaded", "player-ready"].includes(eventType) ||
+        eventNames.some((name) => name.endsWith(":ready") || name.endsWith("-ready")) ||
+        statusNames.includes("ready");
       if (playerReady) requestEmbedResume();
 
       // Ad/verification interstitials can emit "ready" without actual video.
       // Only timeline/play signals count as proof that the provider is advancing.
       const playbackObserved =
         ["aniembed:play", "aniembed:ended"].includes(String(payload.type || "").toLowerCase()) ||
-        ["play", "playing", "pause", "paused", "seek", "time", "progress", "timeupdate", "watching-log", "complete"].includes(eventType) ||
-        ["playing", "paused"].includes(status);
+        eventNames.some((name) =>
+          ["play", "playing", "pause", "paused", "seek", "time", "progress", "timeupdate", "watching-log", "complete"].includes(name)
+        ) ||
+        statusNames.some((name) => ["playing", "paused"].includes(name)) ||
+        typeof positionValue === "number";
       if (playbackObserved) {
         lastEmbedSignalAtRef.current = Date.now();
         playbackRetriesRef.current = { key: `${activeEpisodeId}|${playbackSourceIndex}`, count: 0 };
@@ -1259,9 +1471,12 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
 
       const confirmedPlayback =
         ["aniembed:play"].includes(String(payload.type || "").toLowerCase()) ||
-        ["play", "playing", "time", "progress", "timeupdate", "watching-log", "complete"].includes(eventType) ||
-        status === "playing";
+        eventNames.some((name) => ["play", "playing", "time", "progress", "timeupdate", "watching-log", "complete"].includes(name)) ||
+        statusNames.includes("playing") ||
+        progressIndicatesPlaying;
       if (confirmedPlayback) {
+        embedHasObservedPlaybackRef.current = true;
+        if (!lastEmbedProgressAtRef.current) lastEmbedProgressAtRef.current = Date.now();
         setProviderPlaybackOutcomes((previous) =>
           previous[observedEmbedProvider] === "playing"
             ? previous
@@ -1301,20 +1516,51 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
     embedLoadStartedAtRef.current = Date.now();
     lastEmbedSignalAtRef.current = 0;
     const interval = window.setInterval(() => {
+      const now = Date.now();
+      const frame = externalEmbedFrameRef.current;
+      // Poll for a supported pause-state response while the iframe is active.
+      // Several servers do not emit a dedicated pause event, even though they
+      // may answer one of the common getPaused/isPlaying queries.
+      if (frame && now - lastEmbedStateProbeAtRef.current >= 5000) {
+        lastEmbedStateProbeAtRef.current = now;
+        requestExternalPlayerState(frame);
+      }
       if (embedPlaybackStateRef.current === "paused") {
         // A paused episode is intentionally not advancing. Do not misclassify
         // silence from a paused iframe as a dead stream and remount it.
-        const now = Date.now();
         embedLoadStartedAtRef.current = now;
         lastEmbedSignalAtRef.current = now;
         return;
       }
-      const lastSignal = Math.max(embedLoadStartedAtRef.current, lastEmbedSignalAtRef.current);
+
       const stallTimeoutMs = observedEmbedProvider === "tryembed" ? 8000 : 18000;
-      if (Date.now() - lastSignal < stallTimeoutMs) return;
+      const hasRecentStateReply = embedStateQuerySupportedRef.current &&
+        now - lastEmbedStateReplyAtRef.current < 12000;
+      const canDistinguishPauseFromStall = observedEmbedProvider === "anixo" ||
+        embedProviderPauseEventsRef.current ||
+        (hasRecentStateReply && embedPlaybackStateRef.current === "playing");
+      const lastSignal = Math.max(embedLoadStartedAtRef.current, lastEmbedSignalAtRef.current);
+      const lastProgress = Math.max(embedLoadStartedAtRef.current, lastEmbedProgressAtRef.current);
+      const lastRelevantActivityAt = embedHasObservedPlaybackRef.current
+        ? lastProgress
+        : lastSignal;
+      if (now - lastRelevantActivityAt < stallTimeoutMs) return;
+
+      // After a provider has started playing, silence alone is not enough to
+      // distinguish an intentional pause from a silent stall. AniXo emits pause
+      // events; other providers can use automatic stall recovery when they
+      // explicitly report pause events or answer a state query. For embeds with
+      // neither capability, only explicit error messages trigger reconnection:
+      // remounting on silence would restart a deliberately paused episode.
+      if (embedHasObservedPlaybackRef.current && !canDistinguishPauseFromStall) {
+        embedLoadStartedAtRef.current = now;
+        lastEmbedSignalAtRef.current = now;
+        return;
+      }
+
       // Reset the baseline before calling into React so rapid repeated timer
       // ticks cannot consume both retries for the same stalled frame.
-      embedLoadStartedAtRef.current = Date.now();
+      embedLoadStartedAtRef.current = now;
       const detail = observedEmbedProvider === "tryembed"
         ? "TryEmbed did not confirm real playback (possible upstream ad or verification interstitial); retrying this server."
         : `${getProviderDisplayName(observedEmbedProvider)} stopped reporting playback; retrying this player.`;
@@ -1340,14 +1586,11 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
     [isLocalBackendEnabled, animeIdParam, anime?.anime?.info?.id, anime?.anime?.info?.name, anime?.anime?.info?.poster],
   );
 
-  if (isLocalBackendEnabled() && !appIsActive && !nativePipActive) {
-    return (
-      <div className="flex aspect-video w-full items-center justify-center rounded-2xl border border-white/10 bg-black px-6 text-center text-sm text-zinc-300">
-        Playback paused because 7xAnime is in the background. Return to the app to continue, or use Picture-in-picture for floating playback.
-      </div>
-    );
-  }
-
+  // Keep the active player mounted while Android backgrounds the app.
+  // Returning a placeholder here unmounts cross-origin iframes and ArtPlayer;
+  // when the app resumes React creates a fresh player, which looks like a reconnect
+  // and loses the provider's in-memory playback session. The watchdog above is
+  // already suspended outside the foreground (unless native PiP is active).
   const playerControls = (
     <div className="flex w-full flex-col gap-3 rounded-2xl border border-white/[0.07] bg-[#101018] p-3 sm:p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
