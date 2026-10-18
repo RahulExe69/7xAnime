@@ -295,6 +295,7 @@ jobs:
           if "disablePictureInPicture" not in viewport or "disablepictureinpicture" not in viewport:
               raise SystemExit("Accessible HTML5 video elements must explicitly disable Picture-in-Picture")
           persistent_host = Path("src/components/persistent-watch-experience.tsx").read_text(encoding="utf-8")
+          episode_list = Path("src/components/anime-episodes.tsx").read_text(encoding="utf-8")
           watch_page = Path("src/app/anime/watch/page.tsx").read_text(encoding="utf-8")
           layout = Path("src/app/layout.tsx").read_text(encoding="utf-8")
           css = Path("src/app/globals.css").read_text(encoding="utf-8")
@@ -317,6 +318,12 @@ jobs:
               raise SystemExit("Background playback stop / PiP lifecycle handling is missing")
           if "getLocalWatchProgress" not in watch_section or "requestEmbedResume" not in watch_section:
               raise SystemExit("Cross-server watch-progress resume handling is missing")
+          if "if (responseSinceResume) return;" not in watch_section or "for (const delay of [400, 1100])" not in watch_section:
+              raise SystemExit("Foreground recovery must not reconnect healthy embeds or send a late duplicate play command")
+          if "overscroll-auto" not in episode_list or "overscroll-contain" in episode_list:
+              raise SystemExit("Episode-list boundary scrolling must chain naturally into the page")
+          if "useLayoutEffect" not in persistent_host or "window.scrollTo({ top: 0, left: 0, behavior: \"auto\" })" not in persistent_host:
+              raise SystemExit("Opening a watch route must reset stale browse-page scroll restoration")
           if "requestExternalPlayerState" not in watch_section or "getPaused" not in watch_section:
               raise SystemExit("Common embedded-player pause-state probing is missing")
           if "source.eventName" not in watch_section or "lastEmbedMediaTimeRef" not in watch_section:
