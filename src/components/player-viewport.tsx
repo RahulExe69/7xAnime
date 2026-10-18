@@ -818,7 +818,8 @@ export function PlayerViewport({
 
   const onRailPointerDown = (event: PointerEvent<HTMLDivElement>) => {
     event.stopPropagation();
-    gestureStartRef.current = { x: event.clientX, y: event.clientY, at: Date.now() };
+    if (isMiniPlayer) return;
+    pointerSwipeRef.current = createSwipeSession(event.clientX, event.clientY);
     try {
       event.currentTarget.setPointerCapture(event.pointerId);
     } catch {
@@ -826,15 +827,25 @@ export function PlayerViewport({
     }
   };
 
+  const onRailPointerMove = (event: PointerEvent<HTMLDivElement>) => {
+    event.stopPropagation();
+    const session = pointerSwipeRef.current;
+    if (session) updateSwipePreview(session, event.clientX - session.startX, event.clientY - session.startY);
+  };
+
   const onRailPointerUp = (event: PointerEvent<HTMLDivElement>) => {
     event.stopPropagation();
-    const start = gestureStartRef.current;
-    gestureStartRef.current = null;
-    if (!start) return;
-    const deltaX = event.clientX - start.x;
-    const deltaY = event.clientY - start.y;
-    if (Math.abs(deltaX) > SWIPE_MAX_X_DRIFT || Math.abs(deltaY) < SWIPE_THRESHOLD) return;
-    handleVerticalSwipe(deltaY);
+    const session = pointerSwipeRef.current;
+    pointerSwipeRef.current = null;
+    if (session) commitSwipeGesture(session, event.clientX - session.startX, event.clientY - session.startY);
+  };
+
+  const onRailPointerCancel = (event: PointerEvent<HTMLDivElement>) => {
+    event.stopPropagation();
+    const session = pointerSwipeRef.current;
+    pointerSwipeRef.current = null;
+    if (session?.previewing && rootRef.current) settlePreviewToOrigin(rootRef.current);
+    else clearSwipeContentProgress(true);
   };
 
   useEffect(() => {
@@ -952,10 +963,11 @@ export function PlayerViewport({
           observes swipes without covering the provider's playback controls. */}
       <div
         aria-hidden="true"
-        className="absolute inset-y-0 right-0 z-[10001] w-4 touch-none bg-transparent"
+        className={`absolute inset-y-0 right-0 z-[10001] w-4 touch-none bg-transparent ${isMiniPlayer ? "hidden" : ""}`}
         onPointerDown={onRailPointerDown}
+        onPointerMove={onRailPointerMove}
         onPointerUp={onRailPointerUp}
-        onPointerCancel={() => { gestureStartRef.current = null; }}
+        onPointerCancel={onRailPointerCancel}
       />
     </div>
   );
