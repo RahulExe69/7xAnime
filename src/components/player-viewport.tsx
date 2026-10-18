@@ -476,8 +476,17 @@ export function PlayerViewport({
     drag.moved = true;
 
     if (drag.mode === "pending") {
-      const verticalExpansion = deltaY < -18 && Math.abs(deltaY) > Math.abs(deltaX) * 1.15;
-      drag.mode = verticalExpansion ? "expand" : "drag";
+      const absX = Math.abs(deltaX);
+      const absY = Math.abs(deltaY);
+      if (deltaY < -18 && absY > absX * 1.15) {
+        drag.mode = "expand";
+      } else if (absX > 18 || deltaY > 18) {
+        drag.mode = "drag";
+      } else {
+        // Give an upward diagonal gesture a few pixels to establish intent
+        // before treating it as a repositioning drag.
+        return;
+      }
     }
 
     if (drag.mode === "expand") {
