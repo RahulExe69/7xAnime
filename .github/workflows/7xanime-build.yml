@@ -350,7 +350,7 @@ jobs:
               raise SystemExit("An event-aware provider is missing from the stall watchdog")
           if "const playerReady =" not in watch_section:
               raise SystemExit("Ready-page events must be distinguished from actual playback")
-          if 'supaplay: "supaplay.fun"' not in watch_section:
+          if 'supaplay: ["supaplay.fun"]' not in watch_section:
               raise SystemExit("SupaPlay embed origin is missing from player event validation")
           if 'vidplus: ["player.vidplus.to", "player2.vidplus.pro"]' not in watch_section:
               raise SystemExit("VidPlus redirect host is missing from player event validation")
