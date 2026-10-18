@@ -303,3 +303,32 @@ Keep the existing ZeroTwo-Py Hindi catalogue and the five standard servers uncha
 
 AnimeHeaven via Anivault-Scraper, DesiDubAnime API, Renime-API, and HiAnime/Aniwatch API are not approved for runtime integration; Senshi remains unqualified because no separate authorized integration was identified. Preserve the existing Hindi catalogue and five standard providers. A source must pass the same deployment/permission and episode-level Hindi gate regardless of how popular its scraper is.
 
+## Candidate qualification — Tatakai API (2026-10-18)
+
+**Decision: HOLD — promising public API lead, not yet approved for runtime integration.** Unlike the previous candidates, the public Tatakai API landing page advertises a dedicated Hindi-dubbed search route and explicitly invites developers to use its SDK or REST endpoints. The remaining uncertainty is specific and actionable: the route schema/version, episode-level language and watch contract, API usage expectations, and upstream content terms need confirmation. No live content endpoint was called in this check, no source code was copied, and no runtime code was changed.
+
+### Evidence found
+
+- Public API landing page: [api.tatakai.me](https://api.tatakai.me/). Its page labels the service “Live,” advertises standard REST integration, and lists `GET /api/v1/hindidubbed/search` as a Hindi/regional search endpoint. This is a better documented deployment lead than a repository that only says “run on localhost.”
+- Public docs entry: [api.tatakai.me/docs](https://api.tatakai.me/docs). The documentation shell is reachable to web search, but its detailed endpoint schema could not be read in this review.
+- Upstream repository page: [Snozxyx/TatakaiAPI](https://github.com/Snozxyx/TatakaiAPI). Its indexed README describes a multi-provider scraper and advertises the hosted docs/API. It also says the project is tied to the main Tatakai project and does not recommend using the API project independently.
+- Route-contract inconsistency: the current landing-page snippet shows `/api/v1/hindidubbed/search`. An indexed SDK copy, [keplerking100/TatakaiAPI](https://github.com/keplerking100/TatakaiAPI/blob/main/sdk/src/index.ts), constructs `/hindidubbed/search?title=...` beneath a configurable `/api/v1` base. Other indexed documentation for the older repository uses `/api/v1/animehindidubbed/search`, with `/info` and `/watch` routes. These may reflect version drift; do not hard-code any of them until the deployed schema is confirmed.
+- License/usage ambiguity: GitHub's repository page identifies the code license as MIT, while the indexed README claims MPL-2.0 and separately says projects based on it must be open-sourced and credited. The same README describes the project as non-commercial/educational and cautions against using the API independently. Those statements are inconsistent and must not be treated as a settled license analysis.
+- Upstream-media caveat: the [main Tatakai project's legal section](https://github.com/Snozxyx/Tatakai) says third-party extensions, scraping integrations, and public APIs remain subject to the respective content owners' rights and terms. The API landing page's invitation to integrate is evidence of an API developer interface; it is not a rights grant from the upstream media sources.
+- Hindi evidence is not yet episode-specific. A Hindi-named search endpoint is a useful discovery signal, but we have not seen the response schema, resolved a known episode, established its audio-language fields, or verified playback.
+
+### Network and verification limits
+
+- The web retrieval tool could not open the documented API route itself. The local runtime also could not resolve `api.tatakai.me` because DNS resolution is unavailable in this environment. This is an environment blocker, **not evidence that the API is offline**.
+- No guessed endpoint, host, or version was probed. No stream URL or upstream episode was requested, and there is no physical Android playback result to report.
+- No runtime tests or build were run because no runtime change was made.
+
+### What will reopen the gate
+
+1. A maintainer-published current OpenAPI/endpoint schema or equivalent confirmation of the exact deployed search → info → episode → watch path and response fields.
+2. Confirmation that the API is intended for independent third-party client integration and clarification of the README/license discrepancy where applicable; upstream content source terms must be reviewed separately.
+3. A bounded sample for one known series/episode, with stable episode identity and explicit `Hindi`/`hi`-specific audio evidence—not merely `dub`.
+4. Later physical-device playback verification before the source can be labelled playback-verified.
+
+**Ruling:** Keep this candidate as the top follow-up lead, but leave it disabled and do not implement a speculative adapter. Preserve the existing ZeroTwo-Py catalogue and five standard servers. This HOLD is different from “the API is offline” or “the candidate has no Hindi catalogue”; it means the integration contract and episode proof are still incomplete.
+
