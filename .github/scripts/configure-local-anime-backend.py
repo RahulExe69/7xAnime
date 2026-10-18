@@ -551,8 +551,8 @@ def copy_python_source() -> None:
     extra_providers = {
         "anixo": "android-local-backend/extra-providers/anixo.py",
         "megavid": "android-local-backend/extra-providers/megavid.py",
-        "tryembed": "android-local-backend/extra-providers/tryembed.py",
         "cinexstream": "android-local-backend/extra-providers/cinexstream.py",
+        "supaplay": "android-local-backend/extra-providers/supaplay.py",
     }
     for provider_name, relative_path in extra_providers.items():
         extra_provider = ROOT / relative_path
@@ -566,7 +566,7 @@ def copy_python_source() -> None:
     ranking_match = re.search(r"(?s)RANKING\s*=\s*\[(.*?)\]", race_text)
     if not ranking_match:
         fail("Could not locate the provider registry in the pinned backend.")
-    ranking_block = '"anixo", "megavid", "tryembed", "cinexstream"'
+    ranking_block = '"anixo", "megavid", "cinexstream", "supaplay"'
     race_text = race_text[:ranking_match.start(1)] + ranking_block + race_text[ranking_match.end(1):]
     race_file.write_text(race_text, encoding="utf-8")
 
@@ -578,7 +578,7 @@ def copy_python_source() -> None:
     provider_dir = destination_src / "providers"
     for provider_file in provider_dir.glob("*.py"):
         # Underscore-prefixed files are shared backend helpers, not provider
-        # adapters. Keep them because the four maintained adapters depend on
+        # adapters. Keep them because the six maintained adapters depend on
         # common HTTP, matching, cache, and media utilities.
         if not provider_file.name.startswith("_") and provider_file.stem not in active_provider_names:
             provider_file.unlink()
@@ -645,7 +645,7 @@ def install_background_playback_guard(main_activity: Path) -> None:
             if (getBridge() != null && getBridge().getWebView() != null) {
                 String stopScript = "(function(){"
                     + "document.querySelectorAll('video,audio').forEach(function(media){try{media.pause();}catch(e){}});"
-                    + "document.querySelectorAll('[data-player-viewport=true] iframe').forEach(function(frame){try{frame.src='about:blank';}catch(e){}});"
+                    + "document.querySelectorAll('[data-player-viewport=true] iframe').forEach(function(frame){try{if(frame.contentWindow){frame.contentWindow.postMessage({event:'pause'},'*');frame.contentWindow.postMessage({type:'pause'},'*');frame.contentWindow.postMessage({method:'pause'},'*');frame.contentWindow.postMessage(JSON.stringify({context:'player.js',version:'0.0.11',method:'pause'}),'*');}}catch(e){}});"
                     + "})();";
                 getBridge().getWebView().evaluateJavascript(stopScript, null);
             }

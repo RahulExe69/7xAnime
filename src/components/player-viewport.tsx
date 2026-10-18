@@ -86,13 +86,15 @@ export function PlayerViewport({
   const nativeSwipeRef = useRef<NativeSwipeSession | null>(null);
   const pointerSwipeRef = useRef<NativeSwipeSession | null>(null);
   const swipePreviewActiveRef = useRef(false);
-  const ancillaryStylesRef = useRef(new Map<HTMLElement, { opacity: string; pointerEvents: string; transition: string; translate: string; willChange: string }>());
-  const routeContentStyleRef = useRef<{ element: HTMLElement; opacity: string; pointerEvents: string; transition: string; translate: string; willChange: string } | null>(null);
+  const ancillaryStylesRef = useRef(new Map<HTMLElement, { opacity: string; pointerEvents: string; transition: string; translate: string; transform: string; transformOrigin: string; willChange: string }>());
+  const ancillaryRectsRef = useRef(new Map<HTMLElement, RectSnapshot>());
+  const routeContentStyleRef = useRef<{ element: HTMLElement; opacity: string; pointerEvents: string; transition: string; translate: string; transform: string; transformOrigin: string; willChange: string } | null>(null);
   const [isMiniDragging, setIsMiniDragging] = useState(false);
   const miniDragRef = useRef<MiniDragGesture | null>(null);
   const suppressMiniClickRef = useRef(false);
   const watchLayoutRef = useRef<SavedWatchLayout | null>(null);
   const lastRectRef = useRef<RectSnapshot | null>(null);
+  const transitionOriginRef = useRef<RectSnapshot | null>(null);
   const layoutAnimationRef = useRef<Animation | null>(null);
   const previousLayoutRef = useRef({ isMiniPlayer, isFullscreen });
   const isFullscreenRef = useRef(false);
@@ -122,84 +124,90 @@ export function PlayerViewport({
   }, []);
 
   // Move the surrounding watch-page content with the video as it minimises, while fading it out in sync.
-  const applySwipeContentProgress = useCallback((rawProgress: number, direction: "collapse" | "expand" | "restore") => {
+  // Animate watch UI into the same lower-right corner as the mini-player.
+  // Sibling surfaces converge on that target rather than drifting in unrelated
+  // directions while fading, so the whole screen feels attached to the player.
+  const applySwipeContentProgress = useCallback((
+    rawProgress: number,
+    direction: "collapse" | "expand" | "restore",
+    _anchorTarget?: RectSnapshot | null,
+  ) => {
+    // Keep page content in place and fade it with the player's gesture.
+    // Moving/scaling every sibling toward the mini-player corner made the
+    // watch page appear to collapse into a dark, clipped smear and caused
+    // the page and player to feel detached. The player itself owns the
+    // finger-following transform; surrounding content only fades and becomes
+    // non-interactive until the transition commits.
     const progress = Math.min(1, Math.max(0, rawProgress));
-    // Leaving fullscreen reveals the watch-page content as the video returns
-    // to inline layout. Minimise/expand transitions fade that content away.
     const opacity = String(direction === "restore" ? progress : 1 - progress);
     const blockInteractions = direction === "restore" ? progress < 0.96 : progress > 0.04;
     const viewport = rootRef.current;
     const playerHost = viewport?.closest<HTMLElement>("[data-persistent-watch-player]") ?? null;
 
-    if (viewport && playerHost && !(direction === "expand" && isMiniPlayer)) {
+    const fadeElement = (element: HTMLElement) => {
+      if (!ancillaryStylesRef.current.has(element)) {
+        ancillaryStylesRef.current.set(element, {
+          opacity: element.style.opacity,
+          pointerEvents: element.style.pointerEvents,
+          transition: element.style.transition,
+          translate: element.style.translate,
+          transform: element.style.transform,
+          transformOrigin: element.style.transformOrigin,
+          willChange: element.style.willChange,
+        });
+      }
+      element.style.transition = "none";
+      element.style.opacity = opacity;
+      element.style.pointerEvents = blockInteractions
+        ? "none"
+        : ancillaryStylesRef.current.get(element)?.pointerEvents ?? "";
+      element.style.transform = ancillaryStylesRef.current.get(element)?.transform ?? "";
+      element.style.transformOrigin = ancillaryStylesRef.current.get(element)?.transformOrigin ?? "";
+      element.style.translate = ancillaryStylesRef.current.get(element)?.translate ?? "";
+      element.style.willChange = "opacity";
+    };
+
+    if (viewport && playerHost) {
       let branch: HTMLElement = viewport;
       while (branch.parentElement && branch.parentElement !== playerHost) {
         const parent = branch.parentElement;
         Array.from(parent.children).forEach((child) => {
           const element = child as HTMLElement;
           if (element === branch || element.contains(viewport)) return;
-          if (!ancillaryStylesRef.current.has(element)) {
-            ancillaryStylesRef.current.set(element, {
-              opacity: element.style.opacity,
-              pointerEvents: element.style.pointerEvents,
-              transition: element.style.transition,
-              translate: element.style.translate,
-              willChange: element.style.willChange,
-            });
-          }
-          element.style.transition = "none";
-          element.style.opacity = opacity;
-          const original = ancillaryStylesRef.current.get(element);
-          const travelDistance = Math.min(window.innerHeight * 0.42, 420);
-          element.style.translate = direction === "collapse"
-            ? `0 ${Math.round(travelDistance * progress)}px`
-            : original?.translate ?? "";
-          element.style.willChange = direction === "collapse" && progress > 0
-            ? "translate, opacity"
-            : original?.willChange ?? "";
-          element.style.pointerEvents = blockInteractions ? "none" : original?.pointerEvents ?? "";
+          fadeElement(element);
         });
         branch = parent;
       }
     }
 
     const routeContent = document.querySelector<HTMLElement>("[data-persistent-route-content]");
-    if (direction === "expand" && isMiniPlayer) {
-      if (routeContent) {
-        if (!routeContentStyleRef.current || routeContentStyleRef.current.element !== routeContent) {
-          routeContentStyleRef.current = {
-            element: routeContent,
-            opacity: routeContent.style.opacity,
-            pointerEvents: routeContent.style.pointerEvents,
-            transition: routeContent.style.transition,
-            translate: routeContent.style.translate,
-            willChange: routeContent.style.willChange,
-          };
-        }
-        routeContent.style.transition = "none";
-        routeContent.style.opacity = opacity;
-        routeContent.style.pointerEvents = blockInteractions ? "none" : routeContentStyleRef.current.pointerEvents;
+    if (direction === "expand" && isMiniPlayer && routeContent) {
+      if (!routeContentStyleRef.current || routeContentStyleRef.current.element !== routeContent) {
+        routeContentStyleRef.current = {
+          element: routeContent,
+          opacity: routeContent.style.opacity,
+          pointerEvents: routeContent.style.pointerEvents,
+          transition: routeContent.style.transition,
+          translate: routeContent.style.translate,
+          transform: routeContent.style.transform,
+          transformOrigin: routeContent.style.transformOrigin,
+          willChange: routeContent.style.willChange,
+        };
       }
-      // Fade app chrome (navigation/footer) away too, not just the route's
-      // scrolling contents, while the mini-player grows to take over the screen.
+      routeContent.style.transition = "none";
+      routeContent.style.opacity = opacity;
+      routeContent.style.pointerEvents = blockInteractions
+        ? "none"
+        : routeContentStyleRef.current.pointerEvents;
+      routeContent.style.willChange = "opacity";
+
       const surface = document.querySelector<HTMLElement>(".persistent-watch-experience");
       const surfaceParent = surface?.parentElement;
       if (surface && surfaceParent) {
         Array.from(surfaceParent.children).forEach((child) => {
           const element = child as HTMLElement;
           if (element === surface || (viewport && element.contains(viewport))) return;
-          if (!ancillaryStylesRef.current.has(element)) {
-            ancillaryStylesRef.current.set(element, {
-              opacity: element.style.opacity,
-              pointerEvents: element.style.pointerEvents,
-              transition: element.style.transition,
-              translate: element.style.translate,
-              willChange: element.style.willChange,
-            });
-          }
-          element.style.transition = "none";
-          element.style.opacity = opacity;
-          element.style.pointerEvents = blockInteractions ? "none" : ancillaryStylesRef.current.get(element)?.pointerEvents ?? "";
+          fadeElement(element);
         });
       }
     }
@@ -209,26 +217,32 @@ export function PlayerViewport({
   }, [isMiniPlayer]);
 
   const clearSwipeContentProgress = useCallback((animate = false) => {
-    const restore = (element: HTMLElement, original: { opacity: string; pointerEvents: string; transition: string; translate: string; willChange: string }) => {
+    const restore = (element: HTMLElement, original: {
+      opacity: string; pointerEvents: string; transition: string; translate: string;
+      transform: string; transformOrigin: string; willChange: string;
+    }) => {
       if (animate) {
-        element.style.transition = "opacity 150ms ease-out, translate 150ms ease-out";
+        element.style.transition = "opacity 180ms ease-out, transform 180ms cubic-bezier(0.22, 1, 0.36, 1), translate 180ms ease-out";
         element.style.opacity = original.opacity;
         element.style.pointerEvents = original.pointerEvents;
         element.style.translate = original.translate;
+        element.style.transform = original.transform;
+        element.style.transformOrigin = original.transformOrigin;
         element.style.willChange = original.willChange;
-        window.setTimeout(() => {
-          element.style.transition = original.transition;
-        }, 170);
+        window.setTimeout(() => { element.style.transition = original.transition; }, 200);
       } else {
         element.style.opacity = original.opacity;
         element.style.pointerEvents = original.pointerEvents;
         element.style.transition = original.transition;
         element.style.translate = original.translate;
+        element.style.transform = original.transform;
+        element.style.transformOrigin = original.transformOrigin;
         element.style.willChange = original.willChange;
       }
     };
     ancillaryStylesRef.current.forEach((original, element) => restore(element, original));
     ancillaryStylesRef.current.clear();
+    ancillaryRectsRef.current.clear();
     if (routeContentStyleRef.current) {
       restore(routeContentStyleRef.current.element, routeContentStyleRef.current);
       routeContentStyleRef.current = null;
@@ -353,7 +367,8 @@ export function PlayerViewport({
 
     const node = rootRef.current;
     if (!node) return;
-    const from = lastRectRef.current;
+    const from = transitionOriginRef.current ?? lastRectRef.current;
+    transitionOriginRef.current = null;
     const interactiveSwipeTransition = swipePreviewActiveRef.current &&
       (previous.isMiniPlayer !== isMiniPlayer || previous.isFullscreen !== isFullscreen);
     if (interactiveSwipeTransition) {
@@ -425,7 +440,16 @@ export function PlayerViewport({
 
 
   const dispatchPlayerAction = useCallback((action: "expand-mini-player" | "minimize-player" | "close-mini-player") => {
-    if (typeof window !== "undefined") window.dispatchEvent(new Event(`7xanime:${action}`));
+    if (typeof window === "undefined") return;
+    if (action === "expand-mini-player" && rootRef.current) {
+      const rect = rootRef.current.getBoundingClientRect();
+      if (rect.width > 0 && rect.height > 0) {
+        const origin = { left: rect.left, top: rect.top, width: rect.width, height: rect.height };
+        transitionOriginRef.current = origin;
+        lastRectRef.current = origin;
+      }
+    }
+    window.dispatchEvent(new Event(`7xanime:${action}`));
   }, []);
 
   const requestEmbeddedControlsHidden = useCallback(() => {
@@ -779,7 +803,7 @@ export function PlayerViewport({
       if (!target) return;
       const progress = Math.min(1, Math.max(0, deltaY / SWIPE_ANIMATION_DISTANCE));
       applyPlayerPreview(session.origin, target, progress);
-      applySwipeContentProgress(progress, session.isFullscreen ? "restore" : "collapse");
+      applySwipeContentProgress(progress, session.isFullscreen ? "restore" : "collapse", target);
       session.previewing = progress > 0;
       return;
     }
@@ -787,7 +811,7 @@ export function PlayerViewport({
     if (session.direction === "expand" && session.fullscreenTarget) {
       const progress = Math.min(1, Math.max(0, -deltaY / SWIPE_ANIMATION_DISTANCE));
       applyPlayerPreview(session.origin, session.fullscreenTarget, progress);
-      applySwipeContentProgress(progress, "expand");
+      applySwipeContentProgress(progress, "expand", session.origin);
       session.previewing = progress > 0;
     }
   }, [applyPlayerPreview, applySwipeContentProgress]);
@@ -823,7 +847,7 @@ export function PlayerViewport({
     if (!session.isFullscreen && session.direction === "collapse" && deltaY > 0 && session.miniTarget) {
       const progress = Math.min(1, Math.max(0, deltaY / SWIPE_ANIMATION_DISTANCE));
       applyPlayerPreview(session.origin, session.miniTarget, progress);
-      applySwipeContentProgress(progress, "collapse");
+      applySwipeContentProgress(progress, "collapse", session.miniTarget);
       const viewportWidth = document.documentElement.clientWidth || window.innerWidth;
       const viewportHeight = document.documentElement.clientHeight || window.innerHeight;
       watchLayoutRef.current = { rect: session.origin, viewportWidth, viewportHeight };
@@ -835,7 +859,7 @@ export function PlayerViewport({
     if (!session.isFullscreen && session.direction === "expand" && deltaY < 0 && session.fullscreenTarget) {
       const progress = Math.min(1, Math.max(0, -deltaY / SWIPE_ANIMATION_DISTANCE));
       applyPlayerPreview(session.origin, session.fullscreenTarget, progress);
-      applySwipeContentProgress(progress, "expand");
+      applySwipeContentProgress(progress, "expand", session.origin);
       const viewportWidth = document.documentElement.clientWidth || window.innerWidth;
       const viewportHeight = document.documentElement.clientHeight || window.innerHeight;
       watchLayoutRef.current = { rect: session.origin, viewportWidth, viewportHeight };
