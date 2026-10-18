@@ -130,106 +130,88 @@ export function PlayerViewport({
   const applySwipeContentProgress = useCallback((
     rawProgress: number,
     direction: "collapse" | "expand" | "restore",
-    anchorTarget?: RectSnapshot | null,
+    _anchorTarget?: RectSnapshot | null,
   ) => {
+    // Keep page content in place and fade it with the player's gesture.
+    // Moving/scaling every sibling toward the mini-player corner made the
+    // watch page appear to collapse into a dark, clipped smear and caused
+    // the page and player to feel detached. The player itself owns the
+    // finger-following transform; surrounding content only fades and becomes
+    // non-interactive until the transition commits.
     const progress = Math.min(1, Math.max(0, rawProgress));
     const opacity = String(direction === "restore" ? progress : 1 - progress);
     const blockInteractions = direction === "restore" ? progress < 0.96 : progress > 0.04;
     const viewport = rootRef.current;
     const playerHost = viewport?.closest<HTMLElement>("[data-persistent-watch-player]") ?? null;
-    const rectFor = (element: HTMLElement): RectSnapshot => {
-      const cached = ancillaryRectsRef.current.get(element);
-      if (cached) return cached;
-      const rect = element.getBoundingClientRect();
-      const snapshot = { left: rect.left, top: rect.top, width: rect.width, height: rect.height };
-      ancillaryRectsRef.current.set(element, snapshot);
-      return snapshot;
+
+    const fadeElement = (element: HTMLElement) => {
+      if (!ancillaryStylesRef.current.has(element)) {
+        ancillaryStylesRef.current.set(element, {
+          opacity: element.style.opacity,
+          pointerEvents: element.style.pointerEvents,
+          transition: element.style.transition,
+          translate: element.style.translate,
+          transform: element.style.transform,
+          transformOrigin: element.style.transformOrigin,
+          willChange: element.style.willChange,
+        });
+      }
+      element.style.transition = "none";
+      element.style.opacity = opacity;
+      element.style.pointerEvents = blockInteractions
+        ? "none"
+        : ancillaryStylesRef.current.get(element)?.pointerEvents ?? "";
+      element.style.transform = ancillaryStylesRef.current.get(element)?.transform ?? "";
+      element.style.transformOrigin = ancillaryStylesRef.current.get(element)?.transformOrigin ?? "";
+      element.style.translate = ancillaryStylesRef.current.get(element)?.translate ?? "";
+      element.style.willChange = "opacity";
     };
-    const applyAnchoredTransform = (element: HTMLElement, rect: RectSnapshot) => {
-      if (!anchorTarget) return;
-      const targetRight = anchorTarget.left + anchorTarget.width;
-      const targetBottom = anchorTarget.top + anchorTarget.height;
-      const dx = (targetRight - rect.left - rect.width) * progress;
-      const dy = (targetBottom - rect.top - rect.height) * progress;
-      const scale = 1 - progress * 0.88;
-      element.style.translate = "none";
-      element.style.transformOrigin = "bottom right";
-      element.style.transform = `translate3d(${dx}px, ${dy}px, 0) scale(${scale})`;
-      element.style.willChange = "transform, opacity";
-    };
-    if (viewport && playerHost && !(direction === "expand" && isMiniPlayer)) {
+
+    if (viewport && playerHost) {
       let branch: HTMLElement = viewport;
       while (branch.parentElement && branch.parentElement !== playerHost) {
         const parent = branch.parentElement;
         Array.from(parent.children).forEach((child) => {
           const element = child as HTMLElement;
           if (element === branch || element.contains(viewport)) return;
-          if (!ancillaryStylesRef.current.has(element)) {
-            ancillaryStylesRef.current.set(element, {
-              opacity: element.style.opacity, pointerEvents: element.style.pointerEvents,
-              transition: element.style.transition, translate: element.style.translate,
-              transform: element.style.transform, transformOrigin: element.style.transformOrigin,
-              willChange: element.style.willChange,
-            });
-          }
-          element.style.transition = "none";
-          element.style.opacity = opacity;
-          const original = ancillaryStylesRef.current.get(element);
-          if (direction === "collapse" && anchorTarget) {
-            applyAnchoredTransform(element, rectFor(element));
-          } else {
-            const travelDistance = Math.min(window.innerHeight * 0.42, 420);
-            element.style.translate = direction === "collapse"
-              ? `0 ${Math.round(travelDistance * progress)}px`
-              : original?.translate ?? "";
-            element.style.transform = original?.transform ?? "";
-            element.style.transformOrigin = original?.transformOrigin ?? "";
-            element.style.willChange = direction === "collapse" && progress > 0
-              ? "translate, opacity"
-              : original?.willChange ?? "";
-          }
-          element.style.pointerEvents = blockInteractions ? "none" : original?.pointerEvents ?? "";
+          fadeElement(element);
         });
         branch = parent;
       }
     }
+
     const routeContent = document.querySelector<HTMLElement>("[data-persistent-route-content]");
-    if (direction === "expand" && isMiniPlayer) {
-      if (routeContent) {
-        if (!routeContentStyleRef.current || routeContentStyleRef.current.element !== routeContent) {
-          routeContentStyleRef.current = {
-            element: routeContent, opacity: routeContent.style.opacity,
-            pointerEvents: routeContent.style.pointerEvents, transition: routeContent.style.transition,
-            translate: routeContent.style.translate, transform: routeContent.style.transform,
-            transformOrigin: routeContent.style.transformOrigin, willChange: routeContent.style.willChange,
-          };
-        }
-        routeContent.style.transition = "none";
-        routeContent.style.opacity = opacity;
-        routeContent.style.pointerEvents = blockInteractions ? "none" : routeContentStyleRef.current.pointerEvents;
-        if (anchorTarget) applyAnchoredTransform(routeContent, rectFor(routeContent));
+    if (direction === "expand" && isMiniPlayer && routeContent) {
+      if (!routeContentStyleRef.current || routeContentStyleRef.current.element !== routeContent) {
+        routeContentStyleRef.current = {
+          element: routeContent,
+          opacity: routeContent.style.opacity,
+          pointerEvents: routeContent.style.pointerEvents,
+          transition: routeContent.style.transition,
+          translate: routeContent.style.translate,
+          transform: routeContent.style.transform,
+          transformOrigin: routeContent.style.transformOrigin,
+          willChange: routeContent.style.willChange,
+        };
       }
+      routeContent.style.transition = "none";
+      routeContent.style.opacity = opacity;
+      routeContent.style.pointerEvents = blockInteractions
+        ? "none"
+        : routeContentStyleRef.current.pointerEvents;
+      routeContent.style.willChange = "opacity";
+
       const surface = document.querySelector<HTMLElement>(".persistent-watch-experience");
       const surfaceParent = surface?.parentElement;
       if (surface && surfaceParent) {
         Array.from(surfaceParent.children).forEach((child) => {
           const element = child as HTMLElement;
           if (element === surface || (viewport && element.contains(viewport))) return;
-          if (!ancillaryStylesRef.current.has(element)) {
-            ancillaryStylesRef.current.set(element, {
-              opacity: element.style.opacity, pointerEvents: element.style.pointerEvents,
-              transition: element.style.transition, translate: element.style.translate,
-              transform: element.style.transform, transformOrigin: element.style.transformOrigin,
-              willChange: element.style.willChange,
-            });
-          }
-          element.style.transition = "none";
-          element.style.opacity = opacity;
-          if (anchorTarget) applyAnchoredTransform(element, rectFor(element));
-          element.style.pointerEvents = blockInteractions ? "none" : ancillaryStylesRef.current.get(element)?.pointerEvents ?? "";
+          fadeElement(element);
         });
       }
     }
+
     document.documentElement.style.setProperty("--player-swipe-progress", String(progress));
     document.documentElement.dataset.playerSwipeDirection = direction;
   }, [isMiniPlayer]);
