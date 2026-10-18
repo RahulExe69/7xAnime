@@ -747,7 +747,7 @@ export function PlayerViewport({
       return;
     }
 
-    const progress = Math.min(1, Math.max(0, session.maxDirectionalDistance / SWIPE_ANIMATION_DISTANCE));
+    const progress = Math.min(1, Math.max(0, finalDirectionalDistance / SWIPE_ANIMATION_DISTANCE));
 
     // Fullscreen down -> inline watch page. A second, distinct down gesture
     // from that inline state is what minimises the video for browsing.
