@@ -76,26 +76,26 @@ Expected output: a justified GO or NO-GO, not a provider button.
 ### Task 3: Add a disabled-by-default AnimeHeaven adapter
 
 **Files:**
-- Create: `src/lib/hindi-providers/animeheaven.ts`
-- Test: `tests/hindi-animeheaven.test.mjs` or the repository's established test equivalent
-- Modify: `src/lib/hindi-provider-normalization.mjs` only if a normalization test reveals a missing case
-- Modify configuration docs only after the exact validated base-setting mechanism is determined from existing environment/config conventions
+- Create: `src/lib/hindi-providers/animeheaven.mjs`
+- Create: `src/lib/hindi-providers/animeheaven.d.ts`
+- Create: `tests/hindi-animeheaven.test.mjs`
+- Modify configuration docs only after Task 1 confirms the endpoint and terms
 
 **Interfaces:**
-- `getAnimeHeavenHindiStreams(titles: string[], episode: number): Promise<HindiDubStream[]>`
-- Each returned stream includes `sourceId: "community-hindi" | "animeheaven"`, `sourceLabel: string`, and `languageEvidence: "hindi-catalogue-contract" | "explicit-hindi-metadata"`. AnimeHeaven may return a stream only when its confirmed response has explicit Hindi-specific evidence; a generic `dub` value must be rejected.
-- The adapter returns an empty list with a sanitized internal outcome when disabled or when candidate resolution fails; it must not throw into the primary watch path.
-- Request JSON through a small injectable request function so tests can use deterministic fixtures and production can use the existing Axios/network conventions.
-- Read the base only from the exact configured public API setting selected after Task 1; validate HTTPS and host, and remain disabled if the setting is absent or invalid.
-- Keep resolver/adapter calls bounded by timeouts, candidate counts, and response-size limits; revalidate redirect targets in any server-side request path.
+- Export `getAnimeHeavenHindiStreams(input: AnimeHeavenInput): Promise<AnimeHeavenStreamCandidate[]>` from the .mjs module and define the same signature in the declaration file.
+- `AnimeHeavenInput` contains `titles: string[]`, `episode: number`, `apiBase: string | undefined`, and an injectable `requestJson` function for deterministic tests.
+- `AnimeHeavenStreamCandidate` contains `sourceId: "animeheaven"`, `sourceLabel: "AnimeHeaven"`, `languageEvidence: "explicit-hindi-metadata"`, `server: string`, `embed: string`, `host: string`, `seriesTitle: string`, `seriesId: string`, `season: number`, and `episode: number`.
+- The adapter returns an empty array with a sanitized internal failure outcome when disabled or when resolution fails; it must not throw into the primary watch path. An AnimeHeaven candidate is emitted only when the confirmed response contains explicit Hindi-specific evidence; a generic `dub` value must be rejected.
+- Read the base only from `NEXT_PUBLIC_HINDI_ANIMEHEAVEN_API_BASE`, passed into the adapter by the existing client-side module. Treat the base as public configuration, not a secret; validate HTTPS and host, and stay disabled if absent or invalid.
+- Keep resolver/adapter calls bounded by timeouts, candidate counts, and response-size limits. Because the client requests the verified API directly, test actual browser/WebView CORS; if the direct path cannot work, stop and revisit the architecture instead of adding an arbitrary proxy.
 
-- [ ] **Step 1: Write failing adapter tests** for disabled configuration, title lookup, correct episode mapping, explicit Hindi evidence, invalid payload, HTTP error, timeout, non-HTTPS API base, unsafe result URL, redirect to a private/loopback destination where server-side fetch is used, oversized response, and strict-source response behavior. Include one near-match title and one wrong episode case.
-- [ ] **Step 2: Run the focused tests** and verify failure is caused by the missing adapter behavior, not test/setup errors.
-- [ ] **Step 3: Implement the minimum adapter** using only the confirmed route parameters and response fields from Task 1. Keep the request count bounded, apply finite timeouts and response limits, bound the candidate count, validate URLs, and avoid logging raw upstream bodies or signed URLs.
-- [ ] **Step 4: Re-run focused tests** and ensure each test passes; verify a source error becomes a local failure result instead of rejecting the main watch query.
+- [ ] **Step 1: Write failing adapter tests** for disabled configuration, title lookup, correct episode mapping, explicit Hindi evidence, invalid payload, HTTP error, timeout, non-HTTPS API base, unsafe result URL, redirect behavior, oversized response, and strict-source response behavior. Include one near-match title and one wrong episode case.
+- [ ] **Step 2: Run the focused tests** with `node --test tests/hindi-animeheaven.test.mjs` and verify failure is caused by missing adapter behavior, not test/setup errors.
+- [ ] **Step 3: Implement the minimum adapter** using only confirmed route parameters and response fields from Task 1. Keep request count bounded, apply finite timeouts/response limits, bound the candidate count, validate URLs, and avoid logging raw upstream bodies or signed URLs.
+- [ ] **Step 4: Re-run focused tests**. Expected: PASS, with source failures becoming local results rather than rejecting the primary watch query.
 - [ ] **Step 5: Commit** as `feat: add isolated AnimeHeaven Hindi adapter`.
 
-Do not create a generic proxy route. Add a FastAPI fixed-route proxy only if evidence proves direct client requests cannot be used; if required, first add a failing contract test in `.github/scripts/test-local-anime-backend.py`, then add only fixed AnimeHeaven paths, safe config handling, timeouts, URL restrictions, and sanitized error mapping.
+Do not create a generic proxy route. If qualification proves direct requests cannot work, stop before implementation and revise the spec rather than slipping a backend deployment into this change.
 
 ### Task 4: Aggregate the new source without regressing current Hindi results
 
@@ -106,7 +106,7 @@ Do not create a generic proxy route. Add a FastAPI fixed-route proxy only if evi
 
 **Interfaces:**
 - Preserve the current export signature `getHindiDubStreams(titles: string[], episode: number)`.
-- Extend `HindiDubStream` with required `sourceId`, `sourceLabel`, and `languageEvidence` fields; set explicit fixed values for results from the existing Hindi-specialized catalogue and preserve the upstream-confirmed evidence for AnimeHeaven.
+- Extend `HindiDubStream` with required `sourceId: "community-hindi" | "animeheaven"`, `sourceLabel: string`, and `languageEvidence: "hindi-catalogue-contract" | "explicit-hindi-metadata"` fields. Assign the current catalogue's fixed source/evidence values at its normalization boundary; map Task 3's `AnimeHeavenStreamCandidate[]` to the AnimeHeaven values without weakening its evidence requirement.
 - Merge candidates into the same `HindiDubStream[]` array shape. Keep `matchedTitle` meaningful for the current source and avoid presenting source-specific matching data as a global match.
 
 - [ ] **Step 1: Write failing orchestration tests**: a timeout or invalid response from AnimeHeaven does not suppress a valid existing Hindi candidate; a valid distinct candidate is included; identical URLs/underlying sources collapse to one option; results for the wrong episode are excluded.
