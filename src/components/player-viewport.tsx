@@ -155,7 +155,7 @@ export function PlayerViewport({
       if (surface && surfaceParent) {
         Array.from(surfaceParent.children).forEach((child) => {
           const element = child as HTMLElement;
-          if (element === surface || element.contains(viewport ?? element)) return;
+          if (element === surface || (viewport && element.contains(viewport))) return;
           if (!ancillaryStylesRef.current.has(element)) {
             ancillaryStylesRef.current.set(element, {
               opacity: element.style.opacity,
