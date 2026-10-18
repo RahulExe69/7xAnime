@@ -207,11 +207,21 @@ export function PlayerViewport({
     const height = origin.height + (target.height - origin.height) * progress;
     const scaleX = width / origin.width;
     const scaleY = height / origin.height;
-    node.style.transition = "none";
-    node.style.transformOrigin = "top left";
-    node.style.willChange = "transform";
-    node.style.transform = `translate3d(${left - origin.left}px, ${top - origin.top}px, 0) scale(${scaleX}, ${scaleY})`;
-    node.style.borderRadius = `${16 + (14 - 16) * progress}px`;
+    if (progress <= 0) {
+      // Returning to the gesture origin is an exact reset, not another
+      // animation; release the compositor hint immediately.
+      node.style.transform = "";
+      node.style.transformOrigin = "";
+      node.style.borderRadius = "";
+      node.style.transition = "";
+      node.style.willChange = "";
+    } else {
+      node.style.transition = "none";
+      node.style.transformOrigin = "top left";
+      node.style.willChange = "transform";
+      node.style.transform = `translate3d(${left - origin.left}px, ${top - origin.top}px, 0) scale(${scaleX}, ${scaleY})`;
+      node.style.borderRadius = `${16 + (14 - 16) * progress}px`;
+    }
     lastRectRef.current = { left, top, width, height };
     swipePreviewActiveRef.current = progress > 0;
   }, []);
