@@ -1,7 +1,7 @@
 # Streaming provider/API research
 
 
-> **Current status (2026-10-17):** This file records historical research, not the active runtime provider list. The only standard playback choices are MegaPlay, AniXo, Megavid, TryEmbed, and CinexStream. AnimeParadise, MegaFlix, NontonGo, AnimeNoSub, and the legacy Kuhi provider pool have been retired/pruned. Do not use old integration notes below as permission to re-enable them; see [SERVERS.md](SERVERS.md) for the current source of truth.
+> **Current status (2026-10-18):** This file records historical research, not the active runtime provider list. The standard playback choices are MegaPlay, AniXo, Megavid, TryEmbed, CinexStream, SupaPlay, and VidPlus. AnimeParadise, MegaFlix, NontonGo, AnimeNoSub, and the legacy Kuhi provider pool have been retired/pruned. Do not use old integration notes below as permission to re-enable them; see [SERVERS.md](SERVERS.md) for the current source of truth.
 
 
 
