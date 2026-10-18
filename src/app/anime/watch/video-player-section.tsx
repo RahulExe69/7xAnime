@@ -1271,7 +1271,6 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
         ...nestedPayloads.flatMap((item) => [item.status, item.state, item.playbackState, item.playerState])]
         .map(normalizeEventName)
         .filter((name): name is string => name.length > 0);
-      const status = statusNames[0] || "";
       const queryStateResponse = eventNames.some((name) =>
         ["get-paused", "get-is-playing", "is-playing", "getpaused", "getisplaying", "isplaying"].includes(name)
       ) || payload.context === "player.js" && eventNames.some((name) => name.includes("paused") || name.includes("playing"));
