@@ -345,7 +345,7 @@ jobs:
           if any(name in local_api_text.lower() for name in retired_names):
               raise SystemExit("Retired providers must not be registered in the Android backend")
           if any(provider not in watch_section for provider in ("tryembed", "cinexstream")):
-              raise SystemExit("Provider stall watchdog does not cover every enabled embed")
+              raise SystemExit("An event-aware provider is missing from the stall watchdog")
           if "const playerReady =" not in watch_section:
               raise SystemExit("Ready-page events must be distinguished from actual playback")
           if 'supaplay: "supaplay.fun"' not in watch_section:
