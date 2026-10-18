@@ -362,3 +362,33 @@ AnimeHeaven via Anivault-Scraper, DesiDubAnime API, Renime-API, and HiAnime/Aniw
 
 Neither AnimeWorldIndia implementation clears the gate. Keep the current ZeroTwo-Py Hindi source and five standard providers unchanged. Tatakai remains the strongest follow-up lead because its public docs show a Hindi route and a separate WatchAnimeWorld response schema with `language`/`langCode`, but Tatakai is still **HOLD** until the deployed response contract, independent-client usage expectations, and known-episode language mapping are verified. This sweep does not prove any candidate is offline.
 
+## Candidate qualification — Anivexa API and Zangetsu provider manifest (2026-10-18)
+
+**Decision: NO-GO for direct 7xAnime integration on the reviewed evidence.** These candidates are technically relevant, but neither clears the combination of a permitted API/deployment, Hindi-specific episode evidence, and an acceptable source-code/usage basis. No source code was copied and no live stream endpoint was probed.
+
+### Candidate C — Anivexa API
+
+- Reviewed [walterwhite-69/Anivexa-API](https://github.com/walterwhite-69/Anivexa-API), current README documentation. It aggregates multiple sources and documents `GET /episodes/:anilistId`, `GET /watch/:provider/:anilistId/sub|dub/:provider-:ep`, and a ReAnime HLS redirect.
+- The reviewed current provider list describes generic `sub`/`dub` behavior and source-specific capabilities but does not establish episode-specific Hindi audio for any returned candidate. A generic `dub` route is not Hindi proof.
+- Its README documents self-hosting, cautions that Vercel deployments are widely blocked by providers, and explicitly says provider requests should be for sources that host their own content, not scrapers of third-party sites. A historical public Vercel instance appears in an issue, but its author describes provider failures caused by Vercel IP blocks; it is not an approved dependable deployment for 7xAnime.
+- The repository's root file list has no visible LICENSE file, and no permitted public base intended for independent use is documented.
+
+**Gate result: NO-GO.** Generic dub only, no dependable/authorized deployment, no code-reuse basis established, and the project's own contributor guidance discourages scraping third-party sites. Do not treat a historical public deployment as authorization.
+
+### Candidate D — Zangetsu Spyou provider manifest (AnimeSalt / AnimixStream)
+
+- Reviewed [Spyou/Zangetsu-spyou-provider](https://github.com/Spyou/Zangetsu-spyou-provider): the README and `index.json` identify AnimeSalt, AnimixStream, and other sources with a manifest-level `lang: "hi"`. The README claims AnimeSalt has Hindi/Tamil/Telugu/English/Japanese tracks in a single HLS master, and AnimixStream has Hindi multi-audio HLS.
+- This is a JavaScript scraper-plugin bundle for the Zangetsu app, not a documented public REST API for other clients. The repository's `package.json` sets `"private": true`; no LICENSE file was found at the repository root. No permission to port or redistribute those provider scripts is established.
+- The manifest-level `lang: "hi"` is only a discovery label. Although its README describes a multi-audio source, there is no sample from a known episode proving the current audio-track list, default audio behavior, episode mapping, or playback in 7xAnime.
+- No live network tests were run; the README's optional live test suite would access third-party sites, and there is no approved 7xAnime integration contract or code-reuse basis yet.
+
+**Gate result: NO-GO for direct port; research lead only.** Do not copy the provider scripts while no license is declared. Any fresh implementation would still need a separate review of source terms, safe playback behavior, correct episode mapping, and how the 7xAnime player will select a Hindi audio track from a multi-audio master.
+
+### Updated candidate ranking
+
+1. **Tatakai API — HOLD / top API lead:** It advertises REST integration and a Hindi-specific route, and related WatchAnimeWorld docs demonstrate a possible explicit `language`/`langCode` contract. Exact hosted schema, use expectations, and a real episode sample remain unverified.
+2. **AnimeSalt / AnimixStream via Zangetsu manifest — research only:** Potential multi-audio technical capability, but no reusable license or 7xAnime API contract.
+3. **Other reviewed candidates — NO-GO or unqualified:** AnimeHeaven/Anivault-Scraper, DesiDubAnime API, Renime-API, HiAnime/Aniwatch API, AnimeWorldIndia API family, and Senshi without a distinct integration.
+   
+Keep the current ZeroTwo-Py Hindi catalogue and five standard providers unchanged. No candidate has cleared the gate; this does not establish that any site/API is offline.
+
