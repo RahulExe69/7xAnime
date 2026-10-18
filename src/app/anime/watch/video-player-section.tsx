@@ -8,10 +8,16 @@ import dynamic from "next/dynamic";
 const VideoPlayer = dynamic(() => import("@/components/video-player"), {
   ssr: false,
 });
+const AnimeEpisodes = dynamic(() => import("@/components/anime-episodes"), {
+  ssr: false,
+  loading: () => <div role="status" className="py-8 text-center text-sm text-zinc-500">Loading episodes…</div>,
+});
 import { useGetEpisodeData } from "@/query/get-episode-data";
 import { useQuery } from "react-query";
 import { getHindiDubStreams } from "@/lib/hindi-dub";
 import { ArrowLeft, Captions, Mic, AlertCircle } from "lucide-react";
+import Image from "next/image";
+import parse from "html-react-parser";
 import Link from "next/link";
 import { getProviderDisplayName, getServerProviderTitle, isProviderSelectable, ACTIVE_EMBED_PROVIDER_ORDER } from "@/lib/server-map";
 import { Switch } from "@/components/ui/switch";
@@ -21,6 +27,7 @@ import { PlayerViewport } from "@/components/player-viewport";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 import { useGetAllEpisodes } from "@/query/get-all-episodes";
+import { useGetAnimeDetails } from "@/query/get-anime-details";
 
 import useBookMarks from "@/hooks/use-get-bookmark";
 import { api, isLocalBackendEnabled } from "@/lib/api";
@@ -209,14 +216,19 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
   const epParam = isWatchRoute ? liveEpParam : lastWatchParams?.episode ?? null;
   const episodeIdParam = isWatchRoute ? liveEpisodeIdParam : lastWatchParams?.episodeId || "";
   const { selectedEpisode, setSelectedEpisode, anime: storeAnime } = useAnimeStore();
-  const watchAnimeRef = useRef(storeAnime);
-  if (isWatchRoute && storeAnime?.anime?.info?.id) {
-    watchAnimeRef.current = storeAnime;
+  const { data: fetchedAnimeDetails } = useGetAnimeDetails(animeIdParam);
+  const storedDetailsMatch = storeAnime?.anime?.info?.id === animeIdParam ||
+    Number(storeAnime?.anime?.info?.anilistId) === Number(animeIdParam);
+  const metadataCandidate = storedDetailsMatch ? storeAnime : fetchedAnimeDetails ?? storeAnime;
+  const watchAnimeRef = useRef(metadataCandidate ?? storeAnime);
+  if (isWatchRoute && metadataCandidate?.anime?.info?.id) {
+    watchAnimeRef.current = metadataCandidate;
   }
-  // Detail/explore routes may update the shared anime store while this player
-  // remains mounted. Keep the playing session's metadata frozen until returning
-  // to the watch route, so browsing another title cannot rename/reconfigure it.
-  const anime = isWatchRoute ? storeAnime : watchAnimeRef.current ?? storeAnime;
+  // Keep playing metadata frozen while browsing elsewhere, but fetch it when a
+  // watch URL is opened directly and the shared store has no matching anime.
+  const anime = isWatchRoute
+    ? metadataCandidate ?? storeAnime
+    : watchAnimeRef.current ?? metadataCandidate ?? storeAnime;
 
   const { data: allEpisodesData, isLoading: isEpisodesLoading } = useGetAllEpisodes(animeIdParam);
   const [preferredCategory, setPreferredCategory] = useState<"sub" | "dub">("dub");
@@ -1398,11 +1410,9 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
       megaplay: ["megaplay.buzz"],
       anixo: ["anixo.buzz"],
       megavid: ["megavid.buzz"],
-      tryembed: ["tryembed.us.cc"],
-      cinexstream: ["cinextream.cc"],
+        cinexstream: ["cinextream.cc"],
       supaplay: ["supaplay.fun"],
-      vidplus: ["player.vidplus.to", "player2.vidplus.pro"],
-    };
+      };
     const acceptedHosts = expectedHosts[observedEmbedProvider];
     if (!acceptedHosts) return;
     const handleEmbedMessage = (event: MessageEvent) => {
@@ -1629,15 +1639,15 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
     advanceToNextEpisode,
   ]);
 
-  // Known event-reporting iframe players (MegaPlay, AniXo, Megavid, TryEmbed, CinexStream)
+  // Known event-reporting iframe players (MegaPlay, AniXo, Megavid, CinexStream)
   // should emit playback/progress signals. If their page remains stuck on an
   // upstream error or interstitial and never reports progress, retry the same
-  // iframe twice before switching providers. SupaPlay and VidPlus are not
+  // iframe twice before switching providers. SupaPlay is manual-only until
   // included in this watchdog until their embeds emit playback events verified by us.
   // We cannot inspect/click inside a cross-origin iframe, so this watchdog relies
   // on documented player events.
   useEffect(() => {
-    const watchedProviders = ["megaplay", "anixo", "megavid", "tryembed", "cinexstream"];
+    const watchedProviders = ["megaplay", "anixo", "megavid", "cinexstream"];
     if (
       !isLocalBackendEnabled() ||
       (!appIsActive && !nativePipActive) ||
@@ -1665,7 +1675,7 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
         return;
       }
 
-      const stallTimeoutMs = observedEmbedProvider === "tryembed" ? 8000 : 18000;
+      const stallTimeoutMs = 18000;
       const hasRecentStateReply = embedStateQuerySupportedRef.current &&
         now - lastEmbedStateReplyAtRef.current < 12000;
       const canDistinguishPauseFromStall = observedEmbedProvider === "anixo" ||
@@ -1693,9 +1703,7 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
       // Reset the baseline before calling into React so rapid repeated timer
       // ticks cannot consume both retries for the same stalled frame.
       embedLoadStartedAtRef.current = now;
-      const detail = observedEmbedProvider === "tryembed"
-        ? "TryEmbed did not confirm real playback (possible upstream ad or verification interstitial); retrying this server."
-        : `${getProviderDisplayName(observedEmbedProvider)} stopped reporting playback; retrying this player.`;
+      const detail = `${getProviderDisplayName(observedEmbedProvider)} stopped reporting playback; retrying this player.`;
       handlePlayerError(detail);
     }, 2500);
 
@@ -1724,7 +1732,8 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
   // and loses the provider's in-memory playback session. The watchdog above is
   // already suspended outside the foreground (unless native PiP is active).
   const playerControls = (
-    <div className="flex w-full flex-col gap-3 rounded-2xl border border-white/[0.07] bg-[#101018] p-3 sm:p-4">
+    <>
+    <div className="flex w-full flex-col gap-3 rounded-2xl border border-white/[0.07] bg-[#101018] p-3 sm:p-4>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-1.5 rounded-xl border border-white/[0.08] bg-black/20 p-1">
           <Button size="sm" variant="ghost" disabled={nativeCatalogueComplete && !hasSub} onClick={() => handleCategoryChange("sub")} className={`h-8 rounded-lg px-3 text-xs font-bold transition ${!isHindiMode && activeCategory === "sub" ? "bg-[#ff3b72] text-white hover:bg-[#ff56ad]" : "text-zinc-400 hover:text-white"}`}>
@@ -1860,6 +1869,47 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
         </details>
       )}
     </div>
+    {anime?.anime?.info && (
+      <section id="anime-details" aria-labelledby="anime-details-title" className="rounded-2xl border border-white/[0.07] bg-[#101018] p-3 sm:p-5">
+        <div className="flex items-start gap-4">
+          {anime.anime.info.poster && (
+            <Image src={anime.anime.info.poster} alt={anime.anime.info.name || "Anime poster"} width={88} height={132} unoptimized className="h-[132px] w-[88px] shrink-0 rounded-xl border border-white/10 object-cover" />
+          )}
+          <div className="min-w-0 flex-1 space-y-2">
+            <h2 id="anime-details-title" className="text-lg font-extrabold leading-tight text-white sm:text-xl">{anime.anime.info.name}</h2>
+            <div className="flex flex-wrap gap-1.5 text-[11px] font-semibold text-zinc-300">
+              {anime.anime.info.stats.type && <span className="rounded-lg border border-white/10 bg-white/[0.04] px-2 py-1">{anime.anime.info.stats.type}</span>}
+              {anime.anime.moreInfo.status && <span className="rounded-lg border border-white/10 bg-white/[0.04] px-2 py-1">{anime.anime.moreInfo.status}</span>}
+              {anime.anime.moreInfo.premiered && anime.anime.moreInfo.premiered !== "N/A" && <span className="rounded-lg border border-white/10 bg-white/[0.04] px-2 py-1">{anime.anime.moreInfo.premiered}</span>}
+              {anime.anime.info.stats.rating && anime.anime.info.stats.rating !== "N/A" && <span className="rounded-lg border border-amber-300/20 bg-amber-300/[0.06] px-2 py-1 text-amber-200">★ {anime.anime.info.stats.rating}</span>}
+            </div>
+            {!!anime.anime.moreInfo.genres?.length && (
+              <div className="flex flex-wrap gap-1.5">
+                {anime.anime.moreInfo.genres.slice(0, 6).map((genre) => <span key={genre} className="rounded-full bg-[#ff3b72]/10 px-2 py-1 text-[10px] font-semibold text-[#ff9fbe]">{genre}</span>)}
+              </div>
+            )}
+          </div>
+        </div>
+        <div className="mt-4 border-t border-white/[0.06] pt-3">
+          <h3 className="mb-1.5 text-sm font-bold text-white">Synopsis</h3>
+          <div className="text-sm leading-6 text-zinc-300">{anime.anime.info.description ? parse(anime.anime.info.description) : "No synopsis available."}</div>
+          {!!anime.anime.moreInfo.studios && anime.anime.moreInfo.studios !== "N/A" && (
+            <p className="mt-3 text-xs text-zinc-500"><span className="font-semibold text-zinc-400">Studio:</span> {anime.anime.moreInfo.studios}</p>
+          )}
+        </div>
+      </section>
+    )}
+    <section id="episode-list" aria-label="Anime episodes" className="scroll-mt-4 rounded-2xl border border-white/[0.07] bg-[#101018] p-3 sm:p-4">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div>
+          <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#ff9fbe]">Continue watching</p>
+          <p className="mt-1 text-xs text-zinc-500">Select an episode to keep watching from here.</p>
+        </div>
+        <span className="shrink-0 rounded-lg border border-[#ff3b72]/25 bg-[#ff3b72]/10 px-2.5 py-1.5 text-xs font-bold text-[#ff9fbe]">Episode {currentEpNumber}</span>
+      </div>
+      <AnimeEpisodes animeId={animeIdParam} />
+    </section>
+    </>
   );
   const playerHeader = (
     <div className="flex min-w-0 items-center gap-3 rounded-2xl border border-white/[0.07] bg-[#101018] px-3 py-3 sm:px-4">
