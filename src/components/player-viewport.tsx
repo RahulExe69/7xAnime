@@ -550,8 +550,6 @@ export function PlayerViewport({
     event.stopPropagation();
     miniDragRef.current = null;
     const cancelled = event.type === "pointercancel";
-    const deltaX = event.clientX - drag.startX;
-    const deltaY = event.clientY - drag.startY;
     if (cancelled) {
       setIsMiniDragging(false);
       return;
