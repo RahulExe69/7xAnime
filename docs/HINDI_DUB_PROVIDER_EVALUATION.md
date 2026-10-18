@@ -277,3 +277,29 @@ Until those facts are available, leave the current Hindi catalogue and the five 
 
 Keep the existing ZeroTwo-Py Hindi catalogue and the five standard servers unchanged. Neither candidate advances to runtime tasks. Do not guess a hosted base URL, use a public deployment without authorization, or silently create a new scraping service. A new self-hosted architecture requires an explicit decision and a fresh review of applicable upstream terms before implementation.
 
+## Follow-up qualification gate — HiAnime and Senshi (2026-10-18)
+
+**Decision: NO-GO for runtime integration at current evidence threshold.** This check remains documentation-only; no endpoint was guessed or probed, no episode source was requested, and no runtime file was changed.
+
+### Candidate C — HiAnime / Aniwatch API
+
+- Canonical code repository reviewed: [VoidX3D/hianime-api](https://github.com/VoidX3D/hianime-api) (README blob `ed7a03fc938849c7c0f29a546fc07df3336e4955`; MIT LICENSE blob `0909ca65bdd1e9b1eece9c14aa4a981e2e242fe5`). The README identifies the upstream site as `hianimez.to`.
+- The API documents a local base (`http://localhost:4000`) and instructions for users to host their own instance. It explicitly notes that the prior hosted showcase was misused and says no later hosted version is available, recommending a personal deployment.
+- The README documents `subbed-anime` and `dubbed-anime` categories and episode-server/source routes. The material reviewed does not establish an explicit Hindi-language field; “dubbed” alone is not enough to mark a candidate Hindi.
+- The MIT license permits reuse of the repository code under its conditions, but it does not grant permission from the upstream streaming site to scrape or redistribute its content. The API is described as unofficial; upstream usage permission and a permitted 7xAnime deployment were not established.
+- No episode resolution or physical playback test was performed.
+
+**Gate result: NO-GO.** The implementation has no Hindi-specific episode evidence and no approved API deployment/upstream usage basis. Do not enable its generic dub results as Hindi.
+
+### Senshi candidate search
+
+- Searches for a Senshi-specific anime API or `senshi.live` scraper surfaced [SH0MIK/Anivault-Scraper](https://github.com/SH0MIK/Anivault-Scraper) and forks of that same project, rather than a separate, independently documented Senshi API with a known owner-authorized deployment.
+- Anivault-Scraper is already covered by the AnimeHeaven NO-GO record: no declared repo license, no permitted public API base identified, and no verified episode-specific Hindi contract. A fork does not clear those blockers by itself.
+- No independent endpoint was guessed or probed.
+
+**Gate result: NO-GO / insufficient evidence.** Reopen only with a canonical Senshi integration, a permitted deployment/usage basis, and a Hindi-specific episode signal.
+
+### Current candidate status
+
+AnimeHeaven via Anivault-Scraper, DesiDubAnime API, Renime-API, and HiAnime/Aniwatch API are not approved for runtime integration; Senshi remains unqualified because no separate authorized integration was identified. Preserve the existing Hindi catalogue and five standard providers. A source must pass the same deployment/permission and episode-level Hindi gate regardless of how popular its scraper is.
+
