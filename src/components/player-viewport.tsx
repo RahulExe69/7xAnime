@@ -802,7 +802,7 @@ export function PlayerViewport({
       if (!target) return;
       const progress = Math.min(1, Math.max(0, deltaY / SWIPE_ANIMATION_DISTANCE));
       applyPlayerPreview(session.origin, target, progress);
-      applySwipeContentProgress(progress, session.isFullscreen ? "restore" : "collapse", target);
+      applySwipeContentProgress(progress, session.isFullscreen ? "restore" : "collapse);
       session.previewing = progress > 0;
       return;
     }
@@ -810,7 +810,7 @@ export function PlayerViewport({
     if (session.direction === "expand" && session.fullscreenTarget) {
       const progress = Math.min(1, Math.max(0, -deltaY / SWIPE_ANIMATION_DISTANCE));
       applyPlayerPreview(session.origin, session.fullscreenTarget, progress);
-      applySwipeContentProgress(progress, "expand", session.origin);
+      applySwipeContentProgress(progress, "expand");
       session.previewing = progress > 0;
     }
   }, [applyPlayerPreview, applySwipeContentProgress]);
@@ -846,7 +846,7 @@ export function PlayerViewport({
     if (!session.isFullscreen && session.direction === "collapse" && deltaY > 0 && session.miniTarget) {
       const progress = Math.min(1, Math.max(0, deltaY / SWIPE_ANIMATION_DISTANCE));
       applyPlayerPreview(session.origin, session.miniTarget, progress);
-      applySwipeContentProgress(progress, "collapse", session.miniTarget);
+      applySwipeContentProgress(progress, "collapse");
       const viewportWidth = document.documentElement.clientWidth || window.innerWidth;
       const viewportHeight = document.documentElement.clientHeight || window.innerHeight;
       watchLayoutRef.current = { rect: session.origin, viewportWidth, viewportHeight };
@@ -858,7 +858,7 @@ export function PlayerViewport({
     if (!session.isFullscreen && session.direction === "expand" && deltaY < 0 && session.fullscreenTarget) {
       const progress = Math.min(1, Math.max(0, -deltaY / SWIPE_ANIMATION_DISTANCE));
       applyPlayerPreview(session.origin, session.fullscreenTarget, progress);
-      applySwipeContentProgress(progress, "expand", session.origin);
+      applySwipeContentProgress(progress, "expand");
       const viewportWidth = document.documentElement.clientWidth || window.innerWidth;
       const viewportHeight = document.documentElement.clientHeight || window.innerHeight;
       watchLayoutRef.current = { rect: session.origin, viewportWidth, viewportHeight };
