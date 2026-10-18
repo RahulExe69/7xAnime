@@ -247,3 +247,33 @@ No live endpoint probes, code porting, provider registration, dependency changes
 3. A safe, bounded sample resolution for one known episode, followed later by physical Android playback verification.
 
 Until those facts are available, leave the current Hindi catalogue and the five standard servers unchanged. Revisit this candidate only after an authorized deployment and source-language evidence are available. This is a qualification failure, not proof that AnimeHeaven itself is offline.
+
+## Follow-up qualification gate — DesiDubAnime API and Renime-API (2026-10-18)
+
+**Decision: NO-GO for runtime integration for both candidates at the evidence threshold used by this plan.** This is a documentation-only qualification sweep. No live stream/endpoint probes were made, no third-party scraper source was copied, and no runtime configuration or provider registry was changed.
+
+### Candidate A — DesiDubAnime scraping API
+
+- Canonical repository reviewed: [solo12345689/DesiDubAnime-api](https://github.com/solo12345689/DesiDubAnime-api), README blob `c18728c1cd2e8831eee4ce951e13522f1dc1d313`.
+- The documented API has a language index and Hindi-specific catalogue route: `GET /api/languages` and `GET /api/language/hindi`. The documented episode path is search/discovery → anime details → paginated episodes → `GET /api/watch/{episode_slug}`.
+- The README only documents a locally hosted base (`http://127.0.0.1:8000`) and generic instructions for deploying a copy to a cloud host. It does not name an authorized, existing public API deployment for 7xAnime.
+- The repository's `LICENSE` path was not found by the GitHub contents endpoint; no code-reuse license was established. Do not copy or port this API source on the assumption that public visibility grants reuse rights.
+- The site's published [DMCA notice](https://www.desidubanime.me/dmca/) includes a “private use only” statement. No clearer terms authorizing 7xAnime's automated integration were established.
+- A `hindi` catalogue slug is useful language-specific discovery evidence, but it does not by itself prove that a particular episode's resolved stream contains Hindi audio. No episode was resolved or playback-tested in this review.
+
+**Gate result: NO-GO.** Missing permitted deployment and code/reuse basis; no episode-specific Hindi/playback evidence. Reopen only after the source owner supplies/authorizes a suitable deployment or gives permission applicable to a separately reviewed self-hosted implementation, and a known episode can be verified without bypassing access controls.
+
+### Candidate B — Renime-API
+
+- Canonical repository reviewed: [itzzzDark/Renime-API](https://github.com/itzzzDark/Renime-API). Its README declares an ISC code license and describes a Hindi-first API whose listed upstream providers are AnimeSalt and WatchAnimeWorld.
+- The README provides a local API base (`http://localhost:3000/api`) and local start instructions, not a concrete authorized public deployment for 7xAnime.
+- The README labels the project for educational/research use and warns integrators to handle copyright compliance and upstream site terms themselves. An ISC code license applies to the repository's code; it does not establish permission from the upstream streaming sites to scrape or redistribute their content.
+- The README's endpoint map documents search, details, episodes, and embed routes, but the material reviewed did not establish an episode-specific Hindi audio field or verified Hindi playback contract for a particular episode.
+- No live endpoint probes, episode lookup, or playback test were performed because the required permitted deployment and upstream usage basis were not established.
+
+**Gate result: NO-GO.** The code license alone is insufficient. A permitted deployment/architecture, an acceptable usage basis for the upstream sites, and explicit episode-level Hindi evidence are still missing.
+
+### Current ruling
+
+Keep the existing ZeroTwo-Py Hindi catalogue and the five standard servers unchanged. Neither candidate advances to runtime tasks. Do not guess a hosted base URL, use a public deployment without authorization, or silently create a new scraping service. A new self-hosted architecture requires an explicit decision and a fresh review of applicable upstream terms before implementation.
+
