@@ -264,14 +264,14 @@ jobs:
               raise SystemExit("Player swipe/fullscreen wiring missing")
           if 'session.isFullscreen && session.direction === "collapse" && deltaY > 0 && session.inlineTarget' not in viewport:
               raise SystemExit("Fullscreen swipe-down must return to the inline watch page before minimising")
-          if 'session.direction === "collapse" ? session.inlineTarget' in viewport:
-              raise SystemExit("Fullscreen and inline minimise targets must remain state-specific")
+          if 'session.isFullscreen ? session.inlineTarget : session.miniTarget' not in viewport:
+              raise SystemExit("Fullscreen exit and inline minimisation targets must remain state-specific")
           if 'direction === "restore" ? progress : 1 - progress' not in viewport:
               raise SystemExit("Fullscreen exit must reveal surrounding watch-page content with gesture progress")
           if 'mode: "pending" | "drag" | "expand"' in viewport or "getMiniExpandTarget" in viewport or 'drag.mode === "expand"' in viewport:
               raise SystemExit("Mini-player upward drag must not act as a tap-to-restore shortcut")
-          if 'dispatchPlayerAction("expand-mini-player")' not in viewport:
-              raise SystemExit("Tapping the mini-player must restore the watch page")
+          if 'dispatchPlayerAction("expand-mini-player")' not in viewport or 'if (!drag.moved || drag.mode === "pending")' not in viewport:
+              raise SystemExit("Tapping the mini-player must restore the watch page from pointer-up")
           if 'data-player-viewport="true"' not in viewport:
               raise SystemExit("Player viewport marker is missing")
           if 'allow="autoplay; fullscreen; picture-in-picture; encrypted-media"' in watch_section:
