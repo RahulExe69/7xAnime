@@ -72,15 +72,15 @@ More details, optional Google OAuth setup, and the Android HTTPS endpoint requir
 
 ## Playback servers
 
-7xAnime supports exactly seven standard playback choices: **MegaPlay (Server 1), AniXo, Megavid, TryEmbed, CinexStream, SupaPlay, and VidPlus**. MegaPlay is the default Android iframe; the other six are manual embed routes. SupaPlay's `sub`/`dub` and VidPlus's dub toggle are generic, not verified Hindi-specific audio. AnimeParadise, MegaFlix, NontonGo, AnimeNoSub, and the legacy Kuhi provider pool are retired and are not packaged as active providers. See [the server guide](docs/SERVERS.md) for the maintained allowlist and retirement notes.
+7xAnime supports exactly five standard playback choices: **MegaPlay (Server 1), AniXo, Megavid, CinexStream, and SupaPlay**. MegaPlay is the default Android iframe; the other four are manual embed routes. SupaPlay's `sub`/`dub` selector is generic, not verified Hindi-specific audio. TryEmbed and VidPlus are retired after blank/non-playing device reports, along with AnimeParadise, MegaFlix, NontonGo, AnimeNoSub, and the legacy Kuhi provider pool. See [the server guide](docs/SERVERS.md) for the maintained allowlist and retirement notes.
 
-The Android APK retains only the small shared Kuhi API/catalogue infrastructure needed by the current backend; its unrelated provider adapters are pruned at build time. The six embed providers are cross-origin, so provider-owned player controls and overlays cannot always be customized or removed by the parent app.
+The Android APK retains only the small shared Kuhi API/catalogue infrastructure needed by the current backend; its unrelated provider adapters are pruned at build time. The four supported embeds are cross-origin, so provider-owned player controls and overlays cannot always be customized or removed by the parent app.
 
 ## Player experience marathon
 
 The Android player work applies a shared, provider-agnostic best-effort ad/redirect filter to embedded player requests, blocks pop-up windows and remote JavaScript prompt dialogs, a native landscape fullscreen bridge with swipe/Back support, and double-tap ±10-second seeking in the app-owned ArtPlayer player. See [the player marathon notes](docs/PLAYER-MARATHON.md) for exact coverage and cross-origin iframe limitations. Known ad-domain filtering can never remove every in-page ad, especially content served by the player itself.
 
-When playback detects an actual failure, 7xAnime saves the latest available timestamp, retries recoverable playback errors, then tries the other supported embedded servers before returning to MegaPlay. Ads, blocked pop-ups, and remote JavaScript dialogs are suppressed without being counted as playback failures. SupaPlay and VidPlus remain outside the progress-based stall watchdog until their iframe behavior is verified on an Android device. A visual ad overlay inside a cross-origin iframe is not reliably detectable or dismissible by the parent app; network filtering and popup blocking reduce interruptions but cannot guarantee removal of every in-page ad.
+When playback detects an actual failure, 7xAnime saves the latest available timestamp, retries recoverable playback errors, then tries the other supported embedded servers before returning to MegaPlay. Ads, blocked pop-ups, and remote JavaScript dialogs are suppressed without being counted as playback failures. SupaPlay remains outside the progress-based stall watchdog until its iframe behavior is verified on an Android device. A visual ad overlay inside a cross-origin iframe is not reliably detectable or dismissible by the parent app; network filtering and popup blocking reduce interruptions but cannot guarantee removal of every in-page ad.
 
 ## Android APK with an on-device API
 
@@ -88,7 +88,7 @@ The Android debug build has an experimental **local-backend** path: the APK bund
 a Python runtime and the shared catalogue/context portion of a pinned Kuhi API snapshot,
 starts the API on `127.0.0.1:8000`, and routes supported provider requests and media proxy
 traffic through that loopback service. The only standard playback choices are MegaPlay
-(Server 1), AniXo, Megavid, TryEmbed, CinexStream, SupaPlay, and VidPlus. Unused upstream Kuhi provider modules
+(Server 1), AniXo, Megavid, CinexStream, and SupaPlay. Unused upstream Kuhi provider modules
 are pruned from the packaged APK. A returned embed URL is not proof that the selected
 episode actually plays. This path does **not** require the three hosted API/proxy/PocketBase Actions
 secrets or a server we own.
