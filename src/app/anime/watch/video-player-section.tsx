@@ -1528,14 +1528,11 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
     [isLocalBackendEnabled, animeIdParam, anime?.anime?.info?.id, anime?.anime?.info?.name, anime?.anime?.info?.poster],
   );
 
-  if (isLocalBackendEnabled() && !appIsActive && !nativePipActive) {
-    return (
-      <div className="flex aspect-video w-full items-center justify-center rounded-2xl border border-white/10 bg-black px-6 text-center text-sm text-zinc-300">
-        Playback paused because 7xAnime is in the background. Return to the app to continue, or use Picture-in-picture for floating playback.
-      </div>
-    );
-  }
-
+  // Keep the active player mounted while Android backgrounds the app.
+  // Returning a placeholder here unmounts cross-origin iframes and ArtPlayer;
+  // when the app resumes React creates a fresh player, which looks like a reconnect
+  // and loses the provider's in-memory playback session. The watchdog above is
+  // already suspended outside the foreground (unless native PiP is active).
   const playerControls = (
     <div className="flex w-full flex-col gap-3 rounded-2xl border border-white/[0.07] bg-[#101018] p-3 sm:p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
