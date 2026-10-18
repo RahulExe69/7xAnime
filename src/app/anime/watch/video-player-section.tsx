@@ -264,10 +264,9 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
       setNativePipActive(pipActive);
       if (!pipActive) {
         const frame = externalEmbedFrameRef.current;
-        const embedWasPlaying = !!frame && (
-          embedPlaybackStateRef.current === "playing" ||
-          (embedHasObservedPlaybackRef.current && embedPlaybackStateRef.current !== "paused")
-        );
+        // Only resume an embed when we positively observed it playing before
+        // backgrounding; an unknown state must not override a user's manual pause.
+        const embedWasPlaying = !!frame && embedPlaybackStateRef.current === "playing";
         const directVideos = Array.from(document.querySelectorAll("video"))
           .filter((video) => !video.paused && video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA);
         backgroundPlaybackRef.current = { embedWasPlaying, directVideos };
