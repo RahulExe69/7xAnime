@@ -13,7 +13,6 @@ type PlayerViewportProps = {
   title?: string;
 };
 
-type GestureStart = { x: number; y: number; at: number };
 type MiniDragGesture = {
   pointerId: number;
   startX: number;
@@ -58,7 +57,6 @@ export function PlayerViewport({
   title = "video",
 }: PlayerViewportProps) {
   const rootRef = useRef<HTMLDivElement>(null);
-  const gestureStartRef = useRef<GestureStart | null>(null);
   const pathname = usePathname() || "/";
   const isWatchRoute = pathname === "/anime/watch" || pathname.startsWith("/anime/watch/");
   const isMiniPlayer = !isWatchRoute;
@@ -785,11 +783,9 @@ export function PlayerViewport({
     if (event.pointerType === "mouse") return;
     const target = event.target as HTMLElement | null;
     if (target?.closest("button, a, input, textarea, select, [role='button'], .art-controls, .art-control")) {
-      gestureStartRef.current = null;
       pointerSwipeRef.current = null;
       return;
     }
-    gestureStartRef.current = { x: event.clientX, y: event.clientY, at: Date.now() };
     pointerSwipeRef.current = createSwipeSession(event.clientX, event.clientY);
   }, [createSwipeSession]);
 
@@ -802,7 +798,6 @@ export function PlayerViewport({
   const finishGesture = useCallback((event: PointerEvent<HTMLElement>) => {
     const session = pointerSwipeRef.current;
     pointerSwipeRef.current = null;
-    gestureStartRef.current = null;
     if (!session || event.pointerType === "mouse") return;
     commitSwipeGesture(session, event.clientX - session.startX, event.clientY - session.startY);
   }, [commitSwipeGesture]);
@@ -810,7 +805,6 @@ export function PlayerViewport({
   const cancelGesture = useCallback(() => {
     const session = pointerSwipeRef.current;
     pointerSwipeRef.current = null;
-    gestureStartRef.current = null;
     const node = rootRef.current;
     if (session?.previewing && node) settlePreviewToOrigin(node);
     else clearSwipeContentProgress(true);
