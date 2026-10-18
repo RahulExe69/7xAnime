@@ -1731,6 +1731,7 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
   // when the app resumes React creates a fresh player, which looks like a reconnect
   // and loses the provider's in-memory playback session. The watchdog above is
   // already suspended outside the foreground (unless native PiP is active).
+  // Keep the same control surface available in both mini-player and full-screen layouts.
   const playerControls = (
     <>
     <div className="flex w-full flex-col gap-3 rounded-2xl border border-white/[0.07] bg-[#101018] p-3 sm:p-4">
