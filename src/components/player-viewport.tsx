@@ -134,18 +134,40 @@ export function PlayerViewport({
     }
 
     const routeContent = document.querySelector<HTMLElement>("[data-persistent-route-content]");
-    if (direction === "expand" && isMiniPlayer && routeContent) {
-      if (!routeContentStyleRef.current || routeContentStyleRef.current.element !== routeContent) {
-        routeContentStyleRef.current = {
-          element: routeContent,
-          opacity: routeContent.style.opacity,
-          pointerEvents: routeContent.style.pointerEvents,
-          transition: routeContent.style.transition,
-        };
+    if (direction === "expand" && isMiniPlayer) {
+      if (routeContent) {
+        if (!routeContentStyleRef.current || routeContentStyleRef.current.element !== routeContent) {
+          routeContentStyleRef.current = {
+            element: routeContent,
+            opacity: routeContent.style.opacity,
+            pointerEvents: routeContent.style.pointerEvents,
+            transition: routeContent.style.transition,
+          };
+        }
+        routeContent.style.transition = "none";
+        routeContent.style.opacity = opacity;
+        routeContent.style.pointerEvents = progress > 0.04 ? "none" : routeContentStyleRef.current.pointerEvents;
       }
-      routeContent.style.transition = "none";
-      routeContent.style.opacity = opacity;
-      routeContent.style.pointerEvents = progress > 0.04 ? "none" : routeContentStyleRef.current.pointerEvents;
+      // Fade app chrome (navigation/footer) away too, not just the route's
+      // scrolling contents, while the mini-player grows to take over the screen.
+      const surface = document.querySelector<HTMLElement>(".persistent-watch-experience");
+      const surfaceParent = surface?.parentElement;
+      if (surface && surfaceParent) {
+        Array.from(surfaceParent.children).forEach((child) => {
+          const element = child as HTMLElement;
+          if (element === surface || element.contains(viewport ?? element)) return;
+          if (!ancillaryStylesRef.current.has(element)) {
+            ancillaryStylesRef.current.set(element, {
+              opacity: element.style.opacity,
+              pointerEvents: element.style.pointerEvents,
+              transition: element.style.transition,
+            });
+          }
+          element.style.transition = "none";
+          element.style.opacity = opacity;
+          element.style.pointerEvents = progress > 0.04 ? "none" : ancillaryStylesRef.current.get(element)?.pointerEvents ?? "";
+        });
+      }
     }
 
     document.documentElement.style.setProperty("--player-swipe-progress", String(progress));
