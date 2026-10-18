@@ -209,9 +209,9 @@ export function PlayerViewport({
   }, [isMiniPlayer]);
 
   const clearSwipeContentProgress = useCallback((animate = false) => {
-    const restore = (element: HTMLElement, original: { opacity: string; pointerEvents: string; transition: string }) => {
+    const restore = (element: HTMLElement, original: { opacity: string; pointerEvents: string; transition: string; translate: string; willChange: string }) => {
       if (animate) {
-        element.style.transition = "opacity 150ms ease-out";
+        element.style.transition = "opacity 150ms ease-out, translate 150ms ease-out";
         element.style.opacity = original.opacity;
         element.style.pointerEvents = original.pointerEvents;
         element.style.translate = original.translate;
