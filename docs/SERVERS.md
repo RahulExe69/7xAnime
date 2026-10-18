@@ -12,9 +12,9 @@ This is the source of truth for the providers 7xAnime is allowed to use. Keep th
 | 4 | **TryEmbed** | `android-local-backend/extra-providers/tryembed.py` | Manually selectable embed. |
 | 5 | **CinexStream** | `android-local-backend/extra-providers/cinexstream.py` | Manually selectable embed. |
 | 6 | **SupaPlay** | `android-local-backend/extra-providers/supaplay.py` | Manual iframe using the documented AniList ID route. Generic `sub`/`dub`; `dub` is not proof of Hindi audio. |
-| 7 | **VidPlus** | `android-local-backend/extra-providers/vidplus.py` | Manual iframe using the documented AniList ID route. Generic `sub`/`dub`; no verified Hindi guarantee. |
+| 7 | **VidPlus** | `android-local-backend/extra-providers/vidplus.py` | Manual iframe using the documented AniList ID route. Dub requests use `server=hindi`, but Hindi audio is not yet verified. |
 
-These are the only supported playback choices. AniXo, Megavid, TryEmbed, CinexStream, SupaPlay, and VidPlus construct cross-origin embed URLs; the parent app cannot guarantee provider playback controls or availability. SupaPlay's `sub`/`dub` and VidPlus's `dub` toggle are generic, not episode-level proof of Hindi audio. A module loading or URL being returned does not prove an episode plays. Test actual playback on Android before claiming reliability.
+These are the only supported playback choices. AniXo, Megavid, TryEmbed, CinexStream, SupaPlay, and VidPlus construct cross-origin embed URLs; the parent app cannot guarantee provider playback controls or availability. SupaPlay's `sub`/`dub` is generic. VidPlus requests its documented `server=hindi` selection in dub mode, but neither has episode-level playback proof for Hindi audio. A module loading or URL being returned does not prove an episode plays. Test actual playback on Android before claiming reliability.
 
 ## Provider architecture and Auto
 
