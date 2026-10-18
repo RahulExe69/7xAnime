@@ -1474,12 +1474,35 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
         lastEmbedSignalAtRef.current = now;
         return;
       }
-      const lastSignal = Math.max(embedLoadStartedAtRef.current, lastEmbedSignalAtRef.current);
+
       const stallTimeoutMs = observedEmbedProvider === "tryembed" ? 8000 : 18000;
-      if (Date.now() - lastSignal < stallTimeoutMs) return;
+      const hasRecentStateReply = embedStateQuerySupportedRef.current &&
+        now - lastEmbedStateReplyAtRef.current < 12000;
+      const canDistinguishPauseFromStall = observedEmbedProvider === "anixo" ||
+        embedProviderPauseEventsRef.current ||
+        (hasRecentStateReply && embedPlaybackStateRef.current === "playing");
+      const lastSignal = Math.max(embedLoadStartedAtRef.current, lastEmbedSignalAtRef.current);
+      const lastProgress = Math.max(embedLoadStartedAtRef.current, lastEmbedProgressAtRef.current);
+      const lastRelevantActivityAt = embedHasObservedPlaybackRef.current
+        ? lastProgress
+        : lastSignal;
+      if (now - lastRelevantActivityAt < stallTimeoutMs) return;
+
+      // After a provider has started playing, silence alone is not enough to
+      // distinguish an intentional pause from a silent stall. AniXo emits pause
+      // events; other providers can use automatic stall recovery when they
+      // explicitly report pause events or answer a state query. For embeds with
+      // neither capability, only explicit error messages trigger reconnection:
+      // remounting on silence would restart a deliberately paused episode.
+      if (embedHasObservedPlaybackRef.current && !canDistinguishPauseFromStall) {
+        embedLoadStartedAtRef.current = now;
+        lastEmbedSignalAtRef.current = now;
+        return;
+      }
+
       // Reset the baseline before calling into React so rapid repeated timer
       // ticks cannot consume both retries for the same stalled frame.
-      embedLoadStartedAtRef.current = Date.now();
+      embedLoadStartedAtRef.current = now;
       const detail = observedEmbedProvider === "tryembed"
         ? "TryEmbed did not confirm real playback (possible upstream ad or verification interstitial); retrying this server."
         : `${getProviderDisplayName(observedEmbedProvider)} stopped reporting playback; retrying this player.`;
