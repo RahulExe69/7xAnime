@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-18-hindi-animeheaven-provider-design.md`
 
-**Execution status (2026-10-18):** Task 1 reached **NO-GO** at the authorized-deployment qualification gate. The candidate has no documented/authorized API base in the inspected public materials, GitHub reports no declared repository license, and Hindi-specific episode evidence is not established. Runtime tasks 2–6 are intentionally not executed until these prerequisites are supplied. See `docs/HINDI_DUB_PROVIDER_EVALUATION.md` for evidence and reopening criteria.
+**Execution status (2026-10-18):** The AnimeHeaven gate and the follow-up DesiDubAnime/Renime candidate sweep reached **NO-GO**. No reviewed candidate currently satisfies deployment/usage permission and episode-specific Hindi-evidence requirements. Runtime tasks 2–6 are intentionally blocked. See `docs/HINDI_DUB_PROVIDER_EVALUATION.md` for the full evidence record and reopening criteria.
 
 ## Global Constraints
 
@@ -162,3 +162,16 @@ The final report must say one of the following:
 - **NO-GO / runtime unchanged:** explain the concrete blocker (for example: no authorized deployment, unclear usage terms, absent Hindi-specific signal, or incorrect episode mapping) and link the updated evaluation record.
 
 A successful typecheck/build must never be described as proof that the third-party stream plays. Do not merge the PR or trigger a release build unless explicitly directed.
+
+## Continuation checkpoint — further Hindi-source qualification (2026-10-18)
+
+The AnimeHeaven gate remained NO-GO, so a bounded next-candidate sweep was recorded before considering any runtime changes:
+
+- **DesiDubAnime API — NO-GO:** The repository documents a Hindi catalogue route but no authorized existing public API base; its repository `LICENSE` file was not found; the source site's DMCA notice contains a private-use-only statement; and no episode-specific Hindi/audio playback evidence was gathered.
+- **Renime-API — NO-GO:** The project README declares an ISC code license and lists AnimeSalt/WatchAnimeWorld upstreams, but documents a local-only API base and educational/research use. The code license does not grant rights from those upstream sites, and a specific episode's Hindi audio signal was not established.
+- **Ruling:** Stop before Tasks 2–6. Do not add an adapter, deploy/fork an unapproved scraper service, guess a public API base, modify providers, or run a build. This costs additional evaluation time and delays a potentially useful provider, but avoids enabling an endpoint or audio label without the plan's required evidence.
+- **Reopen criteria:** An authorized deployment or explicitly approved self-hosting plan; a clear usage basis for the scraper code and upstream sources; an exact contract; episode-specific Hindi evidence; then bounded resolution and later physical-device playback verification.
+- The live Android playback status for all these candidates remains **unverified**. Existing Hindi playback and the five standard provider definitions remain untouched.
+
+See `docs/HINDI_DUB_PROVIDER_EVALUATION.md` for the evidence record and source links.
+
