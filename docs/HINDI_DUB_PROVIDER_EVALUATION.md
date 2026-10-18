@@ -384,27 +384,45 @@ Neither AnimeWorldIndia implementation clears the gate. Keep the current ZeroTwo
 
 **Gate result: NO-GO for direct port; research lead only.** Do not copy the provider scripts while no license is declared. Any fresh implementation would still need a separate review of source terms, safe playback behavior, correct episode mapping, and how the 7xAnime player will select a Hindi audio track from a multi-audio master.
 
-### Local-backend reassessment — WatchAnimeWorld / AnimeWorldIndia scraper family
+### Local-backend reassessment — official source is now the preferred direction
 
-**New finding:** the Android package's FastAPI server is genuinely on-device, but its current `/hindi/search` and `/hindi/stream` routes are only a proxy to `anime-api-ashen-chi.vercel.app`. That means the transport wrapper is local; the Hindi catalogue/extraction implementation is still remote.
+**Confirmed architecture:** the Android package's FastAPI server is on-device, but its current `/hindi/search` and `/hindi/stream` routes are a proxy to `anime-api-ashen-chi.vercel.app`. The transport wrapper is local; the catalogue/extraction implementation is still remote.
 
-A newly reviewed ISC-licensed repository, [MSMods-Pro/AnimeWorldIndia-Api](https://github.com/MSMods-Pro/AnimeWorldIndia-Api), documents a language category (`/api/category/language/hindi`), details/languages metadata, season episode lookup, and an embed lookup. However, its source code currently identifies itself as a **WatchAnimeWorld** scraper, hardcodes `https://watchanimeworld.net`, and the live domain redirects to `watchanimeworld.top`. Its Node/Express API is a separate service and is not a drop-in dependency for Chaquopy's Python 3.11 runtime. The project README also calls it educational/research software and places legal compliance on integrators.
+#### Candidate A — Muse India official YouTube channel (HOLD; preferred)
 
-**Decision: best next local-native evaluation lead; still HOLD for runtime integration.** The useful path would be a small Python-only adapter behind the existing local FastAPI routes, rather than bundling a second Node service. Before enabling it, qualification must verify all of the following:
+The [Muse India channel](https://www.youtube.com/channel/UCYYhAzgWuxPauRXdPpLAX3Q) is listed by YouTube as verified and describes itself as publishing copyrighted, legal anime content free on YouTube. Its public channel metadata includes a Hindi-dub anime section. See the [channel result](https://www.youtube.com/channel/UCYYhAzgWuxPauRXdPpLAX3Q), YouTube's [official embedded-player guidance](https://support.google.com/youtube/answer/171780), the [YouTube Data API Services Terms](https://developers.google.com/youtube/terms/api-services-terms-of-service), and the [official video-feed format reference](https://developers.google.com/youtube/data/guides/push_notifications).
 
-1. The upstream site's terms and current public endpoints permit the intended automated access; do not work around access controls, challenges, DRM, or protected media.
-2. Exact-title matching and the show's declared Hindi language can be checked independently of the query string.
-3. A requested season/episode maps to the correct episode-specific embed, and that episode actually provides Hindi audio. The reviewed API contract returns generic server names/URLs and does not itself prove Hindi audio for each episode.
-4. A real Android playback check confirms the selected embed opens without changing the five standard servers or the existing Hindi fallback.
+**Preferred design:** use official YouTube video IDs and the official embedded player only. Do not download, unwrap, proxy, or extract direct video streams. Keep it as an optional source in the existing Hindi selector; do not touch the five standard SUB/ENGLISH servers.
 
-The published repository is useful as a licensed architectural reference, but its ISC code license does not grant rights to the underlying show's streams or override the source site's terms. Do not port its scraper wholesale or turn a catalogue-level Hindi label into a guaranteed episode-level Hindi claim.
+A no-key local-backend discovery experiment can start with the channel feed:
 
-### Updated candidate ranking
+`https://www.youtube.com/feeds/videos.xml?channel_id=UCYYhAzgWuxPauRXdPpLAX3Q`
 
-1. **WatchAnimeWorld / AnimeWorldIndia scraper family — HOLD / best local-native lead:** A Hindi-language catalogue and episode/embed workflow are documented, and the scraper API repository declares ISC, but its current domain redirects, it expects a separate Node service, and language evidence is not episode-specific. Evaluate a fresh Python adapter against the site's terms and a real Hindi episode before any runtime change.
-2. **Tatakai API — HOLD / strongest explicit language-metadata lead:** It advertises a Hindi-specific route, and related docs show `language`/`langCode` fields. The exact deployed contract, integration expectations, and a real episode response remain unverified; do not make it a hard dependency of the APK.
-3. **AnimeSalt / AnimixStream via Zangetsu manifest — research only:** Potential multi-audio capability, but the manifest code has no declared reusable license and there is no 7xAnime API contract.
-4. **Other reviewed candidates — NO-GO or unqualified:** AnimeHeaven/Anivault-Scraper, DesiDubAnime API, Renime-API, HiAnime/Aniwatch API, and Senshi without a distinct, qualified integration.
-   
+This Atom feed format is documented by YouTube for video notifications. However, the environment could not live-fetch this exact feed during this audit, and a channel upload feed is limited to recent uploads rather than a complete historic episode catalogue. It is not enough by itself to support reliable back-catalogue search. Curated official playlist IDs may improve coverage, but no Hindi-specific playlist ID has yet been verified.
+
+**Do not ship a YouTube Data API key inside the APK.** If playlist-based discovery needs the Data API, use an appropriately restricted project credential through a suitable owner-controlled backend or obtain a verified playlist ID by a permitted manual process. Respect the YouTube API Terms and keep the official player/branding/ads behavior intact.
+
+Qualification gate before any implementation:
+
+1. Verify a current official Hindi-dub playlist/feed and sample its real XML response from a supported runtime.
+2. Confirm a known video belongs to the official channel and is actually the correct show/episode; generic title overlap is insufficient.
+3. Require explicit Hindi evidence in the video title or a verified Hindi-specific playlist, plus an unambiguous requested episode number. If season cannot be mapped, do not return the result.
+4. Use a standard YouTube embed URL for the returned video ID and verify the embed works in the Android WebView/PlayerViewport, including playback controls and lifecycle behavior.
+5. Keep the result as a separate optional Hindi stream. Existing Hindi lookup remains available if the official feed fails, has no match, or doesn't include the requested episode.
+
+**Current decision: HOLD for source-coverage and device verification; best direction on permission and architecture.** The official channel is a valid source family to pursue, but no feed was live-tested and no playback has been verified in 7xAnime yet.
+
+#### Candidate B — WatchAnimeWorld / AnimeWorldIndia scraper family (NO-GO for runtime integration)
+
+The [MSMods-Pro/AnimeWorldIndia-Api](https://github.com/MSMods-Pro/AnimeWorldIndia-Api) repository declares an ISC code license and documents Hindi-language catalogue filtering, season episode lookup, and embed lookup. Its own README describes the tool as educational/research use and puts legal compliance on integrators. The inspected code identifies itself as a WatchAnimeWorld scraper, hardcodes `https://watchanimeworld.net`, and current discovery showed domain redirection. Its generic `servers[].url` contract does not confirm Hindi audio for an individual episode.
+
+The code license covers the scraper code, **not** the underlying streamed shows or the website's media. No source-site authorization or sufficiently clear permission basis for integrating its scraped media was established. Do not port its scraper, create a Python clone of the extraction flow, or treat self-hosting as authorization. Revisit only if there is an explicit permission/authorized-content basis, stable documented contract, and episode-level evidence.
+
+#### Other candidates
+
+- **Tatakai API — HOLD, not selected:** public route advertises Hindi search, but the actual deployed response schema, integration terms, and episode-level language signal have not been verified; related repository license/use statements are inconsistent.
+- **AnimeSalt / AnimixStream via Zangetsu manifest — research only:** technical multi-audio claims are interesting, but no reusable plugin license or 7xAnime API contract was established. Do not copy/port the manifest scripts.
+- **AnimeHeaven/Anivault-Scraper, DesiDubAnime API, Renime-API, HiAnime/Aniwatch API, Anivexa, and unspecified Senshi integrations — NO-GO or unqualified** under the previous audit.
+
 Keep the current ZeroTwo-Py Hindi catalogue and five standard providers unchanged. No candidate has cleared the gate; this does not establish that any site/API is offline.
 
