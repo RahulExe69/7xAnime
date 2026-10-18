@@ -397,7 +397,7 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
     return "";
   }, [episodeIdParam, epParam, preferredCategory, providerNames, rawProviders]);
 
-  // Android starts with the dedicated MegaPlay iframe. The four retained embed
+  // Android starts with the dedicated MegaPlay iframe. The five retained embed
   // providers are explicit alternatives, not an automatic extraction race.
   const localFallbackEpisodeId = isLocalBackendEnabled() && animeIdParam
     ? `watch/megaplay/${animeIdParam}/${preferredCategory}/episode-${requestedEpisodeNumber}`
@@ -428,7 +428,7 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
   }, [episodeIdParam, selectedEpisode, setSelectedEpisode]);
 
   // On native Android, begin with Server 1 (MegaPlay) immediately. The legacy
-  // Kuhi Auto race is retired; the four supported embed providers are explicit
+  // Kuhi Auto race is retired; the five supported embed providers are explicit
   // alternatives selected from the server chooser.
   const [useFallback, setUseFallback] = useState<boolean>(() => isLocalBackendEnabled());
   const [isHindiMode, setIsHindiMode] = useState<boolean>(false);
@@ -1398,6 +1398,7 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
       megavid: "megavid.buzz",
       tryembed: "tryembed.us.cc",
       cinexstream: "cinextream.cc",
+      supaplay: "supaplay.fun",
     };
     const expectedHost = expectedHosts[observedEmbedProvider];
     if (!expectedHost) return;
@@ -1626,10 +1627,10 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
   // Known event-reporting iframe players (MegaPlay, AniXo, Megavid, MegaFlix)
   // should emit playback/progress signals. If their page remains stuck on an
   // upstream error or interstitial and never reports progress, retry the same
-  // iframe twice before switching providers. MegaFlix gets a shorter timeout
-  // because its upstream currently returns an endpoint error page; other embeds
-  // get more startup time. We cannot inspect/click inside a cross-origin iframe,
-  // so this watchdog relies on documented player events.
+  // iframe twice before switching providers. SupaPlay is not included in this
+  // watchdog until its classic iframe emits playback events verified by us.
+  // We cannot inspect/click inside a cross-origin iframe, so this watchdog relies
+  // on documented player events.
   useEffect(() => {
     const watchedProviders = ["megaplay", "anixo", "megavid", "tryembed", "cinexstream"];
     if (
