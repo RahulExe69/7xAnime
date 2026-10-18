@@ -209,3 +209,11 @@ html.sevenx-pip-mode [data-player-viewport="true"] {
 video::-webkit-media-controls-picture-in-picture-button {
   display: none !important;
 }
+
+
+/* A true fullscreen player takes over the watch page without leaving blank
+   controls or headings around the fullscreen surface. Swipe previews fade
+   surrounding content inline before this selector takes over at gesture end. */
+[data-persistent-watch-player][data-player-mode="watch"] *:has(> [data-player-viewport="true"][data-player-fullscreen="true"]) > *:not(:has([data-player-viewport="true"])) {
+  display: none !important;
+}
