@@ -289,6 +289,7 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
           pauseAfterEmbedRecoveryRef.current = resumeMode === "paused";
           lastEmbedSignalAtRef.current = 0;
           lastEmbedProgressAtRef.current = 0;
+          lastEmbedStateReplyAtRef.current = 0;
           embedLoadStartedAtRef.current = resumeStartedAt;
           if (resumeMode === "playing") {
             embedHasObservedPlaybackRef.current = true;
@@ -300,13 +301,24 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
           // Some providers ignore the first postMessage after WebView resume.
           // Retry state/play-or-pause commands briefly while keeping the same
           // iframe mounted; only rebuild it if it never responds at all.
-          for (const delay of [400, 1100, 2200]) {
+          // Two short retries are enough for slow WebView wake-up. Avoid a late
+          // ~2.2s play command against an embed that has already resumed; some
+          // providers treat repeated play commands as a fresh load.
+          for (const delay of [400, 1100]) {
             const timer = window.setTimeout(() => {
               if (externalEmbedFrameRef.current !== frame ||
                   frame.src !== sourceAtResume ||
                   !appIsActiveRef.current ||
                   backgroundResumeStartedAtRef.current !== resumeStartedAt) return;
-              if (backgroundResumeModeRef.current === "playing") {
+              const responseSinceResume = Math.max(
+                lastEmbedSignalAtRef.current,
+                lastEmbedProgressAtRef.current,
+                lastEmbedStateReplyAtRef.current,
+              ) >= resumeStartedAt;
+
+              // Do not send duplicate play commands when the provider has
+              // already emitted progress, playback state, or a state-query reply.
+              if (backgroundResumeModeRef.current === "playing" && !responseSinceResume) {
                 requestExternalPlayerPlay(frame);
               } else if (backgroundResumeModeRef.current === "paused") {
                 requestExternalPlayerPause(frame);
@@ -322,10 +334,17 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
                 !appIsActiveRef.current ||
                 backgroundResumeStartedAtRef.current !== resumeStartedAt ||
                 backgroundResumeModeRef.current !== resumeMode) return;
-            // A provider that produces no state/progress response after foreground
-            // was often left as a white iframe by Android. Recreate only that
-            // unresponsive frame; requestEmbedResume restores its saved position
-            // and the resume mode keeps a previously paused episode paused.
+
+            const responseSinceResume = Math.max(
+              lastEmbedSignalAtRef.current,
+              lastEmbedProgressAtRef.current,
+              lastEmbedStateReplyAtRef.current,
+            ) >= resumeStartedAt;
+            if (responseSinceResume) return;
+
+            // Recreate the iframe only when it has stayed completely silent
+            // since foregrounding. A healthy embed must never be reloaded just
+            // because the fallback timer elapsed.
             setPlayerRetryKey((previous) => previous + 1);
           }, 4800);
           lifecycleResumeTimersRef.current.push(recoveryTimer);
