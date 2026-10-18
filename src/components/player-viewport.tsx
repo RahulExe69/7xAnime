@@ -947,7 +947,12 @@ export function PlayerViewport({
   const onRailPointerMove = (event: PointerEvent<HTMLDivElement>) => {
     event.stopPropagation();
     const session = pointerSwipeRef.current;
-    if (session) updateSwipePreview(session, event.clientX - session.startX, event.clientY - session.startY);
+    if (session) updateSwipePreview(
+      session,
+      event.clientX - session.startX,
+      event.clientY - session.startY,
+      event.timeStamp,
+    );
   };
 
   const onRailPointerUp = (event: PointerEvent<HTMLDivElement>) => {
