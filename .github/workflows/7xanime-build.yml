@@ -322,8 +322,8 @@ jobs:
               raise SystemExit("Foreground recovery must not reconnect healthy embeds or send a late duplicate play command")
           if "overscroll-auto" not in episode_list or "overscroll-contain" in episode_list:
               raise SystemExit("Episode-list boundary scrolling must chain naturally into the page")
-          if "useLayoutEffect" not in persistent_host or "window.scrollTo({ top: 0, left: 0, behavior: \"auto\" })" not in persistent_host:
-              raise SystemExit("Opening a watch route must reset stale browse-page scroll restoration")
+          if "useLayoutEffect" not in persistent_host or "window.scrollTo({ top: 0, left: 0, behavior: \"auto\" })" not in persistent_host or "watchLocationKey" not in persistent_host or "useSearchParams" not in persistent_host:
+              raise SystemExit("Opening or switching episodes must reset stale browse-page scroll restoration")
           if "requestExternalPlayerState" not in watch_section or "getPaused" not in watch_section:
               raise SystemExit("Common embedded-player pause-state probing is missing")
           if "source.eventName" not in watch_section or "lastEmbedMediaTimeRef" not in watch_section:
