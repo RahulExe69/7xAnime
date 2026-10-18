@@ -35,7 +35,8 @@ public final class StreamingNavigationWebViewClient extends BridgeWebViewClient 
         "megavid.buzz",
         "tryembed.us.cc",
         "cinextream.cc",
-        "supaplay.fun"
+        "supaplay.fun",
+        "player.vidplus.to"
     ));
 
     private static final Set<String> BLOCKED_AD_DOMAINS = new HashSet<>(Arrays.asList(
