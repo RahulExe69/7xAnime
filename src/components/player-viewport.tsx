@@ -720,38 +720,7 @@ export function PlayerViewport({
           nativeSwipeRef.current = null;
           return;
         }
-        const rect = node.getBoundingClientRect();
-        const viewportWidth = document.documentElement.clientWidth || window.innerWidth;
-        const viewportHeight = document.documentElement.clientHeight || window.innerHeight;
-        let miniTarget: RectSnapshot | null = null;
-        if (!isMiniPlayer) {
-          const safeAreaProbe = document.createElement("div");
-          safeAreaProbe.style.cssText = "position:fixed;visibility:hidden;pointer-events:none;padding-bottom:env(safe-area-inset-bottom);";
-          document.body.appendChild(safeAreaProbe);
-          const safeBottom = Number.parseFloat(getComputedStyle(safeAreaProbe).paddingBottom) || 0;
-          safeAreaProbe.remove();
-          const targetWidth = Math.min(Math.max(190, viewportWidth * 0.58), Math.min(360, viewportWidth - 24));
-          const targetHeight = targetWidth * 9 / 16;
-          miniTarget = {
-            left: viewportWidth - targetWidth - 12,
-            top: viewportHeight - 88 - safeBottom - targetHeight,
-            width: targetWidth,
-            height: targetHeight,
-          };
-        }
-        const fullscreenTarget: RectSnapshot | null = isFullscreen ? null : {
-          left: 0, top: 0, width: viewportWidth, height: viewportHeight,
-        };
-        nativeSwipeRef.current = {
-          isMiniPlayer,
-          isFullscreen,
-          startX: detail.startX,
-          startY: detail.startY,
-          origin: { left: rect.left, top: rect.top, width: rect.width, height: rect.height },
-          miniTarget,
-          fullscreenTarget,
-          previewing: false,
-        };
+        nativeSwipeRef.current = createSwipeSession(detail.startX, detail.startY);
         return;
       }
 
@@ -759,60 +728,26 @@ export function PlayerViewport({
       if (!session) return;
       const deltaX = detail.currentX - session.startX;
       const deltaY = detail.currentY - session.startY;
-      const validVertical = Math.abs(deltaY) >= SWIPE_THRESHOLD && Math.abs(deltaX) <= SWIPE_MAX_X_DRIFT;
-      const withinTrack = Math.abs(deltaX) <= SWIPE_MAX_X_DRIFT;
 
       if (detail.phase === "move") {
-        // A single gesture can reverse direction mid-drag: each frame is based
-        // on the original geometry, so the player follows the finger both ways.
-        if (!session.isMiniPlayer && session.miniTarget && withinTrack && (deltaY > 4 || session.previewing)) {
-          const progress = Math.min(1, Math.max(0, deltaY / 240));
-          applyPlayerPreview(session.origin, session.miniTarget, progress);
-          applySwipeContentProgress(progress, "collapse");
-          session.previewing = progress > 0;
-        } else if (!session.isFullscreen && session.fullscreenTarget && withinTrack &&
-          (deltaY < -4 || (session.previewing && deltaY < 0))) {
-          const progress = Math.min(1, Math.max(0, -deltaY / 240));
-          applyPlayerPreview(session.origin, session.fullscreenTarget, progress);
-          applySwipeContentProgress(progress, "expand");
-          session.previewing = progress > 0;
-        }
+        updateSwipePreview(session, deltaX, deltaY);
         return;
       }
 
       nativeSwipeRef.current = null;
-      if (detail.phase === "end" && validVertical && !session.isMiniPlayer) {
-        if (deltaY > 0 && session.miniTarget) {
-          const progress = Math.min(1, Math.max(0, deltaY / 240));
-          applyPlayerPreview(session.origin, session.miniTarget, progress);
-          applySwipeContentProgress(progress, "collapse");
-          swipePreviewActiveRef.current = true;
-          if (session.isFullscreen) {
-            setIsFullscreen(false);
-            void exitNativePlayerFullscreen();
-          }
-          dispatchPlayerAction("minimize-player");
-          return;
-        }
-        if (deltaY < 0 && session.fullscreenTarget) {
-          const progress = Math.min(1, Math.max(0, -deltaY / 240));
-          applyPlayerPreview(session.origin, session.fullscreenTarget, progress);
-          applySwipeContentProgress(progress, "expand");
-          swipePreviewActiveRef.current = true;
-          void enterFullscreen();
-          return;
-        }
+      if (detail.phase === "end") {
+        commitSwipeGesture(session, deltaX, deltaY);
+      } else if (session.previewing) {
+        settlePreviewToOrigin(node);
+      } else {
+        clearSwipeContentProgress(true);
       }
-
-      if (session.previewing) settlePreviewToOrigin(node);
-      else clearSwipeContentProgress(true);
     };
     window.addEventListener("7xanime:native-player-swipe-progress", handleNativeSwipeProgress);
     return () => window.removeEventListener("7xanime:native-player-swipe-progress", handleNativeSwipeProgress);
   }, [
-    applyPlayerPreview, applySwipeContentProgress, clearSwipeContentProgress,
-    dispatchPlayerAction, enterFullscreen, isFullscreen, isMiniPlayer,
-    settlePreviewToOrigin,
+    clearSwipeContentProgress, commitSwipeGesture, createSwipeSession,
+    settlePreviewToOrigin, updateSwipePreview,
   ]);
 
   const startGesture = useCallback((event: PointerEvent<HTMLElement>) => {
