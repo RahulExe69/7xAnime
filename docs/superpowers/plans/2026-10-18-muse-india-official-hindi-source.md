@@ -40,6 +40,8 @@ This is a feed-based discovery lead, not yet a proven full catalogue. The exact 
 - [ ] Confirm whether recent feed entries include full episodes or only trailers/promos and whether Hindi is explicit in title metadata.
 - [ ] Search the official channel's public playlists manually and identify a Hindi-dub playlist only if its playlist ID is explicitly exposed by the channel. Do not infer IDs or scrape HTML.
 - [ ] Determine the true coverage limit. If only 15 recent uploads are available and no Hindi playlist feed exists, classify it as a recent-uploads supplement rather than a general Hindi episode source.
+- [ ] Use the officially documented feed URL `https://www.youtube.com/xml/feeds/videos.xml?channel_id=UCYYhAzgWuxPauRXdPpLAX3Q`. If the audit environment cannot resolve YouTube, mark the fetch blocked by environment and do not report the feed as down.
+- [ ] Use known official episode metadata as fixtures only: Classroom of the Elite Episode 08 (`0hU9TBeuZQQ`, published 2026-06-25) and Cells at Work! S1E10 (`Tab-cFyTKp8`, published 2026-06-14). These are indexed metadata, not verified feed membership or live embed playback.
 
 ### Task 2: Verify title and episode mapping
 
@@ -53,6 +55,8 @@ This is a feed-based discovery lead, not yet a proven full catalogue. The exact 
 
 - [ ] Construct only `https://www.youtube.com/embed/{videoId}` after validating the video ID format and source identity.
 - [ ] Test the embed inside the current Android `PlayerViewport` and existing iframe policy, including autoplay requirements, Back behavior, app background/foreground, and Picture-in-Picture interaction.
+- [ ] Confirm YouTube receives an allowed app identity/referrer in the Capacitor WebView (`com.sevenx.anime`); treat Error 153 or blocked playback as a failed gate, not a reason to bypass player safeguards.
+- [ ] Verify 7xAnime's mini-player, close affordances, swipe/fullscreen transitions, and any custom controls never obscure YouTube's player surface/controls. If the standard YouTube UI cannot remain unobstructed, do not ship this source inside `PlayerViewport`.
 - [ ] Confirm the video stays playable using YouTube's player controls and doesn't depend on direct-stream extraction.
 - [ ] A returned feed entry is not evidence of playable video; report physical Android playback separately.
 
