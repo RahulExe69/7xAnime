@@ -132,12 +132,10 @@ export function PlayerViewport({
     direction: "collapse" | "expand" | "restore",
     rawDistance = rawProgress * SWIPE_ANIMATION_DISTANCE,
   ) => {
-    // Keep page content in place and fade it with the player's gesture.
-    // Moving/scaling every sibling toward the mini-player corner made the
-    // watch page appear to collapse into a dark, clipped smear and caused
-    // the page and player to feel detached. The player itself owns the
-    // finger-following transform; surrounding content only fades and becomes
-    // non-interactive until the transition commits.
+    // Keep the page and player on one shared drag distance. The viewport is
+    // moved by applyPlayerPreview while its sibling surfaces receive the same
+    // translate below; opacity has its own progress curve so it can fade out
+    // early without capping the player's movement away from the user's finger.
     const progress = Math.min(1, Math.max(0, rawProgress));
     const opacity = String(direction === "restore" ? progress : direction === "collapse" ? Math.pow(1 - progress, 3) : 1 - progress);
     const blockInteractions = direction === "restore" ? progress < 0.96 : progress > 0.04;
@@ -708,9 +706,15 @@ export function PlayerViewport({
       // into the mini-player slot is handled by the route FLIP transition.
       const target = session.isFullscreen
         ? session.inlineTarget
-        : { ...session.origin, top: session.origin.top + SWIPE_ANIMATION_DISTANCE };
+        : { ...session.origin, top: session.origin.top + travelDistance };
       if (!target) return;
-      applyPlayerPreview(session.origin, target, progress);
+      // For inline minimisation, movement is exact finger distance; only the
+      // fade progress is capped. Fullscreen-to-inline still interpolates layout.
+      applyPlayerPreview(
+        session.origin,
+        target,
+        session.isFullscreen ? progress : travelDistance > 0 ? 1 : 0,
+      );
       applySwipeContentProgress(
         progress,
         session.isFullscreen ? "restore" : "collapse",
@@ -766,9 +770,13 @@ export function PlayerViewport({
       // so the post-release FLIP can finish toward the fixed mini-player slot.
       const inlineFollowTarget = {
         ...session.origin,
-        top: session.origin.top + SWIPE_ANIMATION_DISTANCE,
+        top: session.origin.top + Math.max(0, finalDirectionalDistance),
       };
-      applyPlayerPreview(session.origin, inlineFollowTarget, progress);
+      applyPlayerPreview(
+        session.origin,
+        inlineFollowTarget,
+        finalDirectionalDistance > 0 ? 1 : 0,
+      );
       applySwipeContentProgress(progress, "collapse", Math.max(0, finalDirectionalDistance));
       const viewportWidth = document.documentElement.clientWidth || window.innerWidth;
       const viewportHeight = document.documentElement.clientHeight || window.innerHeight;
