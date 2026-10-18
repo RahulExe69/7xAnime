@@ -328,6 +328,11 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
   const embedResumeTimersRef = useRef<number[]>([]);
   const lastEmbedMediaTimeRef = useRef<{ key: string; seconds: number } | null>(null);
   const lastEmbedStateProbeAtRef = useRef(0);
+  const lastEmbedProgressAtRef = useRef(0);
+  const lastEmbedStateReplyAtRef = useRef(0);
+  const embedHasObservedPlaybackRef = useRef(false);
+  const embedProviderPauseEventsRef = useRef(false);
+  const embedStateQuerySupportedRef = useRef(false);
 
   const requestEmbedResume = useCallback(() => {
     if (!isLocalBackendEnabled()) return;
@@ -396,7 +401,12 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
     pauseAfterEmbedRecoveryRef.current = false;
     lastEmbedMediaTimeRef.current = null;
     lastEmbedStateProbeAtRef.current = 0;
-  }, [activeEpisodeId]);
+    lastEmbedProgressAtRef.current = 0;
+    lastEmbedStateReplyAtRef.current = 0;
+    embedHasObservedPlaybackRef.current = false;
+    embedProviderPauseEventsRef.current = false;
+    embedStateQuerySupportedRef.current = false;
+  }, [activeEpisodeId, playbackSourceIndex]);
 
   const flushLatestEmbedProgress = useCallback(() => {
     const latest = lastEmbedProgressRef.current;
@@ -1271,9 +1281,13 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
         ...nestedPayloads.flatMap((item) => [item.status, item.state, item.playbackState, item.playerState])]
         .map(normalizeEventName)
         .filter((name): name is string => name.length > 0);
-      const queryStateResponse = eventNames.some((name) =>
-        ["get-paused", "get-is-playing", "is-playing", "getpaused", "getisplaying", "isplaying"].includes(name)
-      ) || payload.context === "player.js" && eventNames.some((name) => name.includes("paused") || name.includes("playing"));
+      const pausedQueryNames = ["get-paused", "getpaused", "paused-state"];
+      const playingQueryNames = ["get-is-playing", "getisplaying", "is-playing", "isplaying"];
+      const isPausedQueryResponse = eventNames.some((name) => pausedQueryNames.includes(name)) ||
+        payload.context === "player.js" && eventNames.some((name) => name.includes("paused"));
+      const isPlayingQueryResponse = eventNames.some((name) => playingQueryNames.includes(name)) ||
+        payload.context === "player.js" && eventNames.some((name) => name.includes("playing"));
+      const queryStateResponse = isPausedQueryResponse || isPlayingQueryResponse;
       const pausedFlags = [
         payload.paused, payload.isPaused, payload.is_paused,
         ...nestedPayloads.flatMap((item) => [item.paused, item.isPaused, item.is_paused]),
@@ -1283,22 +1297,34 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
         ...nestedPayloads.flatMap((item) => [item.playing, item.isPlaying]),
       ];
       const reportsPausedByBoolean = pausedFlags.some((value) => value === true) ||
-        (queryStateResponse && playingFlags.some((value) => value === false));
+        ((isPausedQueryResponse || isPlayingQueryResponse) && playingFlags.some((value) => value === false));
       const reportsPlayingByBoolean = playingFlags.some((value) => value === true);
       const queryValue = payload.value ?? payload.result ??
         nestedPayloads.map((item) => item.value ?? item.result).find((value) => value !== undefined);
-      const queryReportsPaused = queryStateResponse && queryValue === true;
-      const queryReportsPlaying = queryStateResponse && queryValue === false;
+      const queryReportsPaused = (isPausedQueryResponse && queryValue === true) ||
+        (isPlayingQueryResponse && queryValue === false);
+      const queryReportsPlaying = (isPausedQueryResponse && queryValue === false) ||
+        (isPlayingQueryResponse && queryValue === true);
+      const hasExplicitStateValue = pausedFlags.some((value) => typeof value === "boolean") ||
+        playingFlags.some((value) => typeof value === "boolean") ||
+        typeof queryValue === "boolean";
+      if (queryStateResponse && hasExplicitStateValue) {
+        embedStateQuerySupportedRef.current = true;
+        lastEmbedStateReplyAtRef.current = Date.now();
+      }
       const failed = eventNames.some((name) => name.includes("error") || name === "failed")
         || statusNames.includes("error");
-      const reportedPaused = eventNames.some((name) =>
+      const explicitPauseEvent = eventNames.some((name) =>
         name === "pause" || name === "paused" || name.endsWith(":pause") ||
         name.endsWith(":paused") || name.endsWith("-pause") || name.endsWith("-paused")
-      ) || statusNames.includes("paused") || reportsPausedByBoolean || queryReportsPaused;
-      const reportedPlaying = eventNames.some((name) =>
+      ) || statusNames.includes("paused");
+      const explicitPlayEvent = eventNames.some((name) =>
         name === "play" || name === "playing" || name.endsWith(":play") ||
         name.endsWith(":playing") || name.endsWith("-play") || name.endsWith("-playing")
-      ) || statusNames.includes("playing") || reportsPlayingByBoolean || queryReportsPlaying;
+      ) || statusNames.includes("playing");
+      const reportedPaused = explicitPauseEvent || reportsPausedByBoolean || queryReportsPaused;
+      const reportedPlaying = explicitPlayEvent || reportsPlayingByBoolean || queryReportsPlaying;
+      if (explicitPauseEvent) embedProviderPauseEventsRef.current = true;
       const positionValue = [
         payload.currentTime, payload.time, payload.position,
         ...nestedPayloads.flatMap((item) => [item.currentTime, item.time, item.position]),
@@ -1314,11 +1340,19 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
         ["time", "timeupdate", "progress", "watching-log", "on-time", "on-timeupdate"].includes(name)
       );
       const progressIndicatesPlaying = progressEvent && typeof positionValue === "number" &&
-        (advancedTime || previousTime?.key !== progressKey);
+        positionValue > 0 && (advancedTime || previousTime?.key !== progressKey);
+      if (progressEvent && typeof positionValue === "number" &&
+          (advancedTime || previousTime?.key !== progressKey)) {
+        lastEmbedProgressAtRef.current = Date.now();
+      }
+      if (queryStateResponse && (reportedPaused || reportedPlaying)) {
+        lastEmbedStateReplyAtRef.current = Date.now();
+      }
       if (reportedPaused) {
         embedPlaybackStateRef.current = "paused";
         pauseAfterEmbedRecoveryRef.current = true;
         lastEmbedSignalAtRef.current = Date.now();
+        lastEmbedProgressAtRef.current = Date.now();
         const pausedFrame = externalEmbedFrameRef.current;
         if (pausedFrame) requestExternalPlayerPause(pausedFrame);
       } else if (reportedPlaying || progressIndicatesPlaying) {
@@ -1327,7 +1361,9 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
         // play intent so stale delayed-pause retries cannot pause it again.
         embedPlaybackStateRef.current = "playing";
         pauseAfterEmbedRecoveryRef.current = false;
+        embedHasObservedPlaybackRef.current = true;
         lastEmbedSignalAtRef.current = Date.now();
+        if (reportedPlaying) lastEmbedProgressAtRef.current = Date.now();
       }
 
       // Providers disagree on which field carries the ended signal and how
@@ -1381,6 +1417,8 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
         statusNames.includes("playing") ||
         progressIndicatesPlaying;
       if (confirmedPlayback) {
+        embedHasObservedPlaybackRef.current = true;
+        if (!lastEmbedProgressAtRef.current) lastEmbedProgressAtRef.current = Date.now();
         setProviderPlaybackOutcomes((previous) =>
           previous[observedEmbedProvider] === "playing"
             ? previous
