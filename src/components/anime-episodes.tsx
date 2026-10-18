@@ -144,7 +144,7 @@ const AnimeEpisodes = ({ animeId }: Props) => {
       </div>
 
       <div
-        className="max-h-[min(62vh,34rem)] w-full space-y-1.5 overflow-y-auto overscroll-contain rounded-xl border border-white/[0.06] bg-black/10 p-2 pr-1.5 [scrollbar-gutter:stable]"
+        className="max-h-[min(62vh,34rem)] w-full space-y-1.5 overflow-y-auto overscroll-auto rounded-xl border border-white/[0.06] bg-black/10 p-2 pr-1.5 [scrollbar-gutter:stable]"
         aria-label="Episode choices"
       >
         {visibleEpisodes.map((episode: Episode) => (
