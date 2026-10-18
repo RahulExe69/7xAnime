@@ -802,7 +802,7 @@ export function PlayerViewport({
       if (!target) return;
       const progress = Math.min(1, Math.max(0, deltaY / SWIPE_ANIMATION_DISTANCE));
       applyPlayerPreview(session.origin, target, progress);
-      applySwipeContentProgress(progress, session.isFullscreen ? "restore" : "collapse);
+      applySwipeContentProgress(progress, session.isFullscreen ? "restore" : "collapse");
       session.previewing = progress > 0;
       return;
     }
