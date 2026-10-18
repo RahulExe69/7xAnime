@@ -134,6 +134,34 @@ const requestExternalPlayerPause = (frame: HTMLIFrameElement) => {
   try { target.postMessage("pause", "*"); } catch { /* provider ignored */ }
 };
 
+// Resume commands are best-effort because cross-origin providers expose different
+// APIs. The iframe is deliberately kept mounted across app background/foreground.
+const requestExternalPlayerPlay = (frame: HTMLIFrameElement) => {
+  const target = frame.contentWindow;
+  if (!target) return;
+  const objectCommands = [
+    { event: "play" },
+    { type: "play" },
+    { action: "play" },
+    { method: "play" },
+    { command: "play" },
+    { event: "command", func: "playVideo", args: [] },
+    { func: "playVideo", args: [] },
+  ];
+  for (const command of objectCommands) {
+    try { target.postMessage(command, "*"); } catch { /* provider ignored */ }
+  }
+  const protocolCommands = [
+    { context: "player.js", version: PLAYER_JS_VERSION, method: "play" },
+    { eventName: "postmessage:do:play" },
+    { method: "play", params: {} },
+  ];
+  for (const command of protocolCommands) {
+    try { target.postMessage(JSON.stringify(command), "*"); } catch { /* provider ignored */ }
+  }
+  try { target.postMessage("play", "*"); } catch { /* provider ignored */ }
+};
+
 // Query common state APIs so a silent pause is not mistaken for a stalled
 // stream. This is best-effort: many third-party embeds expose events only.
 const requestExternalPlayerState = (frame: HTMLIFrameElement) => {
@@ -214,14 +242,41 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
 
     void App.addListener("appStateChange", ({ isActive }) => {
       if (isActive) {
+        // Resume only media that this lifecycle handler paused. A player that
+        // the user had already paused stays paused, and the iframe is not rebuilt.
+        const snapshot = backgroundPlaybackRef.current;
+        if (snapshot.embedWasPlaying) {
+          const frame = externalEmbedFrameRef.current;
+          if (frame) requestExternalPlayerPlay(frame);
+        }
+        snapshot.directVideos.forEach((video) => {
+          if (!video.isConnected) return;
+          void video.play().catch(() => {
+            // Autoplay policy may require a manual tap after returning from background.
+          });
+        });
+        backgroundPlaybackRef.current = { embedWasPlaying: false, directVideos: [] };
         setAppIsActive(true);
         return;
       }
 
-      // PiP mode is marked before Android backgrounds the Activity. Keep the
-      // player mounted only when the app really entered its floating-player mode.
       const pipActive = document.documentElement.classList.contains("sevenx-pip-mode");
       setNativePipActive(pipActive);
+      if (!pipActive) {
+        const frame = externalEmbedFrameRef.current;
+        const embedWasPlaying = !!frame && (
+          embedPlaybackStateRef.current === "playing" ||
+          (embedHasObservedPlaybackRef.current && embedPlaybackStateRef.current !== "paused")
+        );
+        const directVideos = Array.from(document.querySelectorAll("video"))
+          .filter((video) => !video.paused && video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA);
+        backgroundPlaybackRef.current = { embedWasPlaying, directVideos };
+        if (frame && embedWasPlaying) requestExternalPlayerPause(frame);
+        directVideos.forEach((video) => video.pause());
+      } else {
+        // Do not interfere with an explicitly active native Picture-in-picture session.
+        backgroundPlaybackRef.current = { embedWasPlaying: false, directVideos: [] };
+      }
       setAppIsActive(false);
     }).then((listener) => {
       if (disposed) void listener.remove();
@@ -299,6 +354,10 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
   const [selectedHindiServer, setSelectedHindiServer] = useState<number>(0);
   const [appIsActive, setAppIsActive] = useState(true);
   const [nativePipActive, setNativePipActive] = useState(false);
+  const backgroundPlaybackRef = useRef<{
+    embedWasPlaying: boolean;
+    directVideos: HTMLVideoElement[];
+  }>({ embedWasPlaying: false, directVideos: [] });
   const [manualProviderPlaybackFailed, setManualProviderPlaybackFailed] = useState(false);
   const [fallbackPlaybackFailed, setFallbackPlaybackFailed] = useState(false);
   const [playbackSourceIndex, setPlaybackSourceIndex] = useState(0);
