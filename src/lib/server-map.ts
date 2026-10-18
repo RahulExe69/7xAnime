@@ -12,18 +12,16 @@ export type ProviderInfo = {
  * Server 1 iframe in VideoPlayerSection and has no Python provider module.
  *
  * Keep this list aligned with ACTIVE_PROVIDER_ORDER in android-local-backend/local_api.py
- * and the six adapters copied by .github/scripts/configure-local-anime-backend.py.
+ * and the four adapters copied by .github/scripts/configure-local-anime-backend.py.
  * Retired provider names intentionally do not appear here; see docs/SERVERS.md.
  */
-export const ACTIVE_EMBED_PROVIDER_ORDER = ["anixo", "megavid", "tryembed", "cinexstream", "supaplay", "vidplus"] as const;
+export const ACTIVE_EMBED_PROVIDER_ORDER = ["anixo", "megavid", "cinexstream", "supaplay"] as const;
 
 export const PROVIDER_INFO: Record<string, ProviderInfo> = {
   anixo: { name: "AniXo", site: "https://anixo.buzz", audio: ["sub", "dub"], formats: ["embed"] },
   megavid: { name: "Megavid", site: "https://megavid.buzz", audio: ["sub", "dub"], formats: ["embed"] },
-  tryembed: { name: "TryEmbed", site: "https://tryembed.us.cc", audio: ["sub", "dub"], formats: ["embed"] },
   cinexstream: { name: "CinexStream", site: "https://cinextream.cc", audio: ["sub", "dub"], formats: ["embed"] },
   supaplay: { name: "SupaPlay", site: "https://supaplay.fun", audio: ["sub", "dub"], formats: ["embed"] },
-  vidplus: { name: "VidPlus", site: "https://player.vidplus.to", audio: ["sub", "dub"], formats: ["embed"] },
 };
 
 export const isProviderSelectable = (providerName: string, category: ProviderAudio): boolean => {
