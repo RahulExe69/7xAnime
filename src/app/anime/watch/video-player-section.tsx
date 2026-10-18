@@ -1625,7 +1625,7 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
     advanceToNextEpisode,
   ]);
 
-  // Known event-reporting iframe players (MegaPlay, AniXo, Megavid, MegaFlix)
+  // Known event-reporting iframe players (MegaPlay, AniXo, Megavid, TryEmbed, CinexStream)
   // should emit playback/progress signals. If their page remains stuck on an
   // upstream error or interstitial and never reports progress, retry the same
   // iframe twice before switching providers. SupaPlay and VidPlus are not
