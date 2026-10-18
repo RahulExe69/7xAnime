@@ -86,8 +86,8 @@ export function PlayerViewport({
   const nativeSwipeRef = useRef<NativeSwipeSession | null>(null);
   const pointerSwipeRef = useRef<NativeSwipeSession | null>(null);
   const swipePreviewActiveRef = useRef(false);
-  const ancillaryStylesRef = useRef(new Map<HTMLElement, { opacity: string; pointerEvents: string; transition: string }>());
-  const routeContentStyleRef = useRef<{ element: HTMLElement; opacity: string; pointerEvents: string; transition: string } | null>(null);
+  const ancillaryStylesRef = useRef(new Map<HTMLElement, { opacity: string; pointerEvents: string; transition: string; translate: string; willChange: string }>());
+  const routeContentStyleRef = useRef<{ element: HTMLElement; opacity: string; pointerEvents: string; transition: string; translate: string; willChange: string } | null>(null);
   const [isMiniDragging, setIsMiniDragging] = useState(false);
   const miniDragRef = useRef<MiniDragGesture | null>(null);
   const suppressMiniClickRef = useRef(false);
@@ -121,7 +121,7 @@ export function PlayerViewport({
     rootRef.current?.style.setProperty("--mini-player-offset", `${normalized.x}px ${normalized.y}px`);
   }, []);
 
-  // Fade the content around the video continuously with the user's finger.
+  // Move the surrounding watch-page content with the video as it minimises, while fading it out in sync.
   const applySwipeContentProgress = useCallback((rawProgress: number, direction: "collapse" | "expand" | "restore") => {
     const progress = Math.min(1, Math.max(0, rawProgress));
     // Leaving fullscreen reveals the watch-page content as the video returns
@@ -143,11 +143,20 @@ export function PlayerViewport({
               opacity: element.style.opacity,
               pointerEvents: element.style.pointerEvents,
               transition: element.style.transition,
+              translate: element.style.translate,
+              willChange: element.style.willChange,
             });
           }
           element.style.transition = "none";
           element.style.opacity = opacity;
           const original = ancillaryStylesRef.current.get(element);
+          const travelDistance = Math.min(window.innerHeight * 0.42, 420);
+          element.style.translate = direction === "collapse"
+            ? `0 ${Math.round(travelDistance * progress)}px`
+            : original?.translate ?? "";
+          element.style.willChange = direction === "collapse" && progress > 0
+            ? "translate, opacity"
+            : original?.willChange ?? "";
           element.style.pointerEvents = blockInteractions ? "none" : original?.pointerEvents ?? "";
         });
         branch = parent;
@@ -163,6 +172,8 @@ export function PlayerViewport({
             opacity: routeContent.style.opacity,
             pointerEvents: routeContent.style.pointerEvents,
             transition: routeContent.style.transition,
+            translate: routeContent.style.translate,
+            willChange: routeContent.style.willChange,
           };
         }
         routeContent.style.transition = "none";
@@ -182,6 +193,8 @@ export function PlayerViewport({
               opacity: element.style.opacity,
               pointerEvents: element.style.pointerEvents,
               transition: element.style.transition,
+              translate: element.style.translate,
+              willChange: element.style.willChange,
             });
           }
           element.style.transition = "none";
@@ -196,11 +209,13 @@ export function PlayerViewport({
   }, [isMiniPlayer]);
 
   const clearSwipeContentProgress = useCallback((animate = false) => {
-    const restore = (element: HTMLElement, original: { opacity: string; pointerEvents: string; transition: string }) => {
+    const restore = (element: HTMLElement, original: { opacity: string; pointerEvents: string; transition: string; translate: string; willChange: string }) => {
       if (animate) {
-        element.style.transition = "opacity 150ms ease-out";
+        element.style.transition = "opacity 150ms ease-out, translate 150ms ease-out";
         element.style.opacity = original.opacity;
         element.style.pointerEvents = original.pointerEvents;
+        element.style.translate = original.translate;
+        element.style.willChange = original.willChange;
         window.setTimeout(() => {
           element.style.transition = original.transition;
         }, 170);
@@ -208,6 +223,8 @@ export function PlayerViewport({
         element.style.opacity = original.opacity;
         element.style.pointerEvents = original.pointerEvents;
         element.style.transition = original.transition;
+        element.style.translate = original.translate;
+        element.style.willChange = original.willChange;
       }
     };
     ancillaryStylesRef.current.forEach((original, element) => restore(element, original));
