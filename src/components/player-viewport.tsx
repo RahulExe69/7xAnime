@@ -24,8 +24,7 @@ type MiniDragGesture = {
   originWidth: number;
   originHeight: number;
   moved: boolean;
-  mode: "pending" | "drag" | "expand";
-  swipeSession: NativeSwipeSession;
+  mode: "pending" | "drag";
 };
 type RectSnapshot = { left: number; top: number; width: number; height: number };
 type SavedWatchLayout = {
@@ -58,8 +57,6 @@ type NativeSwipeSession = {
   lastSampleAt: number;
   lastDeltaY: number;
   velocityY: number;
-  maxDirectionalDistance: number;
-  maxVelocityTowardDirection: number;
 };
 
 const SWIPE_THRESHOLD = 72;
@@ -133,6 +130,7 @@ export function PlayerViewport({
   const applySwipeContentProgress = useCallback((
     rawProgress: number,
     direction: "collapse" | "expand" | "restore",
+    rawDistance = rawProgress * SWIPE_ANIMATION_DISTANCE,
   ) => {
     // Keep page content in place and fade it with the player's gesture.
     // Moving/scaling every sibling toward the mini-player corner made the
@@ -141,7 +139,7 @@ export function PlayerViewport({
     // finger-following transform; surrounding content only fades and becomes
     // non-interactive until the transition commits.
     const progress = Math.min(1, Math.max(0, rawProgress));
-    const opacity = String(direction === "restore" ? progress : 1 - progress);
+    const opacity = String(direction === "restore" ? progress : direction === "collapse" ? Math.pow(1 - progress, 3) : 1 - progress);
     const blockInteractions = direction === "restore" ? progress < 0.96 : progress > 0.04;
     const viewport = rootRef.current;
     const playerHost = viewport?.closest<HTMLElement>("[data-persistent-watch-player]") ?? null;
@@ -165,8 +163,13 @@ export function PlayerViewport({
         : ancillaryStylesRef.current.get(element)?.pointerEvents ?? "";
       element.style.transform = ancillaryStylesRef.current.get(element)?.transform ?? "";
       element.style.transformOrigin = ancillaryStylesRef.current.get(element)?.transformOrigin ?? "";
-      element.style.translate = ancillaryStylesRef.current.get(element)?.translate ?? "";
-      element.style.willChange = "opacity";
+      // Translate every non-player watch-page surface by the same distance as
+      // the player. This keeps the page visually attached instead of leaving
+      // stationary details behind while the iframe moves away.
+      element.style.translate = direction === "collapse"
+        ? `0 ${Math.max(0, rawDistance)}px`
+        : ancillaryStylesRef.current.get(element)?.translate ?? "";
+      element.style.willChange = direction === "collapse" ? "opacity, translate" : "opacity";
     };
 
     if (viewport && playerHost) {
@@ -665,7 +668,6 @@ export function PlayerViewport({
       miniTarget, inlineTarget, fullscreenTarget, previewing: false,
       axis: "undecided", direction: null,
       lastSampleAt: sampleTime, lastDeltaY: 0, velocityY: 0,
-      maxDirectionalDistance: 0, maxVelocityTowardDirection: 0,
     };
   }, [isFullscreen, isMiniPlayer]);
 
@@ -692,46 +694,51 @@ export function PlayerViewport({
       }
     }
 
-    // Lock this touch to its first intentional vertical direction. Once the
-    // gesture has travelled far enough, reversing the finger cannot reverse
-    // the player animation or silently convert a down-swipe into an up-swipe.
-    if (session.axis !== "vertical" || !session.direction) return;
-    if (session.isMiniPlayer && session.direction !== "expand") return;
+    // Mini-player gestures are handled exclusively by the drag/tap shield;
+    // they must never enter the fullscreen swipe state machine.
+    if (session.axis !== "vertical" || !session.direction || session.isMiniPlayer) return;
 
     const directionalDistance = session.direction === "collapse" ? deltaY : -deltaY;
-    const directionalVelocity = session.direction === "collapse" ? session.velocityY : -session.velocityY;
-    session.maxDirectionalDistance = Math.max(
-      session.maxDirectionalDistance,
-      Math.max(0, directionalDistance),
-    );
-    session.maxVelocityTowardDirection = Math.max(
-      session.maxVelocityTowardDirection,
-      Math.max(0, directionalVelocity),
-    );
-    const progress = Math.min(1, Math.max(0, session.maxDirectionalDistance / SWIPE_ANIMATION_DISTANCE));
+    const progress = Math.min(1, Math.max(0, directionalDistance / SWIPE_ANIMATION_DISTANCE));
+    const travelDistance = Math.max(0, directionalDistance);
 
     if (session.direction === "collapse") {
-      const target = session.isFullscreen ? session.inlineTarget : session.miniTarget;
+      // Fullscreen collapses back to its saved inline position. An inline player
+      // instead follows the finger vertically with the page; the final resize
+      // into the mini-player slot is handled by the route FLIP transition.
+      const target = session.isFullscreen
+        ? session.inlineTarget
+        : { ...session.origin, top: session.origin.top + SWIPE_ANIMATION_DISTANCE };
       if (!target) return;
       applyPlayerPreview(session.origin, target, progress);
-      applySwipeContentProgress(progress, session.isFullscreen ? "restore" : "collapse");
+      applySwipeContentProgress(
+        progress,
+        session.isFullscreen ? "restore" : "collapse",
+        travelDistance,
+      );
       session.previewing = progress > 0;
       return;
     }
 
     if (session.direction === "expand" && session.fullscreenTarget) {
       applyPlayerPreview(session.origin, session.fullscreenTarget, progress);
-      applySwipeContentProgress(progress, "expand");
+      applySwipeContentProgress(progress, "expand", travelDistance);
       session.previewing = progress > 0;
     }
   }, [applyPlayerPreview, applySwipeContentProgress]);
 
   const commitSwipeGesture = useCallback((session: NativeSwipeSession, deltaX: number) => {
-    const canCommit = session.axis === "vertical" &&
+    const finalDirectionalDistance = session.direction === "collapse"
+      ? session.lastDeltaY
+      : -session.lastDeltaY;
+    const finalDirectionalVelocity = session.direction === "collapse"
+      ? session.velocityY
+      : -session.velocityY;
+    const canCommit = !session.isMiniPlayer &&
+      session.axis === "vertical" &&
       session.direction !== null &&
       Math.abs(deltaX) <= SWIPE_MAX_X_DRIFT &&
-      shouldCommitVerticalSwipe(session.maxDirectionalDistance, session.maxVelocityTowardDirection) &&
-      (!session.isMiniPlayer || session.direction === "expand");
+      shouldCommitVerticalSwipe(Math.max(0, finalDirectionalDistance), finalDirectionalVelocity);
 
     if (!canCommit) {
       const node = rootRef.current;
@@ -754,25 +761,26 @@ export function PlayerViewport({
     }
 
     if (!session.isMiniPlayer && !session.isFullscreen && session.direction === "collapse" && session.miniTarget) {
-      applyPlayerPreview(session.origin, session.miniTarget, progress);
-      applySwipeContentProgress(progress, "collapse");
+      // During the drag, both the viewport and adjacent watch content move down
+      // by the same distance. Capture the visible player rect before navigating
+      // so the post-release FLIP can finish toward the fixed mini-player slot.
+      const inlineFollowTarget = {
+        ...session.origin,
+        top: session.origin.top + SWIPE_ANIMATION_DISTANCE,
+      };
+      applyPlayerPreview(session.origin, inlineFollowTarget, progress);
+      applySwipeContentProgress(progress, "collapse", Math.max(0, finalDirectionalDistance));
       const viewportWidth = document.documentElement.clientWidth || window.innerWidth;
       const viewportHeight = document.documentElement.clientHeight || window.innerHeight;
       watchLayoutRef.current = { rect: session.origin, viewportWidth, viewportHeight };
+      const node = rootRef.current;
+      if (node) {
+        const rect = node.getBoundingClientRect();
+        transitionOriginRef.current = { left: rect.left, top: rect.top, width: rect.width, height: rect.height };
+        lastRectRef.current = transitionOriginRef.current;
+      }
       swipePreviewActiveRef.current = true;
       dispatchPlayerAction("minimize-player");
-      return;
-    }
-
-    // A fresh upward gesture on the mini-player expands it back to the watch
-    // route and fullscreen together. The persistent iframe stays mounted while
-    // both React Router and the native fullscreen/orientation state catch up.
-    if (session.isMiniPlayer && !session.isFullscreen && session.direction === "expand" && session.fullscreenTarget) {
-      applyPlayerPreview(session.origin, session.fullscreenTarget, progress);
-      applySwipeContentProgress(progress, "expand");
-      swipePreviewActiveRef.current = true;
-      void enterFullscreen();
-      dispatchPlayerAction("expand-mini-player");
       return;
     }
 
@@ -816,12 +824,11 @@ export function PlayerViewport({
       originHeight: rect.height,
       moved: false,
       mode: "pending",
-      swipeSession: createSwipeSession(event.clientX, event.clientY, event.timeStamp),
     };
     try { event.currentTarget.setPointerCapture(event.pointerId); } catch {
       // Pointer capture may be unavailable in older Android WebViews.
     }
-  }, [createSwipeSession, isMiniPlayer]);
+  }, [isMiniPlayer]);
 
   const moveMiniPlayer = useCallback((event: PointerEvent<HTMLDivElement>) => {
     const drag = miniDragRef.current;
@@ -836,20 +843,11 @@ export function PlayerViewport({
     if (drag.mode === "pending") {
       const absX = Math.abs(deltaX);
       const absY = Math.abs(deltaY);
-      if (deltaY < -18 && absY >= absX * 1.15) {
-        drag.mode = "expand";
-      } else if (absX > 18 || absY > 18) {
+      if (absX > 18 || absY > 18) {
         drag.mode = "drag";
       } else {
         return;
       }
-    }
-
-    if (drag.mode === "expand") {
-      // Upward movement expands the player; it no longer drags the mini window.
-      setIsMiniDragging(false);
-      updateSwipePreview(drag.swipeSession, deltaX, deltaY, event.timeStamp);
-      return;
     }
 
     setIsMiniDragging(true);
@@ -865,7 +863,7 @@ export function PlayerViewport({
     // final snapped position, not once per touch-move event.
     miniOffsetRef.current = normalized;
     rootRef.current?.style.setProperty("--mini-player-offset", `${normalized.x}px ${normalized.y}px`);
-  }, [updateSwipePreview]);
+  }, []);
 
   const finishMiniDrag = useCallback((event: PointerEvent<HTMLDivElement>) => {
     const drag = miniDragRef.current;
@@ -875,22 +873,6 @@ export function PlayerViewport({
     const cancelled = event.type === "pointercancel";
     if (cancelled) {
       setIsMiniDragging(false);
-      if (drag.mode === "expand") {
-        const node = rootRef.current;
-        if (node && drag.swipeSession.previewing) settlePreviewToOrigin(node);
-        else clearSwipeContentProgress(true);
-      }
-      return;
-    }
-
-    if (drag.mode === "expand") {
-      setIsMiniDragging(false);
-      suppressMiniClickRef.current = true;
-      const deltaX = event.clientX - drag.startX;
-      const deltaY = event.clientY - drag.startY;
-      updateSwipePreview(drag.swipeSession, deltaX, deltaY, event.timeStamp);
-      commitSwipeGesture(drag.swipeSession, deltaX);
-      window.setTimeout(() => { suppressMiniClickRef.current = false; }, 350);
       return;
     }
 
@@ -923,10 +905,7 @@ export function PlayerViewport({
     }
     revealMiniControls();
     window.setTimeout(() => { suppressMiniClickRef.current = false; }, 350);
-  }, [
-    clearSwipeContentProgress, commitSwipeGesture, dispatchPlayerAction,
-    revealMiniControls, settlePreviewToOrigin, updateMiniOffset, updateSwipePreview,
-  ]);
+  }, [dispatchPlayerAction, revealMiniControls, updateMiniOffset]);
 
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return;
