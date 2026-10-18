@@ -224,3 +224,26 @@ Never collapse these into a single “working” label.
 6. Only after evidence is collected, prepare a separate implementation proposal with exact files, API contract, tests, fallback behavior, and a rollback plan.
 
 No live endpoint probes, code porting, provider registration, dependency changes, or builds are part of this document-only change.
+
+
+## Follow-up qualification gate — AnimeHeaven via Anivault-Scraper (2026-10-18)
+
+**Decision: NO-GO for runtime integration at this time.** The implementation plan's mandatory qualification gate did not pass, so no adapter, provider registry entry, dependency, runtime route, or playback UI change was made.
+
+### Evidence checked
+
+- Canonical repository: [SH0MIK/Anivault-Scraper](https://github.com/SH0MIK/Anivault-Scraper), default branch `main`. GitHub repository metadata currently reports `license: null`; no root `LICENSE` file appeared in its root contents.
+- Latest commit visible during this check: `7cbf2052ccbb472d2ad643978371ba1cb72c5671` (2026-10-01, “Preserve AnimeHeaven episode referer during playback”).
+- The repository's README documents the API flow and example routes, but does not identify a concrete public API base for 7xAnime to call. Its server entrypoint listens on the configured `PORT` and logs a localhost API address, which is a self-hosting instruction, not evidence of a shared public deployment.
+- GitHub metadata does not establish a permitted API instance for this project. The official site linked from the repository is not enough to infer or guess an API hostname or its usage terms.
+- The repository's documented source flow distinguishes source type `dub`, but the public contract reviewed so far does not establish an episode-specific Hindi-language field sufficient for 7xAnime's “Hindi” label. A generic dub flag is not Hindi proof.
+- The official website links to Terms of Use and Privacy pages, but their contents could not be retrieved in the current review. Do not infer API reuse permission from those link labels.
+- Repository code and README claims were reviewed as documentation only. No guessed API hostname was probed; no live episode lookup was attempted; no scraper code was copied.
+
+### What is needed to reopen the gate
+
+1. A concrete API base explicitly supplied or authorized by the upstream owner, with permission/usage terms applicable to calling it from 7xAnime.
+2. A confirmable route contract and an episode-specific signal that identifies Hindi rather than just “dub.”
+3. A safe, bounded sample resolution for one known episode, followed later by physical Android playback verification.
+
+Until those facts are available, leave the current Hindi catalogue and the five standard servers unchanged. Revisit this candidate only after an authorized deployment and source-language evidence are available. This is a qualification failure, not proof that AnimeHeaven itself is offline.
