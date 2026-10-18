@@ -394,13 +394,22 @@ The [Muse India channel](https://www.youtube.com/channel/UCYYhAzgWuxPauRXdPpLAX3
 
 **Preferred design:** use official YouTube video IDs and the official embedded player only. Do not download, unwrap, proxy, or extract direct video streams. Keep it as an optional source in the existing Hindi selector; do not touch the five standard SUB/ENGLISH servers.
 
-A no-key local-backend discovery experiment can start with the channel feed:
+A no-key local-backend discovery experiment should use the channel feed URL documented by YouTube's current push-notification guide:
 
-`https://www.youtube.com/feeds/videos.xml?channel_id=UCYYhAzgWuxPauRXdPpLAX3Q`
+`https://www.youtube.com/xml/feeds/videos.xml?channel_id=UCYYhAzgWuxPauRXdPpLAX3Q`
 
-This Atom feed format is documented by YouTube for video notifications. However, the environment could not live-fetch this exact feed during this audit, and a channel upload feed is limited to recent uploads rather than a complete historic episode catalogue. It is not enough by itself to support reliable back-catalogue search. Curated official playlist IDs may improve coverage, but no Hindi-specific playlist ID has yet been verified.
+The feed format is official, but the exact Muse India feed could not be live-fetched from this work environment: public DNS resolution is unavailable here and the web retrieval returned a cache miss. This is an **environment limitation**, not evidence the endpoint is offline. Channel feeds expose recent uploads (commonly the newest 15) rather than a complete historic episode catalogue, so the feed alone is not enough for reliable back-catalogue search. A Hindi-specific public playlist feed may improve coverage, but no playlist ID has been independently verified. [YouTube push-notifications guide](https://developers.google.com/youtube/data/guides/push_notifications?hl=en) · [recent-upload feed limits](https://hushread.com/blog/youtube-channel-rss-feed)
 
 **Do not ship a YouTube Data API key inside the APK.** If playlist-based discovery needs the Data API, use an appropriately restricted project credential through a suitable owner-controlled backend or obtain a verified playlist ID by a permitted manual process. Respect the YouTube API Terms and keep the official player/branding/ads behavior intact.
+
+**Episode-level examples found in YouTube's indexed metadata (not live playback tests):**
+
+- [[Hindi Dub] Classroom of the Elite — Episode 08 | Muse IN](https://www.youtube.com/watch?v=0hU9TBeuZQQ) — search metadata identifies the uploader as the verified Muse India channel, published June 25, 2026.
+- [[Hindi Dub] Cells at Work! — Episode 10 (S1E10) | Muse IN](https://www.youtube.com/watch?v=Tab-cFyTKp8) — search metadata identifies the uploader as the verified Muse India channel, published June 14, 2026.
+
+These prove that identifiable official Hindi-dub episode records exist, but not that they are still playable, members of the live feed, or embeddable inside 7xAnime. The episode records are useful fixtures for strict title/episode parsing; they do not remove the feed-coverage gate.
+
+**Android player compliance is a hard gate.** The app ID is `com.sevenx.anime` and Capacitor currently serves the app from the HTTPS local origin. The current Hindi iframe's `strict-origin-when-cross-origin` policy permits a referrer but does not itself prove that YouTube receives the required app identity. Google's player requirements say embedded clients must identify themselves with a `Referer` and provide the registered app ID in WebView scenarios where the browser does not provide it automatically. They also prohibit overlays covering any part of the YouTube player. The current custom player/miniplayer must therefore be tested for both referrer/error-153 behavior and whether custom close/mini controls overlap the standard YouTube UI. If satisfying these requirements would require a risky global Capacitor-origin change or covering native player controls, this provider is a NO-GO for the in-app player; do not weaken policy or disable YouTube features. [Required Minimum Functionality — identity, viewport, and overlays](https://developers.google.com/youtube/terms/required-minimum-functionality)
 
 Qualification gate before any implementation:
 
