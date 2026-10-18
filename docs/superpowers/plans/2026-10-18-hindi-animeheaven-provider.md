@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-18-hindi-animeheaven-provider-design.md`
 
-**Execution status (2026-10-18):** AnimeHeaven, DesiDubAnime, Renime-API, and HiAnime/Aniwatch reached **NO-GO**; Senshi remains unqualified. Tatakai API is a new **HOLD** pending contract, usage, and episode-language verification. Runtime tasks 2–6 remain blocked until a candidate clears the gate. See `docs/HINDI_DUB_PROVIDER_EVALUATION.md` for the evidence record.
+**Execution status (2026-10-18):** AnimeHeaven, DesiDubAnime, Renime-API, and HiAnime/Aniwatch reached **NO-GO**; Senshi remains unqualified. Tatakai API is a **HOLD** pending contract, usage, and episode-language verification; the AnimeWorldIndia API family was also evaluated and reached **NO-GO**. Runtime tasks 2–6 remain blocked until a candidate clears the gate. See `docs/HINDI_DUB_PROVIDER_EVALUATION.md` for the evidence record.
 
 ## Global Constraints
 
@@ -196,4 +196,15 @@ A stronger lead surfaced during the wider candidate search: the public [Tatakai 
 - **No runtime files, provider registries, tests, builds, PRs, or merges were changed/executed by this checkpoint.**
 
 Full evidence and reopening criteria are in `docs/HINDI_DUB_PROVIDER_EVALUATION.md`.
+
+## Candidate checkpoint — AnimeWorldIndia API family (2026-10-18)
+
+The next Hindi-focused candidate sweep also reached NO-GO:
+
+- **AniBiee / AnimeWorldIndia-Api — NO-GO:** ISC code license; explicit educational/research disclaimer; self-hosted deployment instructions rather than a documented authorized public base; origin/referer restrictions; and generic embed records with `server`, `name`, and `url` only. The `language/hindi` catalogue filter is not episode-specific audio proof. Repository owner/clone/maintenance references also conflict.
+- **AnimeWorld-India PHP API — NO-GO:** Local XAMPP/WAMP/MAMP deployment instructions, no documented authorized public base, no LICENSE file found in the reviewed repository path, and no episode-level Hindi field in the documented stream contract.
+- **Ruling:** Do not deploy an unapproved scraper or use guessed domains. The standard provider lists and current Hindi source remain untouched. Tatakai stays a HOLD, not GO: its WatchAnimeWorld docs contain explicit source-level `language`/`langCode`, but the deployed response and usage expectations remain unverified. Runtime Tasks 2–6 remain blocked.
+- **Reopen criteria:** Authorized deployment/use basis, current route schema, and an episode-specific Hindi source signal for a known episode before implementation; physical Android playback must be tracked separately.
+
+Evidence and source links are recorded in `docs/HINDI_DUB_PROVIDER_EVALUATION.md`.
 
