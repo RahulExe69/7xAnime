@@ -1275,21 +1275,17 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
       const queryStateResponse = eventNames.some((name) =>
         ["get-paused", "get-is-playing", "is-playing", "getpaused", "getisplaying", "isplaying"].includes(name)
       ) || payload.context === "player.js" && eventNames.some((name) => name.includes("paused") || name.includes("playing"));
-      const booleanValues = [
+      const pausedFlags = [
         payload.paused, payload.isPaused, payload.is_paused,
-        payload.isPlaying === undefined ? undefined : !payload.isPlaying,
-        payload.playing === undefined ? undefined : !payload.playing,
-        ...nestedPayloads.flatMap((item) => [
-          item.paused, item.isPaused, item.is_paused,
-          item.isPlaying === undefined ? undefined : !item.isPlaying,
-          item.playing === undefined ? undefined : !item.playing,
-        ]),
+        ...nestedPayloads.flatMap((item) => [item.paused, item.isPaused, item.is_paused]),
       ];
-      const reportsPausedByBoolean = booleanValues.some((value) => value === true);
-      const reportsPlayingByBoolean = [
+      const playingFlags = [
         payload.playing, payload.isPlaying,
         ...nestedPayloads.flatMap((item) => [item.playing, item.isPlaying]),
-      ].some((value) => value === true);
+      ];
+      const reportsPausedByBoolean = pausedFlags.some((value) => value === true) ||
+        (queryStateResponse && playingFlags.some((value) => value === false));
+      const reportsPlayingByBoolean = playingFlags.some((value) => value === true);
       const queryValue = payload.value ?? payload.result ??
         nestedPayloads.map((item) => item.value ?? item.result).find((value) => value !== undefined);
       const queryReportsPaused = queryStateResponse && queryValue === true;
@@ -1318,7 +1314,7 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
       const progressEvent = eventNames.some((name) =>
         ["time", "timeupdate", "progress", "watching-log", "on-time", "on-timeupdate"].includes(name)
       );
-      const progressIndicatesPlaying = progressEvent &&
+      const progressIndicatesPlaying = progressEvent && typeof positionValue === "number" &&
         (advancedTime || previousTime?.key !== progressKey);
       if (reportedPaused) {
         embedPlaybackStateRef.current = "paused";
