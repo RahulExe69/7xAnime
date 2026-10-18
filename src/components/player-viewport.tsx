@@ -109,7 +109,7 @@ export function PlayerViewport({
     const viewport = rootRef.current;
     const playerHost = viewport?.closest<HTMLElement>("[data-persistent-watch-player]") ?? null;
 
-    if (direction === "collapse" && viewport && playerHost) {
+    if (viewport && playerHost && !(direction === "expand" && isMiniPlayer)) {
       let branch: HTMLElement = viewport;
       while (branch.parentElement && branch.parentElement !== playerHost) {
         const parent = branch.parentElement;
