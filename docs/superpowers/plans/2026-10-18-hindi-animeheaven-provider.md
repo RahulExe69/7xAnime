@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-18-hindi-animeheaven-provider-design.md`
 
-**Execution status (2026-10-18):** AnimeHeaven, DesiDubAnime, Renime-API, and HiAnime/Aniwatch reached **NO-GO**; Senshi remains unqualified. Tatakai API is a **HOLD** pending contract, usage, and episode-language verification; the AnimeWorldIndia API family and Anivexa API were also evaluated and reached **NO-GO**, and the Zangetsu multi-audio manifest remains research-only. Runtime tasks 2–6 remain blocked until a candidate clears the gate. See `docs/HINDI_DUB_PROVIDER_EVALUATION.md` for the evidence record.
+**Execution status (2026-10-18):** This plan's original AnimeHeaven path remains **NO-GO** because no licensed/reachable endpoint with episode-level Hindi evidence has been established. The latest local-backend reassessment is tracked in [HINDI_DUB_PROVIDER_EVALUATION.md](../../HINDI_DUB_PROVIDER_EVALUATION.md): WatchAnimeWorld / AnimeWorldIndia is now the best **local-native evaluation lead**, but still **HOLD**, not approved for runtime integration. Do not execute AnimeHeaven-specific implementation tasks 2–6 for the alternate candidate. First qualify the current site's terms, redirects, episode mapping, explicit Hindi evidence, and embed playback. No runtime files or build configuration should change until that separate gate passes.
 
 ## Global Constraints
 
