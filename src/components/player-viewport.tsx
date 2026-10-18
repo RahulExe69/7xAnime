@@ -67,6 +67,7 @@ export function PlayerViewport({
   const miniControlsTimerRef = useRef<number | null>(null);
   const miniOffsetRef = useRef({ x: 0, y: 0 });
   const nativeSwipeRef = useRef<NativeSwipeSession | null>(null);
+  const pointerSwipeRef = useRef<NativeSwipeSession | null>(null);
   const swipePreviewActiveRef = useRef(false);
   const ancillaryStylesRef = useRef(new Map<HTMLElement, { opacity: string; pointerEvents: string; transition: string }>());
   const routeContentStyleRef = useRef<{ element: HTMLElement; opacity: string; pointerEvents: string; transition: string } | null>(null);
@@ -603,6 +604,94 @@ export function PlayerViewport({
     return () => observer.disconnect();
   }, []);
 
+  const createSwipeSession = useCallback((startX: number, startY: number): NativeSwipeSession => {
+    const node = rootRef.current;
+    const rect = node?.getBoundingClientRect();
+    const origin: RectSnapshot = rect
+      ? { left: rect.left, top: rect.top, width: rect.width, height: rect.height }
+      : { left: 0, top: 0, width: 1, height: 1 };
+    const viewportWidth = document.documentElement.clientWidth || window.innerWidth;
+    const viewportHeight = document.documentElement.clientHeight || window.innerHeight;
+    let miniTarget: RectSnapshot | null = null;
+    if (!isMiniPlayer) {
+      const probe = document.createElement("div");
+      probe.style.cssText = "position:fixed;visibility:hidden;pointer-events:none;padding-bottom:env(safe-area-inset-bottom);";
+      document.body.appendChild(probe);
+      const safeBottom = Number.parseFloat(getComputedStyle(probe).paddingBottom) || 0;
+      probe.remove();
+      const targetWidth = Math.min(Math.max(190, viewportWidth * 0.58), Math.min(360, viewportWidth - 24));
+      const targetHeight = targetWidth * 9 / 16;
+      miniTarget = {
+        left: viewportWidth - targetWidth - 12,
+        top: viewportHeight - 88 - safeBottom - targetHeight,
+        width: targetWidth,
+        height: targetHeight,
+      };
+    }
+    const fullscreenTarget: RectSnapshot | null = isFullscreen ? null : {
+      left: 0, top: 0, width: viewportWidth, height: viewportHeight,
+    };
+    return {
+      isMiniPlayer, isFullscreen, startX, startY, origin,
+      miniTarget, fullscreenTarget, previewing: false,
+    };
+  }, [isFullscreen, isMiniPlayer]);
+
+  const updateSwipePreview = useCallback((session: NativeSwipeSession, deltaX: number, deltaY: number) => {
+    if (session.isMiniPlayer || Math.abs(deltaX) > SWIPE_MAX_X_DRIFT) return;
+    if (session.miniTarget && (deltaY > 4 || session.previewing)) {
+      const progress = Math.min(1, Math.max(0, deltaY / 240));
+      applyPlayerPreview(session.origin, session.miniTarget, progress);
+      applySwipeContentProgress(progress, "collapse");
+      session.previewing = progress > 0;
+      return;
+    }
+    if (session.fullscreenTarget && (deltaY < -4 || (session.previewing && deltaY < 0))) {
+      const progress = Math.min(1, Math.max(0, -deltaY / 240));
+      applyPlayerPreview(session.origin, session.fullscreenTarget, progress);
+      applySwipeContentProgress(progress, "expand");
+      session.previewing = progress > 0;
+    }
+  }, [applyPlayerPreview, applySwipeContentProgress]);
+
+  const commitSwipeGesture = useCallback((session: NativeSwipeSession, deltaX: number, deltaY: number) => {
+    if (Math.abs(deltaY) < SWIPE_THRESHOLD || Math.abs(deltaX) > SWIPE_MAX_X_DRIFT || session.isMiniPlayer) {
+      const node = rootRef.current;
+      if (node && session.previewing) settlePreviewToOrigin(node);
+      else clearSwipeContentProgress(true);
+      return;
+    }
+
+    if (deltaY > 0 && session.miniTarget) {
+      const progress = Math.min(1, Math.max(0, deltaY / 240));
+      applyPlayerPreview(session.origin, session.miniTarget, progress);
+      applySwipeContentProgress(progress, "collapse");
+      swipePreviewActiveRef.current = true;
+      if (session.isFullscreen) {
+        setIsFullscreen(false);
+        void exitNativePlayerFullscreen();
+      }
+      dispatchPlayerAction("minimize-player");
+      return;
+    }
+
+    if (deltaY < 0 && session.fullscreenTarget) {
+      const progress = Math.min(1, Math.max(0, -deltaY / 240));
+      applyPlayerPreview(session.origin, session.fullscreenTarget, progress);
+      applySwipeContentProgress(progress, "expand");
+      swipePreviewActiveRef.current = true;
+      void enterFullscreen();
+      return;
+    }
+
+    const node = rootRef.current;
+    if (node && session.previewing) settlePreviewToOrigin(node);
+    else clearSwipeContentProgress(true);
+  }, [
+    applyPlayerPreview, applySwipeContentProgress, clearSwipeContentProgress,
+    dispatchPlayerAction, enterFullscreen, settlePreviewToOrigin,
+  ]);
+
   const handleVerticalSwipe = useCallback((deltaY: number) => {
     if (deltaY < 0) {
       if (isMiniPlayer) dispatchPlayerAction("expand-mini-player");
@@ -731,23 +820,35 @@ export function PlayerViewport({
     const target = event.target as HTMLElement | null;
     if (target?.closest("button, a, input, textarea, select, [role='button'], .art-controls, .art-control")) {
       gestureStartRef.current = null;
+      pointerSwipeRef.current = null;
       return;
     }
     gestureStartRef.current = { x: event.clientX, y: event.clientY, at: Date.now() };
-  }, []);
+    pointerSwipeRef.current = createSwipeSession(event.clientX, event.clientY);
+  }, [createSwipeSession]);
+
+  const moveGesture = useCallback((event: PointerEvent<HTMLElement>) => {
+    const session = pointerSwipeRef.current;
+    if (!session || event.pointerType === "mouse") return;
+    updateSwipePreview(session, event.clientX - session.startX, event.clientY - session.startY);
+  }, [updateSwipePreview]);
 
   const finishGesture = useCallback((event: PointerEvent<HTMLElement>) => {
-    const start = gestureStartRef.current;
+    const session = pointerSwipeRef.current;
+    pointerSwipeRef.current = null;
     gestureStartRef.current = null;
-    if (!start || event.pointerType === "mouse") return;
-    const deltaX = event.clientX - start.x;
-    const deltaY = event.clientY - start.y;
-    if (Math.abs(deltaX) > SWIPE_MAX_X_DRIFT || Math.abs(deltaY) < SWIPE_THRESHOLD) return;
+    if (!session || event.pointerType === "mouse") return;
+    commitSwipeGesture(session, event.clientX - session.startX, event.clientY - session.startY);
+  }, [commitSwipeGesture]);
 
-    // In portrait, swipe up expands. Down exits fullscreen, then a second
-    // down collapses the same mounted player into the mini-player.
-    handleVerticalSwipe(deltaY);
-  }, [handleVerticalSwipe]);
+  const cancelGesture = useCallback(() => {
+    const session = pointerSwipeRef.current;
+    pointerSwipeRef.current = null;
+    gestureStartRef.current = null;
+    const node = rootRef.current;
+    if (session?.previewing && node) settlePreviewToOrigin(node);
+    else clearSwipeContentProgress(true);
+  }, [clearSwipeContentProgress, settlePreviewToOrigin]);
 
   const onRailPointerDown = (event: PointerEvent<HTMLDivElement>) => {
     event.stopPropagation();
@@ -824,8 +925,9 @@ export function PlayerViewport({
       ref={rootRef}
       className={`${viewportClasses} ${className}`}
       onPointerDown={startGesture}
+      onPointerMove={moveGesture}
       onPointerUp={finishGesture}
-      onPointerCancel={() => { gestureStartRef.current = null; }}
+      onPointerCancel={cancelGesture}
       data-player-fullscreen={isFullscreen ? "true" : "false"}
       data-player-mini={isMiniPlayer ? "true" : "false"}
       data-player-viewport="true"
