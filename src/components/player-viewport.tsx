@@ -546,8 +546,9 @@ export function PlayerViewport({
       if (!cancelled && deltaY <= -SWIPE_THRESHOLD && Math.abs(deltaX) <= SWIPE_MAX_X_DRIFT) {
         swipePreviewActiveRef.current = true;
         suppressMiniClickRef.current = true;
-        void enterFullscreen();
+        // Queue the watch-route expansion before asking Android to rotate/expand.
         dispatchPlayerAction("expand-mini-player");
+        void enterFullscreen();
         window.setTimeout(() => { suppressMiniClickRef.current = false; }, 350);
       } else {
         const node = rootRef.current;
