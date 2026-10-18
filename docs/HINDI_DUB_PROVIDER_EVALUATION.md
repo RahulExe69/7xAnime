@@ -332,3 +332,31 @@ AnimeHeaven via Anivault-Scraper, DesiDubAnime API, Renime-API, and HiAnime/Aniw
 
 **Ruling:** Keep this candidate as the top follow-up lead, but leave it disabled and do not implement a speculative adapter. Preserve the existing ZeroTwo-Py catalogue and five standard servers. This HOLD is different from “the API is offline” or “the candidate has no Hindi catalogue”; it means the integration contract and episode proof are still incomplete.
 
+## Candidate qualification — AnimeWorldIndia API family (2026-10-18)
+
+**Decision: NO-GO for runtime integration on the available evidence.** A Hindi-focused catalogue route exists, but the documented API is self-hosted, the stream response lacks episode-specific language fields, and upstream rights/usage permission is not established. Documentation review only; no live request, scraper-code copy, runtime change, test, or build was performed.
+
+### Candidate A — AniBiee / AnimeWorldIndia Scraper API
+
+- Canonical repository reviewed: [MSMods-Pro/AnimeWorldIndia-Api](https://github.com/MSMods-Pro/AnimeWorldIndia-Api), README blob `a9cc79a737277710e60cd294ecb19acd61bd5e6a`; LICENSE blob `a3b0402e148a47487f25d50a08717c3ace331a2b`. The code uses an ISC license.
+- The README explicitly frames the API as educational/research use and places responsibility for copyright and site terms on the integrator. That is not evidence that the upstream AnimeWorldIndia site authorizes 7xAnime to scrape or redistribute its streams.
+- Documented route flow: `GET /api/search?q=...` → `GET /api/info/:id` → `GET /api/episodes/:id/:season` → `GET /api/embed/:id`. The catalogue supports `GET /api/category/language/hindi`.
+- The documented embed response is a generic `servers[]` list containing `server`, `name`, and `url`; no per-stream `language`, `langCode`, or explicit episode audio-language field appears in the reviewed schema. A Hindi catalogue filter cannot by itself prove the stream for a particular episode has Hindi audio.
+- No public deployment base is documented. The README tells users to install/run the service themselves, and the service applies origin/referer allowlisting (or requires a configured wildcard) and rate limiting. Do not guess a hosted hostname or assume the author's demo domain is an API.
+- Repository ownership/documentation references are inconsistent (the README's clone URL, maintenance badge, and package metadata point to different owner names). This increases the need to obtain the canonical project/deployment from its maintainer rather than fork or guess.
+- No API response was sampled and no known episode was resolved or played.
+
+**Gate result: NO-GO.** No authorized public deployment, no established upstream reuse basis, and no episode-specific Hindi proof. The ISC license covers this repository's code; it does not grant rights from the streaming site or rights holders.
+
+### Candidate B — AnimeWorld-India PHP API
+
+- Reviewed [queryof/AnimeWorld-India-Api-Streaming-api-for-hIndi-animes](https://github.com/queryof/AnimeWorld-India-Api-Streaming-api-for-hIndi-animes). Its README documents a PHP application hosted locally using XAMPP/WAMP/MAMP, with endpoints under `/api/anime-world-india/v1/`.
+- The stream endpoint accepts an episode/movie identifier and returns source links; the published README does not identify an authorized public API base, and no LICENSE file was found in the reviewed repository path.
+- The documentation exposes sample schemas and local example URLs only. It does not provide an episode-level audio-language field or verified Hindi playback sample.
+
+**Gate result: NO-GO.** Local-development API, unclear code-reuse basis, no permitted deployment, and no episode-specific Hindi evidence. Do not infer an API host from the source website's name.
+
+### Ruling
+
+Neither AnimeWorldIndia implementation clears the gate. Keep the current ZeroTwo-Py Hindi source and five standard providers unchanged. Tatakai remains the strongest follow-up lead because its public docs show a Hindi route and a separate WatchAnimeWorld response schema with `language`/`langCode`, but Tatakai is still **HOLD** until the deployed response contract, independent-client usage expectations, and known-episode language mapping are verified. This sweep does not prove any candidate is offline.
+
