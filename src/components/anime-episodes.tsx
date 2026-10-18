@@ -64,6 +64,14 @@ const AnimeEpisodes = ({ animeId }: Props) => {
     });
   }, [episodes, jumpTarget, query, ranges, selectedRange]);
 
+  useEffect(() => {
+    if (jumpTarget === null) return;
+    const frame = requestAnimationFrame(() => {
+      document.getElementById(`episode-option-${jumpTarget}`)?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [jumpTarget]);
+
   const handleJump = () => {
     const target = Number(jumpTo);
     if (!Number.isInteger(target) || target < 1 || target > episodes.length) return;
@@ -74,9 +82,6 @@ const AnimeEpisodes = ({ animeId }: Props) => {
     if (range) setSelectedRange(range);
     setQuery("");
     setJumpTarget(target);
-    requestAnimationFrame(() => {
-      document.getElementById(`episode-option-${target}`)?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-    });
   };
 
   return (
@@ -85,8 +90,8 @@ const AnimeEpisodes = ({ animeId }: Props) => {
         <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex min-w-0 items-center gap-2 text-xs text-zinc-400">
             <ListFilter className="h-4 w-4 shrink-0 text-[#ff9fbe]" />
-            <span>{query.trim() ? `${visibleEpisodes.length} results` : `${episodes.length} episodes available`}</span>
-            {!query.trim() && episodes.length > RANGE_SIZE && (
+            <span>{query.trim() || jumpTarget !== null ? `${visibleEpisodes.length} results` : `${episodes.length} episodes available`}</span>
+            {!query.trim() && jumpTarget === null && episodes.length > RANGE_SIZE && (
               <span className="text-zinc-600">· Showing a range to keep navigation quick</span>
             )}
           </div>
