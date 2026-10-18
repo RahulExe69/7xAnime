@@ -546,7 +546,7 @@ def copy_python_source() -> None:
         shutil.rmtree(destination_src)
     shutil.copytree(source_dir / "src", destination_src)
 
-    # Copy only the five supported embed adapters into the packaged provider tree.
+    # Copy only the six supported embed adapters into the packaged provider tree.
     # MegaPlay is a dedicated frontend iframe and does not need a Python adapter.
     extra_providers = {
         "anixo": "android-local-backend/extra-providers/anixo.py",
@@ -554,6 +554,7 @@ def copy_python_source() -> None:
         "tryembed": "android-local-backend/extra-providers/tryembed.py",
         "cinexstream": "android-local-backend/extra-providers/cinexstream.py",
         "supaplay": "android-local-backend/extra-providers/supaplay.py",
+        "vidplus": "android-local-backend/extra-providers/vidplus.py",
     }
     for provider_name, relative_path in extra_providers.items():
         extra_provider = ROOT / relative_path
@@ -561,25 +562,25 @@ def copy_python_source() -> None:
             fail(f"The extra {provider_name} provider adapter is missing.")
         shutil.copy2(extra_provider, destination_src / "providers" / f"{provider_name}.py")
 
-    # Restrict the copied Kuhi registry to the five maintained embed adapters.
+    # Restrict the copied Kuhi registry to the six maintained embed adapters.
     race_file = destination_src / "providers" / "_race.py"
     race_text = race_file.read_text(encoding="utf-8")
     ranking_match = re.search(r"(?s)RANKING\s*=\s*\[(.*?)\]", race_text)
     if not ranking_match:
         fail("Could not locate the provider registry in the pinned backend.")
-    ranking_block = '"anixo", "megavid", "tryembed", "cinexstream", "supaplay"'
+    ranking_block = '"anixo", "megavid", "tryembed", "cinexstream", "supaplay", "vidplus"'
     race_text = race_text[:ranking_match.start(1)] + ranking_block + race_text[ranking_match.end(1):]
     race_file.write_text(race_text, encoding="utf-8")
 
     # Keep the Kuhi API's catalogue/context helpers, but do not package its
     # unrelated provider adapters. The active provider registry is exactly the
-    # five adapters above; this pruning also prevents dormant modules from being
+    # six adapters above; this pruning also prevents dormant modules from being
     # imported accidentally by future changes.
     active_provider_names = set(extra_providers)
     provider_dir = destination_src / "providers"
     for provider_file in provider_dir.glob("*.py"):
         # Underscore-prefixed files are shared backend helpers, not provider
-        # adapters. Keep them because the five maintained adapters depend on
+        # adapters. Keep them because the six maintained adapters depend on
         # common HTTP, matching, cache, and media utilities.
         if not provider_file.name.startswith("_") and provider_file.stem not in active_provider_names:
             provider_file.unlink()
