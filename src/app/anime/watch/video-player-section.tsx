@@ -1508,8 +1508,7 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
       }
       const now = Date.now();
       const lifecyclePauseEcho = reportedPaused &&
-        backgroundResumeModeRef.current === "playing" &&
-        (!appIsActiveRef.current || now - backgroundResumeStartedAtRef.current < 2500);
+        backgroundResumeModeRef.current === "playing";
       const foregroundPauseMustWin = backgroundResumeModeRef.current === "paused" &&
         (reportedPlaying || progressIndicatesPlaying);
 
