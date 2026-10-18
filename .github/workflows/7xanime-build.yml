@@ -297,6 +297,10 @@ jobs:
               raise SystemExit("Provider event-envelope and playback-intent normalization is missing")
           if '"player-ready"' not in watch_section or "progressIndicatesPlaying" not in watch_section:
               raise SystemExit("Provider ready aliases and progress-based resume intent are missing")
+          if "embedHasObservedPlaybackRef" not in watch_section or "canDistinguishPauseFromStall" not in watch_section:
+              raise SystemExit("The embed watchdog must distinguish unknown pause state from a silent stall")
+          if 'observedEmbedProvider === "anixo"' not in watch_section or "only explicit error messages trigger reconnection" not in watch_section:
+              raise SystemExit("Pause-safe watchdog recovery policy is missing")
           if "onEpisodeEnded?: () => void" not in player_component or 'art.on("video:ended"' not in player_component:
               raise SystemExit("Native video-ended callback is missing")
           if "advanceToNextEpisode" not in watch_section or "episode-" not in watch_section:
