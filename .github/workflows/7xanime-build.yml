@@ -274,7 +274,7 @@ jobs:
               raise SystemExit("Fullscreen swipe-down must return to the inline watch page before minimising")
           if 'const directionalDistance = session.direction === "collapse" ? deltaY : -deltaY' not in viewport or 'finalDirectionalDistance / SWIPE_ANIMATION_DISTANCE' not in viewport:
               raise SystemExit("Player swipe progress must follow the current locked-direction distance")
-          if 'session.isFullscreen ? session.inlineTarget' not in viewport or 'top: session.origin.top + travelDistance' not in viewport or 'top: session.origin.top + Math.max(0, finalDirectionalDistance)' not in viewport:
+          if 'const target = session.isFullscreen' not in viewport or '? session.inlineTarget' not in viewport or 'top: session.origin.top + travelDistance' not in viewport or 'top: session.origin.top + Math.max(0, finalDirectionalDistance)' not in viewport:
               raise SystemExit("Fullscreen exit and inline minimisation must preserve state-specific targets and exact finger distance")
           if 'Math.pow(1 - progress, 3)' not in viewport or 'element.style.translate = direction === "collapse"' not in viewport:
               raise SystemExit("The watch page must move and progressively fade with the inline player gesture")
