@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-18-hindi-animeheaven-provider-design.md`
 
-**Execution status (2026-10-18):** AnimeHeaven, DesiDubAnime, Renime-API, and HiAnime/Aniwatch reached **NO-GO**; Senshi remains unqualified. Tatakai API is a **HOLD** pending contract, usage, and episode-language verification; the AnimeWorldIndia API family was also evaluated and reached **NO-GO**. Runtime tasks 2–6 remain blocked until a candidate clears the gate. See `docs/HINDI_DUB_PROVIDER_EVALUATION.md` for the evidence record.
+**Execution status (2026-10-18):** AnimeHeaven, DesiDubAnime, Renime-API, and HiAnime/Aniwatch reached **NO-GO**; Senshi remains unqualified. Tatakai API is a **HOLD** pending contract, usage, and episode-language verification; the AnimeWorldIndia API family and Anivexa API were also evaluated and reached **NO-GO**, and the Zangetsu multi-audio manifest remains research-only. Runtime tasks 2–6 remain blocked until a candidate clears the gate. See `docs/HINDI_DUB_PROVIDER_EVALUATION.md` for the evidence record.
 
 ## Global Constraints
 
@@ -207,4 +207,14 @@ The next Hindi-focused candidate sweep also reached NO-GO:
 - **Reopen criteria:** Authorized deployment/use basis, current route schema, and an episode-specific Hindi source signal for a known episode before implementation; physical Android playback must be tracked separately.
 
 Evidence and source links are recorded in `docs/HINDI_DUB_PROVIDER_EVALUATION.md`.
+
+## Candidate checkpoint — Anivexa and multi-audio provider manifest (2026-10-18)
+
+The wider search also reviewed a generic streaming aggregator and a Hindi/multi-audio plugin manifest:
+
+- **Anivexa API — NO-GO:** its contract uses generic sub/dub types and does not establish a Hindi-specific per-episode language signal; README says self-hosting, warns that Vercel deployments are widely blocked, and asks contributors to request only sources that self-host content. No dependable authorized endpoint or code-reuse basis was established.
+- **Zangetsu Spyou provider manifest — research only / NO-GO for porting:** its README claims AnimeSalt and AnimixStream have Hindi multi-audio HLS, but it is a scraper plugin for another app, not a 7xAnime REST contract. `package.json` sets `private: true`, no LICENSE file was found, and its manifest-level `lang: hi` does not prove episode-specific audio mapping. Do not copy the scripts.
+- **Ruling:** Tatakai API remains the only top API lead on this search path, still HOLD. A second lead is multi-audio source research, but it has no integration permission. Runtime Tasks 2–6 remain blocked until a permitted contract and actual episode-level Hindi evidence are established; all five standard servers and the current Hindi catalogue remain untouched.
+
+See `docs/HINDI_DUB_PROVIDER_EVALUATION.md` for links and evidence distinctions.
 
