@@ -1335,51 +1335,53 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
     }
   }, [activeEpisodeId, currentProviderName, episodeData?.provider, playbackSourceIndex, isFallbackActive]);
 
-  // Native WebView ad protection emits this event when it cancels a remote
-  // JS dialog, popup window, remote permission request, or top-level redirect.
-  // These are strong signals of a deceptive interstitial; switch servers rather
-  // than leaving the viewer stuck on an empty "robot check" page.
+  // Native interception reports both blocked ad interactions and actual player-document errors.
+  // Popups, remote JavaScript dialogs, permissions, and top-level ad redirects are expected
+  // to be suppressed, so they must not consume playback retries or hide a server. Only a
+  // failed embedded player document is treated as a provider playback failure.
   useEffect(() => {
     if (!isLocalBackendEnabled()) return;
 
     const handleBlockedPlayerAction = (event: Event) => {
       if (isHindiMode) return;
+      const detail = (event as CustomEvent<{ reason?: string; host?: string }>).detail || {};
+      const reason = String(detail.reason || "blocked");
+      const host = String(detail.host || "third-party player");
+
+      // Blocking an ad, popup or dialog means protection worked; it is not a player failure.
+      if (!reason.startsWith("embed-")) return;
+
       const now = Date.now();
-      // Debounce duplicate native events from a single frame, but permit an
-      // immediate retry to emit the same signal after playerRetryKey remounts it.
       if (
         blockedPlayerActionAtRef.current.retryKey === playerRetryKey &&
         now - blockedPlayerActionAtRef.current.at < 900
       ) return;
       blockedPlayerActionAtRef.current = { retryKey: playerRetryKey, at: now };
 
-      const detail = (event as CustomEvent<{ reason?: string; host?: string }>).detail || {};
-      // Some embedded servers emit or trigger blocked actions while paused;
-      // never let these background signals reconnect a deliberately paused video.
+      // A frame refused by X-Frame-Options/CSP will not start by repeatedly reloading
+      // the same URL. Move to the next provider immediately and preserve the reason.
+      if (reason === "embed-blocked-by-response") {
+        setLastPlayerError(`${getProviderDisplayName(currentProviderName)} refused iframe embedding (${host}).`);
+        advanceAfterSourceFailure();
+        return;
+      }
+
+      // Do not reconnect a deliberately paused player; preserve its current state.
       if (embedPlaybackStateRef.current === "paused") {
         lastEmbedSignalAtRef.current = now;
         const pausedFrame = externalEmbedFrameRef.current;
         if (pausedFrame) requestExternalPlayerPause(pausedFrame);
         return;
       }
-      const reason = String(detail.reason || "blocked popup");
-      const host = String(detail.host || "third-party player");
-      // Blocked popups, JS dialogs and top-level redirects are recovery signals,
-      // not a reason to skip the retry sequence. Remount the current frame twice;
-      // repeated interruption then advances to another configured server.
-      const deceptiveInterstitial = reason.startsWith("javascript-")
-        || reason === "popup"
-        || reason === "top-level-redirect"
-        || reason === "permission-request";
-      const recoveryDetail = deceptiveInterstitial
-        ? `Blocked deceptive interstitial (${reason}) from ${host}; reconnecting to the current server.`
-        : `Blocked ${reason} from ${host}; reconnecting to the current server.`;
-      handlePlayerError(recoveryDetail);
+
+      handlePlayerError(`Embedded player document failed (${reason}) on ${host}; reconnecting.`);
     };
 
     window.addEventListener("7xanime:blocked-player-action", handleBlockedPlayerAction);
     return () => window.removeEventListener("7xanime:blocked-player-action", handleBlockedPlayerAction);
   }, [
+    advanceAfterSourceFailure,
+    currentProviderName,
     handlePlayerError,
     isHindiMode,
     isLocalBackendEnabled,
@@ -1392,17 +1394,17 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
   useEffect(() => {
     if (!isLocalBackendEnabled() || (!isFallbackActive && observedEmbedSource?.type !== "embed")) return;
 
-    const expectedHosts: Record<string, string> = {
-      megaplay: "megaplay.buzz",
-      anixo: "anixo.buzz",
-      megavid: "megavid.buzz",
-      tryembed: "tryembed.us.cc",
-      cinexstream: "cinextream.cc",
-      supaplay: "supaplay.fun",
-      vidplus: "player.vidplus.to",
+    const expectedHosts: Record<string, string[]> = {
+      megaplay: ["megaplay.buzz"],
+      anixo: ["anixo.buzz"],
+      megavid: ["megavid.buzz"],
+      tryembed: ["tryembed.us.cc"],
+      cinexstream: ["cinextream.cc"],
+      supaplay: ["supaplay.fun"],
+      vidplus: ["player.vidplus.to", "player2.vidplus.pro"],
     };
-    const expectedHost = expectedHosts[observedEmbedProvider];
-    if (!expectedHost) return;
+    const acceptedHosts = expectedHosts[observedEmbedProvider];
+    if (!acceptedHosts) return;
     const handleEmbedMessage = (event: MessageEvent) => {
       if (event.source !== externalEmbedFrameRef.current?.contentWindow) return;
 
@@ -1414,7 +1416,9 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
 
       let hostname = "";
       try { hostname = new URL(event.origin).hostname.toLowerCase(); } catch { return; }
-      if (hostname !== expectedHost && !hostname.endsWith(`.${expectedHost}`)) return;
+      if (!acceptedHosts.some((expectedHost) =>
+        hostname === expectedHost || hostname.endsWith(`.${expectedHost}`)
+      )) return;
 
       const payload = raw as Record<string, unknown>;
       const normalizeEventName = (value: unknown) =>

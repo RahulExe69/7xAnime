@@ -256,8 +256,10 @@ jobs:
           viewport = Path("src/components/player-viewport.tsx").read_text(encoding="utf-8")
           if "7xanime:blocked-player-action" not in watch_section:
               raise SystemExit("Player page is not wired to blocked-ad auto-switch events")
-          if "deceptiveInterstitial" not in watch_section:
-              raise SystemExit("Deceptive interstitials must advance to another provider")
+          if 'if (!reason.startsWith("embed-")) return;' not in watch_section:
+              raise SystemExit("Blocked ad interactions must not trigger playback retries")
+          if "embed-blocked-by-response" not in watch_section:
+              raise SystemExit("Non-recoverable iframe policy blocks must advance without repeated retries")
           if "YouTube-style double tap" not in player_component or "art.seek = targetTime" not in player_component:
               raise SystemExit("Double-tap ±10-second seeking wiring missing")
           if "SWIPE_THRESHOLD" not in viewport or "enterNativePlayerFullscreen" not in viewport:
@@ -350,10 +352,10 @@ jobs:
               raise SystemExit("Ready-page events must be distinguished from actual playback")
           if 'supaplay: "supaplay.fun"' not in watch_section:
               raise SystemExit("SupaPlay embed origin is missing from player event validation")
-          if 'vidplus: "player.vidplus.to"' not in watch_section:
-              raise SystemExit("VidPlus embed origin is missing from player event validation")
+          if 'vidplus: ["player.vidplus.to", "player2.vidplus.pro"]' not in watch_section:
+              raise SystemExit("VidPlus redirect host is missing from player event validation")
           navigation_client = Path("android-local-backend/StreamingNavigationWebViewClient.java").read_text(encoding="utf-8")
-          if '"supaplay.fun"' not in navigation_client or '"player.vidplus.to"' not in navigation_client:
+          if any(host not in navigation_client for host in ('"supaplay.fun"', '"player.vidplus.to"', '"player2.vidplus.pro"')):
               raise SystemExit("SupaPlay or VidPlus iframe failure handling is missing from the native WebView host list")
           if 'observedEmbedProvider === "tryembed" ? 8000 : 18000' not in watch_section:
               raise SystemExit("TryEmbed interstitial timeout is missing")
@@ -423,7 +425,12 @@ jobs:
               raise SystemExit("Launcher generation must explicitly remove adaptive icon XML to avoid mask-driven cropping")
           if "Image.Resampling.LANCZOS" in launcher_script or "ic_launcher_foreground.png" in launcher_script:
               raise SystemExit("Launcher script must not resize or redraw the approved source icon")
-          print("Provider-agnostic filter-list engine, warning-card removal, approved 7xAnime branding, fullscreen and seeking gestures are wired.")
+          background_guard = Path(".github/scripts/configure-local-anime-backend.py").read_text(encoding="utf-8")
+          if "frame.src='about:blank'" in background_guard:
+              raise SystemExit("Background lifecycle must not destroy the embedded iframe document")
+          if "frame.contentWindow.postMessage({event:'pause'}" not in background_guard:
+              raise SystemExit("Background lifecycle must preserve embedded players while asking them to pause")
+          print("Provider-agnostic filter-list engine, pause-safe background lifecycle, warning-card removal, approved 7xAnime branding, fullscreen and seeking gestures are wired.")
           PY
 
       # Test the exact patched Python tree that Chaquopy packages in the APK,

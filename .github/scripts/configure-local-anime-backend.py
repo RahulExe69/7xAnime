@@ -647,7 +647,7 @@ def install_background_playback_guard(main_activity: Path) -> None:
             if (getBridge() != null && getBridge().getWebView() != null) {
                 String stopScript = "(function(){"
                     + "document.querySelectorAll('video,audio').forEach(function(media){try{media.pause();}catch(e){}});"
-                    + "document.querySelectorAll('[data-player-viewport=true] iframe').forEach(function(frame){try{frame.src='about:blank';}catch(e){}});"
+                    + "document.querySelectorAll('[data-player-viewport=true] iframe').forEach(function(frame){try{if(frame.contentWindow){frame.contentWindow.postMessage({event:'pause'},'*');frame.contentWindow.postMessage({type:'pause'},'*');frame.contentWindow.postMessage({method:'pause'},'*');frame.contentWindow.postMessage(JSON.stringify({context:'player.js',version:'0.0.11',method:'pause'}),'*');}}catch(e){}});"
                     + "})();";
                 getBridge().getWebView().evaluateJavascript(stopScript, null);
             }

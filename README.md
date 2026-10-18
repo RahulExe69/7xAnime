@@ -72,7 +72,7 @@ More details, optional Google OAuth setup, and the Android HTTPS endpoint requir
 
 ## Playback servers
 
-7xAnime supports exactly seven standard playback choices: **MegaPlay (Server 1), AniXo, Megavid, TryEmbed, CinexStream, SupaPlay, and VidPlus**. MegaPlay is the default Android iframe; the other six are manual embed routes. SupaPlay's `sub`/`dub` is generic. VidPlus requests its documented `server=hindi` selection in dub mode, but the resulting audio is not yet verified as Hindi. AnimeParadise, MegaFlix, NontonGo, AnimeNoSub, and the legacy Kuhi provider pool are retired and are not packaged as active providers. See [the server guide](docs/SERVERS.md) for the maintained allowlist and retirement notes.
+7xAnime supports exactly seven standard playback choices: **MegaPlay (Server 1), AniXo, Megavid, TryEmbed, CinexStream, SupaPlay, and VidPlus**. MegaPlay is the default Android iframe; the other six are manual embed routes. SupaPlay's `sub`/`dub` and VidPlus's dub toggle are generic, not verified Hindi-specific audio. AnimeParadise, MegaFlix, NontonGo, AnimeNoSub, and the legacy Kuhi provider pool are retired and are not packaged as active providers. See [the server guide](docs/SERVERS.md) for the maintained allowlist and retirement notes.
 
 The Android APK retains only the small shared Kuhi API/catalogue infrastructure needed by the current backend; its unrelated provider adapters are pruned at build time. The six embed providers are cross-origin, so provider-owned player controls and overlays cannot always be customized or removed by the parent app.
 
@@ -80,7 +80,7 @@ The Android APK retains only the small shared Kuhi API/catalogue infrastructure 
 
 The Android player work applies a shared, provider-agnostic best-effort ad/redirect filter to embedded player requests, blocks pop-up windows and remote JavaScript prompt dialogs, a native landscape fullscreen bridge with swipe/Back support, and double-tap ±10-second seeking in the app-owned ArtPlayer player. See [the player marathon notes](docs/PLAYER-MARATHON.md) for exact coverage and cross-origin iframe limitations. Known ad-domain filtering can never remove every in-page ad, especially content served by the player itself.
 
-When playback is detected as failed, 7xAnime saves the latest available timestamp, retries the current player twice, then tries the other six supported embed servers before returning to MegaPlay. SupaPlay and VidPlus are kept out of the progress-based stall watchdog until their iframe behavior is verified on an Android device. Failed servers are hidden from the chooser for the current session. A visual ad overlay inside a cross-origin iframe is not reliably detectable or dismissible by the parent app; blocked network requests/pop-ups and stalled event-reporting embeds can trigger recovery, but this cannot guarantee removal of every in-page ad.
+When playback detects an actual failure, 7xAnime saves the latest available timestamp, retries recoverable playback errors, then tries the other supported embedded servers before returning to MegaPlay. Ads, blocked pop-ups, and remote JavaScript dialogs are suppressed without being counted as playback failures. SupaPlay and VidPlus remain outside the progress-based stall watchdog until their iframe behavior is verified on an Android device. A visual ad overlay inside a cross-origin iframe is not reliably detectable or dismissible by the parent app; network filtering and popup blocking reduce interruptions but cannot guarantee removal of every in-page ad.
 
 ## Android APK with an on-device API
 

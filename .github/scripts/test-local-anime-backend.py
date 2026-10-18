@@ -521,7 +521,7 @@ class LocalAnimeApiTests(unittest.TestCase):
             )
             self.assertEqual(
                 dub_stream[0]["url"],
-                "https://player.vidplus.to/embed/anime/21/7?dub=true&server=hindi",
+                "https://player.vidplus.to/embed/anime/21/7?dub=true",
             )
             self.assertEqual(dub_stream[0]["server"], "VidPlus")
             self.assertEqual(dub_stream[0]["upstream"], "vidplus")
@@ -557,7 +557,7 @@ class LocalAnimeApiTests(unittest.TestCase):
             self.assertEqual(payload["providerStatus"], "ok")
             self.assertEqual(
                 payload["streams"][0]["url"],
-                "https://player.vidplus.to/embed/anime/21/44?dub=true&server=hindi",
+                "https://player.vidplus.to/embed/anime/21/44?dub=true",
             )
             context_lookup.assert_not_awaited()
 

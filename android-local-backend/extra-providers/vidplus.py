@@ -1,8 +1,8 @@
 """Manual-only VidPlus anime iframe adapter.
 
 Uses the public documentation's AniList ID + episode-number player route.
-Dub playback requests the documented `server=hindi` selector, but actual Hindi
-audio still needs episode/device verification. This adapter does not extract direct media.
+The generic dub toggle does not prove Hindi audio is available. This adapter
+does not extract direct media.
 """
 from __future__ import annotations
 
@@ -70,7 +70,7 @@ async def watch(anilist_id: int, audio: str, ep: int, ctx: dict | None = None) -
 
     tracks = ("sub", "dub") if audio == "all" else (audio,)
     return [{
-        "url": f"{BASE}/embed/anime/{anime_id}/{episode}?dub={'true' if track == 'dub' else 'false'}" + ("&server=hindi" if track == "dub" else ""),
+        "url": f"{BASE}/embed/anime/{anime_id}/{episode}?dub={'true' if track == 'dub' else 'false'}",
         "type": "embed",
         "server": "VidPlus",
         "upstream": NAME,
