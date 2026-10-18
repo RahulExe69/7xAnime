@@ -10,6 +10,8 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-18-hindi-animeheaven-provider-design.md`
 
+**Execution status (2026-10-18):** Task 1 reached **NO-GO** at the authorized-deployment qualification gate. The candidate has no documented/authorized API base in the inspected public materials, GitHub reports no declared repository license, and Hindi-specific episode evidence is not established. Runtime tasks 2–6 are intentionally not executed until these prerequisites are supplied. See `docs/HINDI_DUB_PROVIDER_EVALUATION.md` for evidence and reopening criteria.
+
 ## Global Constraints
 
 - The standard playback list remains exactly MegaPlay, AniXo, Megavid, TryEmbed, and CinexStream.
