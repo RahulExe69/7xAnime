@@ -18,6 +18,7 @@
 - Do not copy or port Anivault-Scraper implementation code; GitHub currently reports no declared repository license for that project.
 - Do not guess or hard-code a public API base. The candidate is disabled unless an explicitly configured, permitted base is verified.
 - A generic `dub` response or an embed URL does not prove Hindi audio or playable output.
+- Use finite request timeouts and response-size limits; validate HTTPS URLs and redirect destinations for server-side requests; block loopback, private, link-local, and metadata-service destinations where inappropriate.
 - No DRM circumvention, private-token/key bypass, arbitrary URL proxy, or user-controlled API base.
 - Use test-first changes for runtime behavior. Do not run a build during the design/qualification phase; after implementation, run verification and a build only as agreed.
 - Report API response, correct episode resolution, Hindi confirmation, and physical-device playback as separate evidence levels.
@@ -63,8 +64,9 @@ Expected output: a justified GO or NO-GO, not a provider button.
 - Create: `tests/hindi-provider-normalization.test.mjs`
 
 **Interfaces:**
-- Export pure, network-free helpers for validating HTTPS URLs, source identity, Hindi-language evidence, and candidate normalization.
-- Keep the helper independent of React, Axios, and app-level imports so the Node built-in test runner can exercise the same production logic without new dependencies.
+- Export `isSafeHttpsUrl(value: unknown, allowedHosts?: string[]): value is string`, `hasExplicitHindiEvidence(value: unknown): boolean`, and `dedupeHindiCandidates<T extends { sourceId: string; embed: string }>(candidates: T[]): T[]`.
+- `hasExplicitHindiEvidence` returns true only for an explicit Hindi-specific language value from the qualified schema; generic values such as `dub`, `English`, missing fields, and guessed title matches return false.
+- Keep these helpers independent of React, Axios, and app-level imports so the Node built-in test runner exercises the same production logic without new dependencies.
 - The declaration file must match the actual .mjs exports exactly and provide the TypeScript types consumed by the existing resolver.
 
 - [ ] **Step 1: Write failing tests** with Node's `node:test` and `node:assert/strict` for valid candidate normalization, malformed responses, generic-dub rejection, invalid schemes, unsafe URLs, and duplicate URL/source identity.
@@ -83,7 +85,7 @@ Expected output: a justified GO or NO-GO, not a provider button.
 
 **Interfaces:**
 - Export `getAnimeHeavenHindiStreams(input: AnimeHeavenInput): Promise<AnimeHeavenStreamCandidate[]>` from the .mjs module and define the same signature in the declaration file.
-- `AnimeHeavenInput` contains `titles: string[]`, `episode: number`, `apiBase: string | undefined`, and an injectable `requestJson` function for deterministic tests.
+- `AnimeHeavenInput` contains `titles: string[]`, `episode: number`, `apiBase: string | undefined`, and `requestJson(url: string, params: Record<string, string | number>, options: { timeoutMs: number; maxBytes: number }): Promise<unknown>` for deterministic tests.
 - `AnimeHeavenStreamCandidate` contains `sourceId: "animeheaven"`, `sourceLabel: "AnimeHeaven"`, `languageEvidence: "explicit-hindi-metadata"`, `server: string`, `embed: string`, `host: string`, `seriesTitle: string`, `seriesId: string`, `season: number`, and `episode: number`.
 - The adapter returns an empty array with a sanitized internal failure outcome when disabled or when resolution fails; it must not throw into the primary watch path. An AnimeHeaven candidate is emitted only when the confirmed response contains explicit Hindi-specific evidence; a generic `dub` value must be rejected.
 - Read the base only from `NEXT_PUBLIC_HINDI_ANIMEHEAVEN_API_BASE`, passed into the adapter by the existing client-side module. Treat the base as public configuration, not a secret; validate HTTPS and host, and stay disabled if absent or invalid.
@@ -137,16 +139,20 @@ Do not create a generic proxy route. If qualification proves direct requests can
 **Rollback check:** Confirm every new runtime path is behind the explicit validated configuration and can be disabled by removing that setting. If review uncovers a provider-specific regression, revert the adapter/resolver/UI commits as a unit; the existing catalogue and five standard servers must continue to work.
 
 **Files:**
+- Create: `tests/standard-server-regression.test.mjs`
 - Modify: `docs/HINDI_DUB_PROVIDER_EVALUATION.md`
+- Modify: `docs/SELF_HOSTING.md` to document `NEXT_PUBLIC_HINDI_ANIMEHEAVEN_API_BASE` only if the source qualifies and the setting is supported by existing build configuration
 - Modify: `docs/SERVERS.md` only if the new source has genuinely passed support criteria, and keep it in a separate Hindi section
 - Read-only regression targets: `src/lib/server-map.ts`, `android-local-backend/local_api.py`, `.github/scripts/configure-local-anime-backend.py`
 
-- [ ] **Step 1: Add a failing or executable regression assertion** that the standard provider list and Android packaging allowlist remain the existing exact set.
-- [ ] **Step 2: Run the regression assertion** and verify it catches any accidental registry change.
-- [ ] **Step 3: Record evidence states separately** in `docs/HINDI_DUB_PROVIDER_EVALUATION.md`: API responds, episode resolves, Hindi confirmed, and playback verified. Set playback verified only after physical-device test.
-- [ ] **Step 4: Run the full relevant test suite**: TypeScript focused tests, repository lint/typecheck, and `python .github/scripts/test-local-anime-backend.py` if Python backend files or contracts changed. Record any pre-existing failures by name.
-- [ ] **Step 5: Review final diff** against the spec, verify the standard server map/order/build packaging remain unchanged, and commit as `test: verify Hindi provider isolation and record evidence`.
-- [ ] **Step 6: Open a PR** from `feat/hindi-animeheaven-provider` to `master`, with test results, endpoint evidence and explicit statement that physical Android playback is unverified unless a device test actually occurred.
+- [ ] **Step 1: Write a failing regression test** in `tests/standard-server-regression.test.mjs` using Node's built-in test runner. Assert the frontend and Python registry contain exactly `anixo`, `megavid`, `tryembed`, and `cinexstream`; assert the Android packaging list matches those four; assert MegaPlay remains Server 1/default/fallback and no Hindi-only source is registered in the standard list.
+- [ ] **Step 2: Run the regression test** with `node --test tests/standard-server-regression.test.mjs`. Expected: FAIL only if a listed invariant is violated.
+- [ ] **Step 3: Implement the minimum regression assertion** using read-only file inspection and explicit expected values; do not edit production registries to satisfy the test.
+- [ ] **Step 4: Re-run the regression test**. Expected: PASS on the unmodified standard provider list.
+- [ ] **Step 5: Record evidence states separately** in `docs/HINDI_DUB_PROVIDER_EVALUATION.md`: API responds, episode resolves, Hindi confirmed, and playback verified. Set playback verified only after physical-device test.
+- [ ] **Step 6: Run the full relevant test suite**: `node --test tests/hindi-provider-normalization.test.mjs tests/hindi-animeheaven.test.mjs tests/standard-server-regression.test.mjs`, `npm run lint`, `npx tsc --noEmit` where compatible with repository settings, and `python .github/scripts/test-local-anime-backend.py` if Python backend files or contracts changed. Record any pre-existing failures by name.
+- [ ] **Step 7: Review final diff** against the spec, verify the standard server map/order/build packaging remain unchanged, and commit as `test: verify Hindi provider isolation and record evidence`.
+- [ ] **Step 8: Open a PR** from `feat/hindi-animeheaven-provider` to `master`, with test results, endpoint evidence and explicit statement that physical Android playback is unverified unless a device test actually occurred.
 
 ## Final implementation report
 
