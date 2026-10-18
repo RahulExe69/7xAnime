@@ -384,11 +384,27 @@ Neither AnimeWorldIndia implementation clears the gate. Keep the current ZeroTwo
 
 **Gate result: NO-GO for direct port; research lead only.** Do not copy the provider scripts while no license is declared. Any fresh implementation would still need a separate review of source terms, safe playback behavior, correct episode mapping, and how the 7xAnime player will select a Hindi audio track from a multi-audio master.
 
+### Local-backend reassessment — WatchAnimeWorld / AnimeWorldIndia scraper family
+
+**New finding:** the Android package's FastAPI server is genuinely on-device, but its current `/hindi/search` and `/hindi/stream` routes are only a proxy to `anime-api-ashen-chi.vercel.app`. That means the transport wrapper is local; the Hindi catalogue/extraction implementation is still remote.
+
+A newly reviewed ISC-licensed repository, [MSMods-Pro/AnimeWorldIndia-Api](https://github.com/MSMods-Pro/AnimeWorldIndia-Api), documents a language category (`/api/category/language/hindi`), details/languages metadata, season episode lookup, and an embed lookup. However, its source code currently identifies itself as a **WatchAnimeWorld** scraper, hardcodes `https://watchanimeworld.net`, and the live domain redirects to `watchanimeworld.top`. Its Node/Express API is a separate service and is not a drop-in dependency for Chaquopy's Python 3.11 runtime. The project README also calls it educational/research software and places legal compliance on integrators.
+
+**Decision: best next local-native evaluation lead; still HOLD for runtime integration.** The useful path would be a small Python-only adapter behind the existing local FastAPI routes, rather than bundling a second Node service. Before enabling it, qualification must verify all of the following:
+
+1. The upstream site's terms and current public endpoints permit the intended automated access; do not work around access controls, challenges, DRM, or protected media.
+2. Exact-title matching and the show's declared Hindi language can be checked independently of the query string.
+3. A requested season/episode maps to the correct episode-specific embed, and that episode actually provides Hindi audio. The reviewed API contract returns generic server names/URLs and does not itself prove Hindi audio for each episode.
+4. A real Android playback check confirms the selected embed opens without changing the five standard servers or the existing Hindi fallback.
+
+The published repository is useful as a licensed architectural reference, but its ISC code license does not grant rights to the underlying show's streams or override the source site's terms. Do not port its scraper wholesale or turn a catalogue-level Hindi label into a guaranteed episode-level Hindi claim.
+
 ### Updated candidate ranking
 
-1. **Tatakai API — HOLD / top API lead:** It advertises REST integration and a Hindi-specific route, and related WatchAnimeWorld docs demonstrate a possible explicit `language`/`langCode` contract. Exact hosted schema, use expectations, and a real episode sample remain unverified.
-2. **AnimeSalt / AnimixStream via Zangetsu manifest — research only:** Potential multi-audio technical capability, but no reusable license or 7xAnime API contract.
-3. **Other reviewed candidates — NO-GO or unqualified:** AnimeHeaven/Anivault-Scraper, DesiDubAnime API, Renime-API, HiAnime/Aniwatch API, AnimeWorldIndia API family, and Senshi without a distinct integration.
+1. **WatchAnimeWorld / AnimeWorldIndia scraper family — HOLD / best local-native lead:** A Hindi-language catalogue and episode/embed workflow are documented, and the scraper API repository declares ISC, but its current domain redirects, it expects a separate Node service, and language evidence is not episode-specific. Evaluate a fresh Python adapter against the site's terms and a real Hindi episode before any runtime change.
+2. **Tatakai API — HOLD / strongest explicit language-metadata lead:** It advertises a Hindi-specific route, and related docs show `language`/`langCode` fields. The exact deployed contract, integration expectations, and a real episode response remain unverified; do not make it a hard dependency of the APK.
+3. **AnimeSalt / AnimixStream via Zangetsu manifest — research only:** Potential multi-audio capability, but the manifest code has no declared reusable license and there is no 7xAnime API contract.
+4. **Other reviewed candidates — NO-GO or unqualified:** AnimeHeaven/Anivault-Scraper, DesiDubAnime API, Renime-API, HiAnime/Aniwatch API, and Senshi without a distinct, qualified integration.
    
 Keep the current ZeroTwo-Py Hindi catalogue and five standard providers unchanged. No candidate has cleared the gate; this does not establish that any site/API is offline.
 
