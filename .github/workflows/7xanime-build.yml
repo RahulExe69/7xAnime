@@ -44,7 +44,7 @@ concurrency:
 
 jobs:
   debug-apk:
-    if: github.event_name == 'pull_request' || inputs.build_type == 'debug' || (github.event_name == 'push' && contains(github.event.head_commit.message, '[debug-build]'))
+    if: github.event_name == 'pull_request' || inputs.build_type == 'debug' || github.event_name == 'push'
     name: Build Debug APK
     runs-on: ubuntu-latest
     timeout-minutes: 45
