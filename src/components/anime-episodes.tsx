@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import { Input } from "./ui/input";
 import { Search, ArrowDownToLine, ListFilter } from "lucide-react";
@@ -29,7 +29,6 @@ const AnimeEpisodes = ({ animeId }: Props) => {
   const [selectedRange, setSelectedRange] = useState("1-50");
   const [jumpTo, setJumpTo] = useState("");
   const [jumpTarget, setJumpTarget] = useState<number | null>(null);
-  const listRef = useRef<HTMLDivElement>(null);
 
   const ranges = useMemo(() => {
     const result: string[] = [];
@@ -140,18 +139,13 @@ const AnimeEpisodes = ({ animeId }: Props) => {
       </div>
 
       <div
-        ref={listRef}
         className="max-h-[min(62vh,34rem)] w-full space-y-1.5 overflow-y-auto overscroll-contain rounded-xl border border-white/[0.06] bg-black/10 p-2 pr-1.5 [scrollbar-gutter:stable]"
         aria-label="Episode choices"
       >
         {visibleEpisodes.map((episode: Episode) => (
-          <EpisodeCard
-            episode={episode}
-            key={episode.episodeId || episode.number}
-            className="w-full"
-            animeId={animeId}
-            variant="list"
-          />
+          <div id={`episode-option-${episode.number}`} key={episode.episodeId || episode.number} className="scroll-m-2">
+            <EpisodeCard episode={episode} className="w-full" animeId={animeId} variant="list" />
+          </div>
         ))}
         {!visibleEpisodes.length && !isLoading && (
           <div className="flex min-h-24 items-center justify-center rounded-xl px-4 text-center text-sm text-zinc-500">
