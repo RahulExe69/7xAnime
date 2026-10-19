@@ -705,7 +705,7 @@ def install_update_bridge(main_activity: Path) -> None:
     main_activity.write_text(text, encoding="utf-8")
 
 def install_player_swipe_observer(main_activity: Path) -> None:
-    """Observe embedded-player swipes without consuming their touch events."""
+    """Observe embedded swipes and claim vertical moves to prevent concurrent page scrolling."""
     text = main_activity.read_text(encoding="utf-8")
     text = add_import(text, "import android.view.MotionEvent;")
     text = add_import(text, "import android.webkit.WebView;")
