@@ -67,8 +67,8 @@ const SWIPE_FLING_VELOCITY = 680;
 const SWIPE_ANIMATION_DISTANCE = 240;
 // Keep the finger-tracked fullscreen preview elastic but deliberately bounded.
 // Once the swipe commits, FLIP animates from this small stretch into fullscreen.
-const SWIPE_FULLSCREEN_PREVIEW_WIDTH_STRETCH = 0.025;
-const SWIPE_FULLSCREEN_PREVIEW_HEIGHT_STRETCH = 0.12;
+const SWIPE_FULLSCREEN_PREVIEW_WIDTH_STRETCH = 0.06;
+const SWIPE_FULLSCREEN_PREVIEW_HEIGHT_STRETCH = SWIPE_FULLSCREEN_PREVIEW_WIDTH_STRETCH;
 const SWIPE_FULLSCREEN_PREVIEW_TOP_TRAVEL = 36;
 
 const fullscreenSwipePreviewTarget = (origin: RectSnapshot): RectSnapshot => {
