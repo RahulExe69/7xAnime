@@ -254,12 +254,22 @@ export function PlayerViewport({
     document.documentElement.style.removeProperty("--player-swipe-progress");
   }, []);
 
-  const applyPlayerPreview = useCallback((origin: RectSnapshot, target: RectSnapshot, rawProgress: number) => {
+  const applyPlayerPreview = useCallback((
+    origin: RectSnapshot,
+    target: RectSnapshot,
+    rawProgress: number,
+    followVerticalDistance?: number,
+  ) => {
     const node = rootRef.current;
     if (!node || origin.width <= 0 || origin.height <= 0) return;
     const progress = Math.min(1, Math.max(0, rawProgress));
     const left = origin.left + (target.left - origin.left) * progress;
-    const top = origin.top + (target.top - origin.top) * progress;
+    // During inline-to-mini collapse, vertical travel remains attached to the
+    // finger while X/size interpolate toward the mini-player dock. On release,
+    // the route FLIP finishes the final few pixels into the docked rectangle.
+    const top = followVerticalDistance == null
+      ? origin.top + (target.top - origin.top) * progress
+      : origin.top + Math.max(0, followVerticalDistance);
     const width = origin.width + (target.width - origin.width) * progress;
     const height = origin.height + (target.height - origin.height) * progress;
     const scaleX = width / origin.width;
@@ -706,14 +716,23 @@ export function PlayerViewport({
       // into the mini-player slot is handled by the route FLIP transition.
       const target = session.isFullscreen
         ? session.inlineTarget
-        : { ...session.origin, top: session.origin.top + travelDistance };
+        : session.miniTarget;
       if (!target) return;
-      // For inline minimisation, movement is exact finger distance; only the
-      // fade progress is capped. Fullscreen-to-inline still interpolates layout.
+      // On the inline down-swipe, the player shrinks and tracks diagonally
+      // toward the lower-right mini-player slot during the drag itself. Its
+      // vertical coordinate still follows the finger, rather than jumping to
+      // the dock only after the gesture ends.
+      const maxVerticalTravel = session.isFullscreen
+        ? undefined
+        : Math.max(0, target.top - session.origin.top);
+      const verticalTravel = maxVerticalTravel == null
+        ? undefined
+        : Math.min(travelDistance, maxVerticalTravel);
       applyPlayerPreview(
         session.origin,
         target,
-        session.isFullscreen ? progress : travelDistance > 0 ? 1 : 0,
+        progress,
+        verticalTravel,
       );
       applySwipeContentProgress(
         progress,
@@ -768,14 +787,20 @@ export function PlayerViewport({
       // During the drag, both the viewport and adjacent watch content move down
       // by the same distance. Capture the visible player rect before navigating
       // so the post-release FLIP can finish toward the fixed mini-player slot.
-      const inlineFollowTarget = {
-        ...session.origin,
-        top: session.origin.top + Math.max(0, finalDirectionalDistance),
-      };
+      const inlineFollowTarget = session.miniTarget;
+      if (!inlineFollowTarget) {
+        clearSwipeContentProgress(true);
+        return;
+      }
+      const verticalTravel = Math.min(
+        Math.max(0, finalDirectionalDistance),
+        Math.max(0, inlineFollowTarget.top - session.origin.top),
+      );
       applyPlayerPreview(
         session.origin,
         inlineFollowTarget,
-        finalDirectionalDistance > 0 ? 1 : 0,
+        progress,
+        verticalTravel,
       );
       applySwipeContentProgress(progress, "collapse", Math.max(0, finalDirectionalDistance));
       const viewportWidth = document.documentElement.clientWidth || window.innerWidth;
@@ -1082,7 +1107,7 @@ export function PlayerViewport({
   }, []);
 
   const viewportClasses = isFullscreen
-    ? "fixed inset-0 z-[10000] !m-0 !h-[100dvh] !min-h-0 !w-screen !max-h-none !max-w-none !aspect-auto !rounded-none !border-0 !shadow-none bg-black touch-pan-x"
+    ? "fixed inset-0 z-[10000] !m-0 !h-[100dvh] !min-h-0 !w-screen !max-h-none !max-w-none !aspect-auto !rounded-none !border-0 !shadow-none overflow-hidden isolate bg-black touch-pan-x"
     : "relative aspect-video w-full overflow-hidden rounded-2xl border border-white/10 bg-black shadow-2xl shadow-black/40 touch-pan-x";
 
   return (
@@ -1099,7 +1124,7 @@ export function PlayerViewport({
       aria-label={title}
       data-mini-dragging={isMiniDragging ? "true" : "false"}
     >
-      <div className="absolute inset-0 h-full w-full">
+      <div className="absolute inset-0 h-full w-full overflow-hidden isolate">
         {children}
       </div>
 
