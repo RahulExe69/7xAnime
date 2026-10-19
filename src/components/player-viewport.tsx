@@ -65,6 +65,21 @@ const SWIPE_TOUCH_SLOP = 8;
 const SWIPE_FLING_DISTANCE = 34;
 const SWIPE_FLING_VELOCITY = 680;
 const SWIPE_ANIMATION_DISTANCE = 240;
+// Keep the finger-tracked fullscreen preview elastic but deliberately bounded.
+// Once the swipe commits, FLIP animates from this small stretch into fullscreen.
+const SWIPE_FULLSCREEN_PREVIEW_WIDTH_STRETCH = 0.025;
+const SWIPE_FULLSCREEN_PREVIEW_HEIGHT_STRETCH = 0.12;
+const SWIPE_FULLSCREEN_PREVIEW_TOP_TRAVEL = 36;
+
+const fullscreenSwipePreviewTarget = (origin: RectSnapshot): RectSnapshot => {
+  const width = origin.width * (1 + SWIPE_FULLSCREEN_PREVIEW_WIDTH_STRETCH);
+  return {
+    left: origin.left - (width - origin.width) / 2,
+    top: origin.top - SWIPE_FULLSCREEN_PREVIEW_TOP_TRAVEL,
+    width,
+    height: origin.height * (1 + SWIPE_FULLSCREEN_PREVIEW_HEIGHT_STRETCH),
+  };
+};
 
 const shouldCommitVerticalSwipe = (distance: number, velocityTowardGesture: number) =>
   distance >= SWIPE_THRESHOLD ||
@@ -86,9 +101,9 @@ export function PlayerViewport({
   const nativeSwipeRef = useRef<NativeSwipeSession | null>(null);
   const pointerSwipeRef = useRef<NativeSwipeSession | null>(null);
   const swipePreviewActiveRef = useRef(false);
-  const ancillaryStylesRef = useRef(new Map<HTMLElement, { opacity: string; pointerEvents: string; transition: string; translate: string; transform: string; transformOrigin: string; willChange: string }>());
+  const ancillaryStylesRef = useRef(new Map<HTMLElement, { opacity: string; pointerEvents: string; transition: string; translate: string; transform: string; transformOrigin: string; willChange: string; position: string; zIndex: string }>());
   const ancillaryRectsRef = useRef(new Map<HTMLElement, RectSnapshot>());
-  const routeContentStyleRef = useRef<{ element: HTMLElement; opacity: string; pointerEvents: string; transition: string; translate: string; transform: string; transformOrigin: string; willChange: string } | null>(null);
+  const routeContentStyleRef = useRef<{ element: HTMLElement; opacity: string; pointerEvents: string; transition: string; translate: string; transform: string; transformOrigin: string; willChange: string; position: string; zIndex: string } | null>(null);
   const [isMiniDragging, setIsMiniDragging] = useState(false);
   const miniDragRef = useRef<MiniDragGesture | null>(null);
   const suppressMiniClickRef = useRef(false);
@@ -152,9 +167,15 @@ export function PlayerViewport({
           transform: element.style.transform,
           transformOrigin: element.style.transformOrigin,
           willChange: element.style.willChange,
+          position: element.style.position,
+          zIndex: element.style.zIndex,
         });
       }
       element.style.transition = "none";
+      // Explicitly stack watch-page surfaces above the stretched iframe preview.
+      // Transforms form a new stacking context, so DOM order alone is insufficient.
+      element.style.position = "relative";
+      element.style.zIndex = "10003";
       element.style.opacity = opacity;
       element.style.pointerEvents = blockInteractions
         ? "none"
@@ -195,9 +216,13 @@ export function PlayerViewport({
           transform: routeContent.style.transform,
           transformOrigin: routeContent.style.transformOrigin,
           willChange: routeContent.style.willChange,
+          position: routeContent.style.position,
+          zIndex: routeContent.style.zIndex,
         };
       }
       routeContent.style.transition = "none";
+      routeContent.style.position = "relative";
+      routeContent.style.zIndex = "10003";
       routeContent.style.opacity = opacity;
       routeContent.style.pointerEvents = blockInteractions
         ? "none"
@@ -222,7 +247,7 @@ export function PlayerViewport({
   const clearSwipeContentProgress = useCallback((animate = false) => {
     const restore = (element: HTMLElement, original: {
       opacity: string; pointerEvents: string; transition: string; translate: string;
-      transform: string; transformOrigin: string; willChange: string;
+      transform: string; transformOrigin: string; willChange: string; position: string; zIndex: string;
     }) => {
       if (animate) {
         element.style.transition = "opacity 180ms ease-out, transform 180ms cubic-bezier(0.22, 1, 0.36, 1), translate 180ms ease-out";
@@ -231,6 +256,8 @@ export function PlayerViewport({
         element.style.translate = original.translate;
         element.style.transform = original.transform;
         element.style.transformOrigin = original.transformOrigin;
+        element.style.position = original.position;
+        element.style.zIndex = original.zIndex;
         element.style.willChange = original.willChange;
         window.setTimeout(() => { element.style.transition = original.transition; }, 200);
       } else {
@@ -240,6 +267,8 @@ export function PlayerViewport({
         element.style.translate = original.translate;
         element.style.transform = original.transform;
         element.style.transformOrigin = original.transformOrigin;
+        element.style.position = original.position;
+        element.style.zIndex = original.zIndex;
         element.style.willChange = original.willChange;
       }
     };
@@ -756,9 +785,10 @@ export function PlayerViewport({
     }
 
     if (session.direction === "expand" && session.fullscreenTarget) {
-      applyPlayerPreview(session.origin, session.fullscreenTarget, progress);
+      const previewProgress = Math.min(1, travelDistance / SWIPE_THRESHOLD);
+      applyPlayerPreview(session.origin, fullscreenSwipePreviewTarget(session.origin), previewProgress);
       applySwipeContentProgress(progress, "expand", travelDistance);
-      session.previewing = progress > 0;
+      session.previewing = previewProgress > 0;
     }
   }, [applyPlayerPreview, applySwipeContentProgress]);
 
@@ -830,8 +860,9 @@ export function PlayerViewport({
     }
 
     if (!session.isMiniPlayer && !session.isFullscreen && session.direction === "expand" && session.fullscreenTarget) {
-      applyPlayerPreview(session.origin, session.fullscreenTarget, progress);
-      applySwipeContentProgress(progress, "expand");
+      const previewProgress = Math.min(1, Math.max(0, finalDirectionalDistance) / SWIPE_THRESHOLD);
+      applyPlayerPreview(session.origin, fullscreenSwipePreviewTarget(session.origin), previewProgress);
+      applySwipeContentProgress(progress, "expand", Math.max(0, finalDirectionalDistance));
       const viewportWidth = document.documentElement.clientWidth || window.innerWidth;
       const viewportHeight = document.documentElement.clientHeight || window.innerHeight;
       watchLayoutRef.current = { rect: session.origin, viewportWidth, viewportHeight };
