@@ -274,8 +274,8 @@ jobs:
               raise SystemExit("Fullscreen swipe-down must return to the inline watch page before minimising")
           if 'const directionalDistance = session.direction === "collapse" ? deltaY : -deltaY' not in viewport or 'finalDirectionalDistance / SWIPE_ANIMATION_DISTANCE' not in viewport:
               raise SystemExit("Player swipe progress must follow the current locked-direction distance")
-          if 'const target = session.isFullscreen' not in viewport or '? session.inlineTarget' not in viewport or 'top: session.origin.top + travelDistance' not in viewport or 'top: session.origin.top + Math.max(0, finalDirectionalDistance)' not in viewport:
-              raise SystemExit("Fullscreen exit and inline minimisation must preserve state-specific targets and exact finger distance")
+          if 'const target = session.isFullscreen' not in viewport or '? session.inlineTarget' not in viewport or 'followVerticalDistance' not in viewport or 'session.miniTarget' not in viewport or 'const verticalTravel' not in viewport:
+              raise SystemExit("Fullscreen exit and inline minimisation must preserve state-specific targets, finger tracking, and continuous mini-player sizing")
           if 'Math.pow(1 - progress, 3)' not in viewport or 'element.style.translate = direction === "collapse"' not in viewport:
               raise SystemExit("The watch page must move and progressively fade with the inline player gesture")
           if 'mode: "pending" | "drag" | "expand"' in viewport or 'drag.mode === "expand"' in viewport or 'drag.swipeSession' in viewport:
@@ -303,6 +303,8 @@ jobs:
               raise SystemExit("Persistent player host is not mounted from the root layout")
           if "MotionEvent.ACTION_MOVE" not in main_activity or "MotionEvent.ACTION_UP" not in main_activity:
               raise SystemExit("Native continuous embedded-player swipe observation is not installed")
+          if "verticalGesture" not in main_activity or "return verticalGesture;" not in main_activity:
+              raise SystemExit("Vertical drags in cross-origin embeds must claim the gesture so the WebView page cannot scroll simultaneously")
           if "7xanime:native-player-swipe-progress" not in viewport or "7xanime:native-player-swipe-progress" not in main_activity:
               raise SystemExit("Finger-following embedded-player swipe events are not wired end-to-end")
           if 'data-persistent-watch-player="true"' not in persistent_host or "lastWatchHrefRef" not in persistent_host:
@@ -375,8 +377,8 @@ jobs:
           if 'id="episode-list"' not in watch_section or "AnimeEpisodes animeId={animeIdParam}" not in watch_section:
               raise SystemExit("Watch page no longer exposes its episode selector")
           viewport = Path("src/components/player-viewport.tsx").read_text(encoding="utf-8")
-          if "transitionOriginRef" not in viewport or 'transformOrigin = "top left"' not in viewport or "left = origin.left + (target.left - origin.left) * progress" not in viewport or "top = origin.top + (target.top - origin.top) * progress" not in viewport:
-              raise SystemExit("Mini-player expansion/collapse must animate from its actual anchored position")
+          if "transitionOriginRef" not in viewport or 'transformOrigin = "top left"' not in viewport or "left = origin.left + (target.left - origin.left) * progress" not in viewport or "top = followVerticalDistance == null" not in viewport or "overflow-hidden isolate bg-black" not in viewport:
+              raise SystemExit("Mini-player motion must stay anchored to the finger and fullscreen content must be clipped")
           if "Blocked navigation to known advertising host" not in nav:
               raise SystemExit("Known ad-network document navigation is not blocked")
 
