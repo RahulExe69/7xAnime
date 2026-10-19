@@ -624,9 +624,10 @@ def install_picture_in_picture_lifecycle(main_activity: Path) -> None:
 
 
 def install_background_playback_guard(main_activity: Path) -> None:
-    """Stop attached media and detached native fullscreen video when leaving foreground."""
+    """Stop foreground-only media in background and restore embeds on foreground return."""
     text = main_activity.read_text(encoding="utf-8")
     text = add_import(text, "import android.os.Build;")
+    text = add_import(text, "import android.webkit.WebView;")
     if "streamingWebChromeClient.stopFullscreenForBackground()" not in text:
         close = text.rfind("}")
         class_match = re.search(r"class\s+MainActivity\s+extends\s+BridgeActivity\s*\{", text)
@@ -645,7 +646,7 @@ def install_background_playback_guard(main_activity: Path) -> None:
             if (getBridge() != null && getBridge().getWebView() != null) {
                 String stopScript = "(function(){"
                     + "document.querySelectorAll('video,audio').forEach(function(media){try{media.pause();}catch(e){}});"
-                    + "document.querySelectorAll('[data-player-viewport=true] iframe').forEach(function(frame){try{if(frame.contentWindow){frame.contentWindow.postMessage({event:'pause'},'*');frame.contentWindow.postMessage({type:'pause'},'*');frame.contentWindow.postMessage({method:'pause'},'*');frame.contentWindow.postMessage(JSON.stringify({context:'player.js',version:'0.0.11',method:'pause'}),'*');}}catch(e){}});"
+                    + "document.querySelectorAll('[data-player-viewport=true] iframe').forEach(function(frame){try{if(frame.contentWindow){frame.contentWindow.postMessage({event:'pause'},'*');frame.contentWindow.postMessage({type:'pause'},'*');frame.contentWindow.postMessage({method:'pause'},'*');frame.contentWindow.postMessage(JSON.stringify({context:'player.js',version:'0.0.11',method:'pause'}),'*');}var savedSrc=frame.getAttribute('src')||frame.src;if(savedSrc&&savedSrc!=='about:blank'){frame.setAttribute('data-sevenx-background-src',savedSrc);frame.src='about:blank';}}catch(e){}});"
                     + "})();";
                 getBridge().getWebView().evaluateJavascript(stopScript, null);
             }
@@ -654,6 +655,26 @@ def install_background_playback_guard(main_activity: Path) -> None:
     }
 """
         text = text[:close] + method + text[close:]
+
+    # A provider may ignore every cross-origin pause message. Save its URL and
+    # detach the iframe while the Activity is stopped; the active URL is restored
+    # onStart so foreground playback can reload and recover its saved timestamp.
+    if "data-sevenx-background-src" in text and "iframe[data-sevenx-background-src]" not in text:
+        close = text.rfind("}")
+        class_match = re.search(r"class\s+MainActivity\s+extends\s+BridgeActivity\s*\{", text)
+        if not class_match or close < class_match.end():
+            fail("Could not locate MainActivity for restoring backgrounded embeds.")
+        resume_method = """
+    @Override
+    public void onStart() {
+        super.onStart();
+        if (getBridge() != null && getBridge().getWebView() != null) {
+            WebView webView = getBridge().getWebView();
+            webView.evaluateJavascript("(function(){document.querySelectorAll('iframe[data-sevenx-background-src]').forEach(function(frame){var saved=frame.getAttribute('data-sevenx-background-src');frame.removeAttribute('data-sevenx-background-src');if(saved){frame.src=saved;}});})();", null);
+        }
+    }
+"""
+        text = text[:close] + resume_method + text[close:]
     main_activity.write_text(text, encoding="utf-8")
 
 
@@ -705,7 +726,7 @@ def install_update_bridge(main_activity: Path) -> None:
     main_activity.write_text(text, encoding="utf-8")
 
 def install_player_swipe_observer(main_activity: Path) -> None:
-    """Observe embedded-player swipes without consuming their touch events."""
+    """Observe embedded swipes and claim vertical moves to prevent concurrent page scrolling."""
     text = main_activity.read_text(encoding="utf-8")
     text = add_import(text, "import android.view.MotionEvent;")
     text = add_import(text, "import android.webkit.WebView;")
@@ -725,6 +746,7 @@ def install_player_swipe_observer(main_activity: Path) -> None:
             private long startAt;
             private long lastDispatchAt;
             private boolean trackingPlayerGesture;
+            private boolean verticalGesture;
             private int gestureToken;
 
             private String makeEvent(String phase, float x, float y, float density, long elapsed) {
@@ -757,6 +779,7 @@ def install_player_swipe_observer(main_activity: Path) -> None:
                     startAt = event.getEventTime();
                     lastDispatchAt = startAt;
                     trackingPlayerGesture = false;
+                    verticalGesture = false;
                     final int token = ++gestureToken;
                     final float cssX = startX / density;
                     final float cssY = startY / density;
@@ -775,23 +798,40 @@ def install_player_swipe_observer(main_activity: Path) -> None:
                     return false;
                 }
                 if (event.getActionMasked() == MotionEvent.ACTION_MOVE) {
-                    if (trackingPlayerGesture && event.getEventTime() - lastDispatchAt >= 16L) {
-                        lastDispatchAt = event.getEventTime();
-                        dispatch("move", event, density);
+                    if (trackingPlayerGesture) {
+                        final float dx = event.getX() - startX;
+                        final float dy = event.getY() - startY;
+                        // A vertical drag inside a cross-origin iframe must belong
+                        // to the player transition, not the WebView's page scroller.
+                        // Keep the claim for the full gesture, including reversals.
+                        if (!verticalGesture
+                                && Math.abs(dy) >= 8f * density
+                                && Math.abs(dy) >= Math.abs(dx) * 1.15f) {
+                            verticalGesture = true;
+                        }
+                        if (event.getEventTime() - lastDispatchAt >= 16L) {
+                            lastDispatchAt = event.getEventTime();
+                            dispatch("move", event, density);
+                        }
+                        return verticalGesture;
                     }
                     return false;
                 }
                 if (event.getActionMasked() == MotionEvent.ACTION_UP) {
+                    final boolean consumeGesture = trackingPlayerGesture && verticalGesture;
                     if (trackingPlayerGesture) dispatch("end", event, density);
                     trackingPlayerGesture = false;
+                    verticalGesture = false;
                     gestureToken++; // Invalidate a late ACTION_DOWN hit-test callback.
-                    return false;
+                    return consumeGesture;
                 }
                 if (event.getActionMasked() == MotionEvent.ACTION_CANCEL) {
+                    final boolean consumeGesture = trackingPlayerGesture && verticalGesture;
                     if (trackingPlayerGesture) dispatch("cancel", event, density);
                     trackingPlayerGesture = false;
+                    verticalGesture = false;
                     gestureToken++;
-                    return false;
+                    return consumeGesture;
                 }
                 return false;
             }

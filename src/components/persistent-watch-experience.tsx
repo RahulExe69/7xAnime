@@ -1,7 +1,7 @@
 "use client";
 
-import { Suspense, type ReactNode, useEffect, useRef, useState } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { Suspense, type ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import VideoPlayerSection from "@/app/anime/watch/video-player-section";
 import { ROUTES } from "@/constants/routes";
 
@@ -12,6 +12,35 @@ type PersistentWatchExperienceProps = {
 type WatchLocationDetail = {
   href?: string;
 };
+
+function WatchRouteScrollReset({ isWatchRoute }: { isWatchRoute: boolean }) {
+  const searchParams = useSearchParams();
+  const watchLocationKey = isWatchRoute
+    ? `${searchParams.get("anime") || ""}:${searchParams.get("episode") || ""}:${searchParams.get("ep") || ""}`
+    : "";
+
+  // Next.js can restore the previous browse-page scroll offset both when
+  // entering the watch route and when changing episodes on the same pathname.
+  // Include the watch query identity so each newly opened episode starts with
+  // its player visible. This hook is isolated under Suspense to keep static
+  // pages buildable while still responding to client-side route changes.
+  useLayoutEffect(() => {
+    if (!isWatchRoute) return;
+
+    const resetScrollPosition = () => {
+      window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+    };
+
+    resetScrollPosition();
+    // A second pass wins over scroll restoration scheduled by route navigation.
+    const frame = window.requestAnimationFrame(resetScrollPosition);
+    return () => window.cancelAnimationFrame(frame);
+  }, [isWatchRoute, watchLocationKey]);
+
+  return null;
+}
 
 export function PersistentWatchExperience({ children }: PersistentWatchExperienceProps) {
   const pathname = usePathname() || ROUTES.HOME;
@@ -63,6 +92,9 @@ export function PersistentWatchExperience({ children }: PersistentWatchExperienc
 
   return (
     <div className="persistent-watch-experience" data-player-mode={playerMode}>
+      <Suspense fallback={null}>
+        <WatchRouteScrollReset isWatchRoute={isWatchRoute} />
+      </Suspense>
       <div data-persistent-route-content="true">
         {!isWatchRoute ? children : null}
       </div>

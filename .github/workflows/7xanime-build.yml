@@ -268,19 +268,22 @@ jobs:
               raise SystemExit("Double-tap ±10-second seeking wiring missing")
           if "SWIPE_THRESHOLD" not in viewport or "enterNativePlayerFullscreen" not in viewport:
               raise SystemExit("Player swipe/fullscreen wiring missing")
-          # The gesture direction is locked at the first intentional vertical movement.
-          # Track peak travel in that direction so reversing before release cannot
-          # turn a fullscreen-down gesture into a mini-player collapse.
+          if "SWIPE_FULLSCREEN_PREVIEW_HEIGHT_STRETCH" not in viewport or "fullscreenSwipePreviewTarget" not in viewport:
+              raise SystemExit("Fullscreen swipe must use a bounded elastic preview before the fullscreen trigger")
+          if 'element.style.zIndex = "10003"' not in viewport or "element.style.zIndex = original.zIndex" not in viewport:
+              raise SystemExit("Adjacent watch-page surfaces must mask the stretched player preview and restore their original stacking")
+          # Lock the initial gesture direction, but derive preview and release
+          # progress from the current finger position so reversing follows the finger.
           if 'if (session.isFullscreen && session.direction === "collapse" && session.inlineTarget)' not in viewport:
               raise SystemExit("Fullscreen swipe-down must return to the inline watch page before minimising")
-          if 'session.maxDirectionalDistance' not in viewport or 'session.direction === "collapse" ? deltaY : -deltaY' not in viewport:
-              raise SystemExit("Player swipe progress must remain aligned with the locked gesture direction")
-          if 'session.isFullscreen ? session.inlineTarget : session.miniTarget' not in viewport:
-              raise SystemExit("Fullscreen exit and inline minimisation targets must remain state-specific")
-          if 'direction === "restore" ? progress : 1 - progress' not in viewport:
-              raise SystemExit("Fullscreen exit must reveal surrounding watch-page content with gesture progress")
-          if 'mode: "pending" | "drag" | "expand"' not in viewport or 'drag.mode === "expand"' not in viewport or 'commitSwipeGesture(drag.swipeSession, deltaX)' not in viewport:
-              raise SystemExit("A deliberate upward mini-player swipe must animate expansion on pointer-up")
+          if 'const directionalDistance = session.direction === "collapse" ? deltaY : -deltaY' not in viewport or 'finalDirectionalDistance / SWIPE_ANIMATION_DISTANCE' not in viewport:
+              raise SystemExit("Player swipe progress must follow the current locked-direction distance")
+          if 'const target = session.isFullscreen' not in viewport or '? session.inlineTarget' not in viewport or 'followVerticalDistance' not in viewport or 'session.miniTarget' not in viewport or 'const verticalTravel' not in viewport:
+              raise SystemExit("Fullscreen exit and inline minimisation must preserve state-specific targets, finger tracking, and continuous mini-player sizing")
+          if 'Math.pow(1 - progress, 3)' not in viewport or 'element.style.translate = direction === "collapse"' not in viewport:
+              raise SystemExit("The watch page must move and progressively fade with the inline player gesture")
+          if 'mode: "pending" | "drag" | "expand"' in viewport or 'drag.mode === "expand"' in viewport or 'drag.swipeSession' in viewport:
+              raise SystemExit("Mini-player upward swipes must not invoke the fullscreen expansion gesture")
           if 'dispatchPlayerAction("expand-mini-player")' not in viewport or 'if (!drag.moved || drag.mode === "pending")' not in viewport:
               raise SystemExit("Tapping the mini-player must restore the watch page from pointer-up")
           if 'data-player-viewport="true"' not in viewport:
@@ -296,6 +299,7 @@ jobs:
           if "disablePictureInPicture" not in viewport or "disablepictureinpicture" not in viewport:
               raise SystemExit("Accessible HTML5 video elements must explicitly disable Picture-in-Picture")
           persistent_host = Path("src/components/persistent-watch-experience.tsx").read_text(encoding="utf-8")
+          episode_list = Path("src/components/anime-episodes.tsx").read_text(encoding="utf-8")
           watch_page = Path("src/app/anime/watch/page.tsx").read_text(encoding="utf-8")
           layout = Path("src/app/layout.tsx").read_text(encoding="utf-8")
           css = Path("src/app/globals.css").read_text(encoding="utf-8")
@@ -303,6 +307,8 @@ jobs:
               raise SystemExit("Persistent player host is not mounted from the root layout")
           if "MotionEvent.ACTION_MOVE" not in main_activity or "MotionEvent.ACTION_UP" not in main_activity:
               raise SystemExit("Native continuous embedded-player swipe observation is not installed")
+          if "verticalGesture" not in main_activity or "return verticalGesture;" not in main_activity:
+              raise SystemExit("Vertical drags in cross-origin embeds must claim the gesture so the WebView page cannot scroll simultaneously")
           if "7xanime:native-player-swipe-progress" not in viewport or "7xanime:native-player-swipe-progress" not in main_activity:
               raise SystemExit("Finger-following embedded-player swipe events are not wired end-to-end")
           if 'data-persistent-watch-player="true"' not in persistent_host or "lastWatchHrefRef" not in persistent_host:
@@ -318,6 +324,12 @@ jobs:
               raise SystemExit("Background playback stop / PiP lifecycle handling is missing")
           if "getLocalWatchProgress" not in watch_section or "requestEmbedResume" not in watch_section:
               raise SystemExit("Cross-server watch-progress resume handling is missing")
+          if "if (responseSinceResume) return;" not in watch_section or "for (const delay of [400, 1100])" not in watch_section:
+              raise SystemExit("Foreground recovery must not reconnect healthy embeds or send a late duplicate play command")
+          if "overscroll-auto" not in episode_list or "overscroll-contain" in episode_list:
+              raise SystemExit("Episode-list boundary scrolling must chain naturally into the page")
+          if "useLayoutEffect" not in persistent_host or "window.scrollTo({ top: 0, left: 0, behavior: \"auto\" })" not in persistent_host or "watchLocationKey" not in persistent_host or "useSearchParams" not in persistent_host:
+              raise SystemExit("Opening or switching episodes must reset stale browse-page scroll restoration")
           if "requestExternalPlayerState" not in watch_section or "getPaused" not in watch_section:
               raise SystemExit("Common embedded-player pause-state probing is missing")
           if "source.eventName" not in watch_section or "lastEmbedMediaTimeRef" not in watch_section:
@@ -369,8 +381,8 @@ jobs:
           if 'id="episode-list"' not in watch_section or "AnimeEpisodes animeId={animeIdParam}" not in watch_section:
               raise SystemExit("Watch page no longer exposes its episode selector")
           viewport = Path("src/components/player-viewport.tsx").read_text(encoding="utf-8")
-          if "transitionOriginRef" not in viewport or 'transformOrigin = "top left"' not in viewport or "left = origin.left + (target.left - origin.left) * progress" not in viewport or "top = origin.top + (target.top - origin.top) * progress" not in viewport:
-              raise SystemExit("Mini-player expansion/collapse must animate from its actual anchored position")
+          if "transitionOriginRef" not in viewport or 'transformOrigin = "top left"' not in viewport or "left = origin.left + (target.left - origin.left) * progress" not in viewport or "top = followVerticalDistance == null" not in viewport or 'node.style.zIndex = "10002"' not in viewport or "overflow-hidden isolate bg-black" not in viewport:
+              raise SystemExit("Mini-player motion must stay anchored to the finger, paint above page siblings, and clip fullscreen content")
           if "Blocked navigation to known advertising host" not in nav:
               raise SystemExit("Known ad-network document navigation is not blocked")
 
@@ -438,10 +450,12 @@ jobs:
           if "Image.Resampling.LANCZOS" in launcher_script or "ic_launcher_foreground.png" in launcher_script:
               raise SystemExit("Launcher script must not resize or redraw the approved source icon")
           background_guard = Path(".github/scripts/configure-local-anime-backend.py").read_text(encoding="utf-8")
-          if "frame.src='about:blank'" in background_guard:
-              raise SystemExit("Background lifecycle must not destroy the embedded iframe document")
+          if "frame.src='about:blank'" not in background_guard or "data-sevenx-background-src" not in background_guard:
+              raise SystemExit("Background lifecycle must detach iframe playback that ignores pause messages and retain its source for restore")
+          if "iframe[data-sevenx-background-src]" not in background_guard or "void onStart()" not in background_guard:
+              raise SystemExit("Backgrounded iframe sources must be restored on Activity foreground")
           if "frame.contentWindow.postMessage({event:'pause'}" not in background_guard:
-              raise SystemExit("Background lifecycle must preserve embedded players while asking them to pause")
+              raise SystemExit("Background lifecycle must request an orderly player pause before detaching the iframe")
           print("Provider-agnostic filter-list engine, pause-safe background lifecycle, warning-card removal, approved 7xAnime branding, fullscreen and seeking gestures are wired.")
           PY
 
