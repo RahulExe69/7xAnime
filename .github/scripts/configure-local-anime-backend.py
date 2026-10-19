@@ -725,6 +725,7 @@ def install_player_swipe_observer(main_activity: Path) -> None:
             private long startAt;
             private long lastDispatchAt;
             private boolean trackingPlayerGesture;
+            private boolean verticalGesture;
             private int gestureToken;
 
             private String makeEvent(String phase, float x, float y, float density, long elapsed) {
@@ -757,6 +758,7 @@ def install_player_swipe_observer(main_activity: Path) -> None:
                     startAt = event.getEventTime();
                     lastDispatchAt = startAt;
                     trackingPlayerGesture = false;
+                    verticalGesture = false;
                     final int token = ++gestureToken;
                     final float cssX = startX / density;
                     final float cssY = startY / density;
@@ -775,23 +777,40 @@ def install_player_swipe_observer(main_activity: Path) -> None:
                     return false;
                 }
                 if (event.getActionMasked() == MotionEvent.ACTION_MOVE) {
-                    if (trackingPlayerGesture && event.getEventTime() - lastDispatchAt >= 16L) {
-                        lastDispatchAt = event.getEventTime();
-                        dispatch("move", event, density);
+                    if (trackingPlayerGesture) {
+                        final float dx = event.getX() - startX;
+                        final float dy = event.getY() - startY;
+                        // A vertical drag inside a cross-origin iframe must belong
+                        // to the player transition, not the WebView's page scroller.
+                        // Keep the claim for the full gesture, including reversals.
+                        if (!verticalGesture
+                                && Math.abs(dy) >= 8f * density
+                                && Math.abs(dy) >= Math.abs(dx) * 1.15f) {
+                            verticalGesture = true;
+                        }
+                        if (event.getEventTime() - lastDispatchAt >= 16L) {
+                            lastDispatchAt = event.getEventTime();
+                            dispatch("move", event, density);
+                        }
+                        return verticalGesture;
                     }
                     return false;
                 }
                 if (event.getActionMasked() == MotionEvent.ACTION_UP) {
+                    final boolean consumeGesture = trackingPlayerGesture && verticalGesture;
                     if (trackingPlayerGesture) dispatch("end", event, density);
                     trackingPlayerGesture = false;
+                    verticalGesture = false;
                     gestureToken++; // Invalidate a late ACTION_DOWN hit-test callback.
-                    return false;
+                    return consumeGesture;
                 }
                 if (event.getActionMasked() == MotionEvent.ACTION_CANCEL) {
+                    final boolean consumeGesture = trackingPlayerGesture && verticalGesture;
                     if (trackingPlayerGesture) dispatch("cancel", event, density);
                     trackingPlayerGesture = false;
+                    verticalGesture = false;
                     gestureToken++;
-                    return false;
+                    return consumeGesture;
                 }
                 return false;
             }
