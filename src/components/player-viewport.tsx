@@ -101,9 +101,9 @@ export function PlayerViewport({
   const nativeSwipeRef = useRef<NativeSwipeSession | null>(null);
   const pointerSwipeRef = useRef<NativeSwipeSession | null>(null);
   const swipePreviewActiveRef = useRef(false);
-  const ancillaryStylesRef = useRef(new Map<HTMLElement, { opacity: string; pointerEvents: string; transition: string; translate: string; transform: string; transformOrigin: string; willChange: string; position: string; zIndex: string }>());
+  const ancillaryStylesRef = useRef(new Map<HTMLElement, { opacity: string; pointerEvents: string; transition: string; translate: string; transform: string; transformOrigin: string; willChange: string; position: string; zIndex: string; scale: string }>());
   const ancillaryRectsRef = useRef(new Map<HTMLElement, RectSnapshot>());
-  const routeContentStyleRef = useRef<{ element: HTMLElement; opacity: string; pointerEvents: string; transition: string; translate: string; transform: string; transformOrigin: string; willChange: string; position: string; zIndex: string } | null>(null);
+  const routeContentStyleRef = useRef<{ element: HTMLElement; opacity: string; pointerEvents: string; transition: string; translate: string; transform: string; transformOrigin: string; willChange: string; position: string; zIndex: string; scale: string } | null>(null);
   const [isMiniDragging, setIsMiniDragging] = useState(false);
   const miniDragRef = useRef<MiniDragGesture | null>(null);
   const suppressMiniClickRef = useRef(false);
@@ -146,14 +146,18 @@ export function PlayerViewport({
     rawProgress: number,
     direction: "collapse" | "expand" | "restore",
     rawDistance = rawProgress * SWIPE_ANIMATION_DISTANCE,
+    collapseTarget?: RectSnapshot,
   ) => {
     // Keep the page and player on one shared drag distance. The viewport is
     // moved by applyPlayerPreview while its sibling surfaces receive the same
     // translate below; opacity has its own progress curve so it can fade out
     // early without capping the player's movement away from the user's finger.
     const progress = Math.min(1, Math.max(0, rawProgress));
-    const opacity = String(direction === "restore" ? progress : direction === "collapse" ? Math.pow(1 - progress, 3) : 1 - progress);
-    const blockInteractions = direction === "restore" ? progress < 0.96 : progress > 0.04;
+    const collapseProgress = direction === "collapse"
+      ? Math.min(1, Math.max(0, rawDistance / SWIPE_ANIMATION_DISTANCE))
+      : progress;
+    const opacity = String(direction === "restore" ? progress : direction === "collapse" ? Math.pow(1 - collapseProgress, 3) : 1 - progress);
+    const blockInteractions = direction === "restore" ? progress < 0.96 : (direction === "collapse" ? collapseProgress : progress) > 0.04;
     const viewport = rootRef.current;
     const playerHost = viewport?.closest<HTMLElement>("[data-persistent-watch-player]") ?? null;
 
@@ -169,6 +173,11 @@ export function PlayerViewport({
           willChange: element.style.willChange,
           position: element.style.position,
           zIndex: element.style.zIndex,
+          scale: element.style.scale,
+        });
+        const rect = element.getBoundingClientRect();
+        ancillaryRectsRef.current.set(element, {
+          left: rect.left, top: rect.top, width: rect.width, height: rect.height,
         });
       }
       element.style.transition = "none";
@@ -180,15 +189,28 @@ export function PlayerViewport({
       element.style.pointerEvents = blockInteractions
         ? "none"
         : ancillaryStylesRef.current.get(element)?.pointerEvents ?? "";
-      element.style.transform = ancillaryStylesRef.current.get(element)?.transform ?? "";
-      element.style.transformOrigin = ancillaryStylesRef.current.get(element)?.transformOrigin ?? "";
-      // Translate every non-player watch-page surface by the same distance as
-      // the player. This keeps the page visually attached instead of leaving
-      // stationary details behind while the iframe moves away.
-      element.style.translate = direction === "collapse"
-        ? `0 ${Math.max(0, rawDistance)}px`
-        : ancillaryStylesRef.current.get(element)?.translate ?? "";
-      element.style.willChange = direction === "collapse" ? "opacity, translate" : "opacity";
+      const original = ancillaryStylesRef.current.get(element);
+      const originalRect = ancillaryRectsRef.current.get(element);
+      element.style.transform = original?.transform ?? "";
+      element.style.transformOrigin = original?.transformOrigin ?? "";
+      if (direction === "collapse" && collapseTarget && originalRect) {
+        // Move every page surface toward the same mini-player dock as the video.
+        // The scale is centred on each surface while its translation converges
+        // its centre on the dock, creating one coherent collapse instead of a
+        // full-sized page simply sliding downward behind an independent player.
+        const targetCenterX = collapseTarget.left + collapseTarget.width / 2;
+        const targetCenterY = collapseTarget.top + collapseTarget.height / 2;
+        const originCenterX = originalRect.left + originalRect.width / 2;
+        const originCenterY = originalRect.top + originalRect.height / 2;
+        const translateX = (targetCenterX - originCenterX) * collapseProgress;
+        const translateY = (targetCenterY - originCenterY) * collapseProgress;
+        element.style.translate = `${translateX}px ${translateY}px`;
+        element.style.scale = String(Math.max(0.15, 1 - collapseProgress * 0.85));
+      } else {
+        element.style.translate = original?.translate ?? "";
+        element.style.scale = original?.scale ?? "";
+      }
+      element.style.willChange = direction === "collapse" ? "opacity, translate, scale" : "opacity";
     };
 
     if (viewport && playerHost) {
@@ -218,6 +240,7 @@ export function PlayerViewport({
           willChange: routeContent.style.willChange,
           position: routeContent.style.position,
           zIndex: routeContent.style.zIndex,
+          scale: routeContent.style.scale,
         };
       }
       routeContent.style.transition = "none";
@@ -247,10 +270,10 @@ export function PlayerViewport({
   const clearSwipeContentProgress = useCallback((animate = false) => {
     const restore = (element: HTMLElement, original: {
       opacity: string; pointerEvents: string; transition: string; translate: string;
-      transform: string; transformOrigin: string; willChange: string; position: string; zIndex: string;
+      transform: string; transformOrigin: string; willChange: string; position: string; zIndex: string; scale: string;
     }) => {
       if (animate) {
-        element.style.transition = "opacity 180ms ease-out, transform 180ms cubic-bezier(0.22, 1, 0.36, 1), translate 180ms ease-out";
+        element.style.transition = "opacity 180ms ease-out, transform 180ms cubic-bezier(0.22, 1, 0.36, 1), translate 180ms ease-out, scale 180ms ease-out";
         element.style.opacity = original.opacity;
         element.style.pointerEvents = original.pointerEvents;
         element.style.translate = original.translate;
@@ -258,6 +281,7 @@ export function PlayerViewport({
         element.style.transformOrigin = original.transformOrigin;
         element.style.position = original.position;
         element.style.zIndex = original.zIndex;
+        element.style.scale = original.scale;
         element.style.willChange = original.willChange;
         window.setTimeout(() => { element.style.transition = original.transition; }, 200);
       } else {
@@ -269,6 +293,7 @@ export function PlayerViewport({
         element.style.transformOrigin = original.transformOrigin;
         element.style.position = original.position;
         element.style.zIndex = original.zIndex;
+        element.style.scale = original.scale;
         element.style.willChange = original.willChange;
       }
     };
@@ -779,6 +804,7 @@ export function PlayerViewport({
         progress,
         session.isFullscreen ? "restore" : "collapse",
         travelDistance,
+        session.isFullscreen ? undefined : session.miniTarget ?? undefined,
       );
       session.previewing = progress > 0;
       return;
@@ -844,7 +870,7 @@ export function PlayerViewport({
         progress,
         verticalTravel,
       );
-      applySwipeContentProgress(progress, "collapse", Math.max(0, finalDirectionalDistance));
+      applySwipeContentProgress(progress, "collapse", Math.max(0, finalDirectionalDistance), session.miniTarget);
       const viewportWidth = document.documentElement.clientWidth || window.innerWidth;
       const viewportHeight = document.documentElement.clientHeight || window.innerHeight;
       watchLayoutRef.current = { rect: session.origin, viewportWidth, viewportHeight };

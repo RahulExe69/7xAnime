@@ -280,8 +280,10 @@ jobs:
               raise SystemExit("Player swipe progress must follow the current locked-direction distance")
           if 'const target = session.isFullscreen' not in viewport or '? session.inlineTarget' not in viewport or 'followVerticalDistance' not in viewport or 'session.miniTarget' not in viewport or 'const verticalTravel' not in viewport:
               raise SystemExit("Fullscreen exit and inline minimisation must preserve state-specific targets, finger tracking, and continuous mini-player sizing")
-          if 'Math.pow(1 - progress, 3)' not in viewport or 'element.style.translate = direction === "collapse"' not in viewport:
-              raise SystemExit("The watch page must move and progressively fade with the inline player gesture")
+          if 'Math.pow(1 - collapseProgress, 3)' not in viewport or 'collapseTarget?: RectSnapshot' not in viewport or 'targetCenterX - originCenterX' not in viewport or 'element.style.scale = String(Math.max(0.15, 1 - collapseProgress * 0.85))' not in viewport:
+              raise SystemExit("The watch page must move and progressively scale/fade toward the mini-player dock with the inline player gesture")
+          if "ancillaryRectsRef.current.set(element" not in viewport or "element.style.scale = original.scale" not in viewport:
+              raise SystemExit("The shared watch-page motion must restore its original geometry after a cancelled gesture")
           if 'mode: "pending" | "drag" | "expand"' in viewport or 'drag.mode === "expand"' in viewport or 'drag.swipeSession' in viewport:
               raise SystemExit("Mini-player upward swipes must not invoke the fullscreen expansion gesture")
           if 'dispatchPlayerAction("expand-mini-player")' not in viewport or 'if (!drag.moved || drag.mode === "pending")' not in viewport:
