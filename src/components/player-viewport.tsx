@@ -153,8 +153,11 @@ export function PlayerViewport({
     // translate below; opacity has its own progress curve so it can fade out
     // early without capping the player's movement away from the user's finger.
     const progress = Math.min(1, Math.max(0, rawProgress));
-    const opacity = String(direction === "restore" ? progress : direction === "collapse" ? Math.pow(1 - progress, 3) : 1 - progress);
-    const blockInteractions = direction === "restore" ? progress < 0.96 : progress > 0.04;
+    const collapseProgress = direction === "collapse"
+      ? Math.min(1, Math.max(0, rawDistance / SWIPE_ANIMATION_DISTANCE))
+      : progress;
+    const opacity = String(direction === "restore" ? progress : direction === "collapse" ? Math.pow(1 - collapseProgress, 3) : 1 - progress);
+    const blockInteractions = direction === "restore" ? progress < 0.96 : (direction === "collapse" ? collapseProgress : progress) > 0.04;
     const viewport = rootRef.current;
     const playerHost = viewport?.closest<HTMLElement>("[data-persistent-watch-player]") ?? null;
 
@@ -199,10 +202,10 @@ export function PlayerViewport({
         const targetCenterY = collapseTarget.top + collapseTarget.height / 2;
         const originCenterX = originalRect.left + originalRect.width / 2;
         const originCenterY = originalRect.top + originalRect.height / 2;
-        const translateX = (targetCenterX - originCenterX) * progress;
-        const translateY = (targetCenterY - originCenterY) * progress;
+        const translateX = (targetCenterX - originCenterX) * collapseProgress;
+        const translateY = (targetCenterY - originCenterY) * collapseProgress;
         element.style.translate = `${translateX}px ${translateY}px`;
-        element.style.scale = String(Math.max(0.15, 1 - progress * 0.85));
+        element.style.scale = String(Math.max(0.15, 1 - collapseProgress * 0.85));
       } else {
         element.style.translate = original?.translate ?? "";
         element.style.scale = original?.scale ?? "";
