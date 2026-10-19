@@ -112,6 +112,12 @@ jobs:
           fi
           bash .github/scripts/android-version.sh "${VERSION}" >> "${GITHUB_ENV}"
 
+      - name: Verify Android bundle enables the on-device API
+        run: |
+          set -euo pipefail
+          grep -Fq 'NEXT_PUBLIC_LOCAL_BACKEND=1 NEXT_STATIC_EXPORT=1 npm run build' .github/scripts/build-7xanime-web.sh
+          grep -Fq 'process.env.NEXT_PUBLIC_LOCAL_BACKEND === "1"' src/lib/api.ts
+
       - name: Build static web bundle
         run: npm run build:android-web
 
