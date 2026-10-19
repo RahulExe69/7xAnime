@@ -268,6 +268,10 @@ jobs:
               raise SystemExit("Double-tap ±10-second seeking wiring missing")
           if "SWIPE_THRESHOLD" not in viewport or "enterNativePlayerFullscreen" not in viewport:
               raise SystemExit("Player swipe/fullscreen wiring missing")
+          if "SWIPE_FULLSCREEN_PREVIEW_HEIGHT_STRETCH" not in viewport or "fullscreenSwipePreviewTarget" not in viewport:
+              raise SystemExit("Fullscreen swipe must use a bounded elastic preview before the fullscreen trigger")
+          if 'element.style.zIndex = "10003"' not in viewport or "element.style.zIndex = original.zIndex" not in viewport:
+              raise SystemExit("Adjacent watch-page surfaces must mask the stretched player preview and restore their original stacking")
           # Lock the initial gesture direction, but derive preview and release
           # progress from the current finger position so reversing follows the finger.
           if 'if (session.isFullscreen && session.direction === "collapse" && session.inlineTarget)' not in viewport:
@@ -446,10 +450,12 @@ jobs:
           if "Image.Resampling.LANCZOS" in launcher_script or "ic_launcher_foreground.png" in launcher_script:
               raise SystemExit("Launcher script must not resize or redraw the approved source icon")
           background_guard = Path(".github/scripts/configure-local-anime-backend.py").read_text(encoding="utf-8")
-          if "frame.src='about:blank'" in background_guard:
-              raise SystemExit("Background lifecycle must not destroy the embedded iframe document")
+          if "frame.src='about:blank'" not in background_guard or "data-sevenx-background-src" not in background_guard:
+              raise SystemExit("Background lifecycle must detach iframe playback that ignores pause messages and retain its source for restore")
+          if "iframe[data-sevenx-background-src]" not in background_guard or "void onStart()" not in background_guard:
+              raise SystemExit("Backgrounded iframe sources must be restored on Activity foreground")
           if "frame.contentWindow.postMessage({event:'pause'}" not in background_guard:
-              raise SystemExit("Background lifecycle must preserve embedded players while asking them to pause")
+              raise SystemExit("Background lifecycle must request an orderly player pause before detaching the iframe")
           print("Provider-agnostic filter-list engine, pause-safe background lifecycle, warning-card removal, approved 7xAnime branding, fullscreen and seeking gestures are wired.")
           PY
 
