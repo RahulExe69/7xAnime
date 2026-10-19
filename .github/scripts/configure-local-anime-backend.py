@@ -661,7 +661,7 @@ def install_background_playback_guard(main_activity: Path) -> None:
     # onStart so foreground playback can reload and recover its saved timestamp.
     if "data-sevenx-background-src" in text and "iframe[data-sevenx-background-src]" not in text:
         close = text.rfind("}")
-        class_match = re.search(r"class\\s+MainActivity\\s+extends\\s+BridgeActivity\\s*\\{", text)
+        class_match = re.search(r"class\s+MainActivity\s+extends\s+BridgeActivity\s*\{", text)
         if not class_match or close < class_match.end():
             fail("Could not locate MainActivity for restoring backgrounded embeds.")
         resume_method = """
