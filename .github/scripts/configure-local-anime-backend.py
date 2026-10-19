@@ -655,6 +655,26 @@ def install_background_playback_guard(main_activity: Path) -> None:
     }
 """
         text = text[:close] + method + text[close:]
+
+    # A provider may ignore every cross-origin pause message. Save its URL and
+    # detach the iframe while the Activity is stopped; the active URL is restored
+    # onStart so foreground playback can reload and recover its saved timestamp.
+    if "data-sevenx-background-src" in text and "iframe[data-sevenx-background-src]" not in text:
+        close = text.rfind("}")
+        class_match = re.search(r"class\\s+MainActivity\\s+extends\\s+BridgeActivity\\s*\\{", text)
+        if not class_match or close < class_match.end():
+            fail("Could not locate MainActivity for restoring backgrounded embeds.")
+        resume_method = """
+    @Override
+    public void onStart() {
+        super.onStart();
+        if (getBridge() != null && getBridge().getWebView() != null) {
+            WebView webView = getBridge().getWebView();
+            webView.evaluateJavascript("(function(){document.querySelectorAll('iframe[data-sevenx-background-src]').forEach(function(frame){var saved=frame.getAttribute('data-sevenx-background-src');frame.removeAttribute('data-sevenx-background-src');if(saved){frame.src=saved;}});})();", null);
+        }
+    }
+"""
+        text = text[:close] + resume_method + text[close:]
     main_activity.write_text(text, encoding="utf-8")
 
 
