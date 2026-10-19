@@ -712,8 +712,9 @@ export function PlayerViewport({
 
     if (session.direction === "collapse") {
       // Fullscreen collapses back to its saved inline position. An inline player
-      // instead follows the finger vertically with the page; the final resize
-      // into the mini-player slot is handled by the route FLIP transition.
+      // follows the finger vertically while its size and horizontal position
+      // progressively converge on the mini-player dock. FLIP only finishes any
+      // remaining travel after the finger is released.
       const target = session.isFullscreen
         ? session.inlineTarget
         : session.miniTarget;
@@ -784,9 +785,9 @@ export function PlayerViewport({
     }
 
     if (!session.isMiniPlayer && !session.isFullscreen && session.direction === "collapse" && session.miniTarget) {
-      // During the drag, both the viewport and adjacent watch content move down
-      // by the same distance. Capture the visible player rect before navigating
-      // so the post-release FLIP can finish toward the fixed mini-player slot.
+      // During the drag, player and adjacent page surfaces move down together,
+      // while the player also shrinks and travels toward the dock. Capture that
+      // visible rectangle so the post-release FLIP can finish without a jump.
       const inlineFollowTarget = session.miniTarget;
       if (!inlineFollowTarget) {
         clearSwipeContentProgress(true);
