@@ -624,9 +624,10 @@ def install_picture_in_picture_lifecycle(main_activity: Path) -> None:
 
 
 def install_background_playback_guard(main_activity: Path) -> None:
-    """Stop attached media and detached native fullscreen video when leaving foreground."""
+    """Stop foreground-only media in background and restore embeds on foreground return."""
     text = main_activity.read_text(encoding="utf-8")
     text = add_import(text, "import android.os.Build;")
+    text = add_import(text, "import android.webkit.WebView;")
     if "streamingWebChromeClient.stopFullscreenForBackground()" not in text:
         close = text.rfind("}")
         class_match = re.search(r"class\s+MainActivity\s+extends\s+BridgeActivity\s*\{", text)
@@ -645,7 +646,7 @@ def install_background_playback_guard(main_activity: Path) -> None:
             if (getBridge() != null && getBridge().getWebView() != null) {
                 String stopScript = "(function(){"
                     + "document.querySelectorAll('video,audio').forEach(function(media){try{media.pause();}catch(e){}});"
-                    + "document.querySelectorAll('[data-player-viewport=true] iframe').forEach(function(frame){try{if(frame.contentWindow){frame.contentWindow.postMessage({event:'pause'},'*');frame.contentWindow.postMessage({type:'pause'},'*');frame.contentWindow.postMessage({method:'pause'},'*');frame.contentWindow.postMessage(JSON.stringify({context:'player.js',version:'0.0.11',method:'pause'}),'*');}}catch(e){}});"
+                    + "document.querySelectorAll('[data-player-viewport=true] iframe').forEach(function(frame){try{if(frame.contentWindow){frame.contentWindow.postMessage({event:'pause'},'*');frame.contentWindow.postMessage({type:'pause'},'*');frame.contentWindow.postMessage({method:'pause'},'*');frame.contentWindow.postMessage(JSON.stringify({context:'player.js',version:'0.0.11',method:'pause'}),'*');}var savedSrc=frame.getAttribute('src')||frame.src;if(savedSrc&&savedSrc!=='about:blank'){frame.setAttribute('data-sevenx-background-src',savedSrc);frame.src='about:blank';}}catch(e){}});"
                     + "})();";
                 getBridge().getWebView().evaluateJavascript(stopScript, null);
             }
