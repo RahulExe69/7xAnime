@@ -288,7 +288,11 @@ export function PlayerViewport({
       node.style.borderRadius = "";
       node.style.transition = "";
       node.style.willChange = "";
+      node.style.zIndex = "";
     } else {
+      // A live scale preview must paint above sibling page sections; otherwise
+      // later content is composited over the enlarged iframe as ghost layers.
+      node.style.zIndex = "10002";
       node.style.transition = "none";
       node.style.transformOrigin = "top left";
       node.style.willChange = "transform";
@@ -309,6 +313,7 @@ export function PlayerViewport({
       node.style.borderRadius = "";
       node.style.transition = "";
       node.style.willChange = "";
+      node.style.zIndex = "";
       clearSwipeContentProgress(true);
     };
     if (!currentTransform) {
@@ -403,6 +408,7 @@ export function PlayerViewport({
     const reducedMotion = document.documentElement.dataset.reducedMotion === "true" ||
       window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     if (reducedMotion || !from || rect.width < 1 || rect.height < 1) {
+      node.style.zIndex = "";
       lastRectRef.current = to;
       return;
     }
@@ -415,6 +421,7 @@ export function PlayerViewport({
       Math.abs(deltaX) < 1 && Math.abs(deltaY) < 1 &&
       Math.abs(scaleX - 1) < 0.02 && Math.abs(scaleY - 1) < 0.02
     ) {
+      node.style.zIndex = "";
       lastRectRef.current = to;
       return;
     }
@@ -442,8 +449,12 @@ export function PlayerViewport({
         left: finalRect.left, top: finalRect.top,
         width: finalRect.width, height: finalRect.height,
       };
+      node.style.zIndex = "";
     }).catch(() => {
-      if (layoutAnimationRef.current === animation) layoutAnimationRef.current = null;
+      if (layoutAnimationRef.current === animation) {
+        layoutAnimationRef.current = null;
+        node.style.zIndex = "";
+      }
     });
     return () => {
       // Do not cancel here: a navigation can immediately trigger another
