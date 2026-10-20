@@ -147,6 +147,7 @@ export function PlayerViewport({
     direction: "collapse" | "expand" | "restore",
     rawDistance = rawProgress * SWIPE_ANIMATION_DISTANCE,
     collapseTarget?: RectSnapshot,
+    collapseOrigin?: RectSnapshot,
   ) => {
     // Keep the page and player on one shared drag distance. The viewport is
     // moved by applyPlayerPreview while its sibling surfaces receive the same
@@ -181,10 +182,16 @@ export function PlayerViewport({
         });
       }
       element.style.transition = "none";
-      // Explicitly stack watch-page surfaces above the stretched iframe preview.
-      // Transforms form a new stacking context, so DOM order alone is insufficient.
-      element.style.position = "relative";
-      element.style.zIndex = "10003";
+      // During fullscreen expansion the page masks the elastic video edges. For
+      // minimising, keep page surfaces behind the player so labels never paint
+      // over the anime frame while the two converge into the dock.
+      if (direction === "expand") {
+        element.style.position = "relative";
+        element.style.zIndex = "10003";
+      } else {
+        element.style.position = ancillaryStylesRef.current.get(element)?.position ?? "";
+        element.style.zIndex = ancillaryStylesRef.current.get(element)?.zIndex ?? "";
+      }
       element.style.opacity = opacity;
       element.style.pointerEvents = blockInteractions
         ? "none"
@@ -193,19 +200,25 @@ export function PlayerViewport({
       const originalRect = ancillaryRectsRef.current.get(element);
       element.style.transform = original?.transform ?? "";
       element.style.transformOrigin = original?.transformOrigin ?? "";
-      if (direction === "collapse" && collapseTarget && originalRect) {
-        // Move every page surface toward the same mini-player dock as the video.
-        // The scale is centred on each surface while its translation converges
-        // its centre on the dock, creating one coherent collapse instead of a
-        // full-sized page simply sliding downward behind an independent player.
-        const targetCenterX = collapseTarget.left + collapseTarget.width / 2;
-        const targetCenterY = collapseTarget.top + collapseTarget.height / 2;
-        const originCenterX = originalRect.left + originalRect.width / 2;
-        const originCenterY = originalRect.top + originalRect.height / 2;
-        const translateX = (targetCenterX - originCenterX) * collapseProgress;
-        const translateY = (targetCenterY - originCenterY) * collapseProgress;
+      if (direction === "collapse" && collapseTarget && collapseOrigin && originalRect) {
+        // Apply the same affine transform to every watch-page surface as to the
+        // player: identical scale, X interpolation, and finger-tracked Y travel.
+        // Using one shared origin prevents each label/card from independently
+        // converging on the dock (which made the page feel like detached layers).
+        const targetScale = collapseTarget.width / Math.max(1, collapseOrigin.width);
+        const sharedScale = 1 + (targetScale - 1) * collapseProgress;
+        const currentLeft = collapseOrigin.left +
+          (collapseTarget.left - collapseOrigin.left) * collapseProgress;
+        const maxVerticalTravel = Math.max(0, collapseTarget.top - collapseOrigin.top);
+        const verticalTravel = Math.min(Math.max(0, rawDistance), maxVerticalTravel);
+        const currentTop = collapseOrigin.top + verticalTravel;
+        const translateX = currentLeft +
+          (originalRect.left - collapseOrigin.left) * sharedScale - originalRect.left;
+        const translateY = currentTop +
+          (originalRect.top - collapseOrigin.top) * sharedScale - originalRect.top;
+        element.style.transformOrigin = "top left";
         element.style.translate = `${translateX}px ${translateY}px`;
-        element.style.scale = String(Math.max(0.15, 1 - collapseProgress * 0.85));
+        element.style.scale = String(sharedScale);
       } else {
         element.style.translate = original?.translate ?? "";
         element.style.scale = original?.scale ?? "";
@@ -805,6 +818,7 @@ export function PlayerViewport({
         session.isFullscreen ? "restore" : "collapse",
         travelDistance,
         session.isFullscreen ? undefined : session.miniTarget ?? undefined,
+        session.isFullscreen ? undefined : session.origin,
       );
       session.previewing = progress > 0;
       return;
@@ -870,7 +884,7 @@ export function PlayerViewport({
         progress,
         verticalTravel,
       );
-      applySwipeContentProgress(progress, "collapse", Math.max(0, finalDirectionalDistance), session.miniTarget);
+      applySwipeContentProgress(progress, "collapse", Math.max(0, finalDirectionalDistance), session.miniTarget, session.origin);
       const viewportWidth = document.documentElement.clientWidth || window.innerWidth;
       const viewportHeight = document.documentElement.clientHeight || window.innerHeight;
       watchLayoutRef.current = { rect: session.origin, viewportWidth, viewportHeight };
