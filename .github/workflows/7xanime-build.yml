@@ -334,8 +334,10 @@ jobs:
               raise SystemExit("Background playback stop / PiP lifecycle handling is missing")
           if "getLocalWatchProgress" not in watch_section or "requestEmbedResume" not in watch_section:
               raise SystemExit("Cross-server watch-progress resume handling is missing")
-          if "if (responseSinceResume) return;" not in watch_section or "for (const delay of [400, 1100])" not in watch_section:
-              raise SystemExit("Foreground recovery must not reconnect healthy embeds or send a late duplicate play command")
+          if "Keep the existing iframe document alive." not in watch_section or "for (const delay of [400, 1100])" not in watch_section or "requestExternalPlayerState(frame);" not in watch_section:
+              raise SystemExit("Foreground recovery must keep the iframe session alive and use state probes after WebView resumes")
+          if "const recoveryTimer = window.setTimeout" in watch_section or "Recreate the iframe only when it has stayed completely silent" in watch_section:
+              raise SystemExit("Foreground recovery must not remount an embed simply because its provider is silent")
           if "overscroll-auto" not in episode_list or "overscroll-contain" in episode_list:
               raise SystemExit("Episode-list boundary scrolling must chain naturally into the page")
           if "useLayoutEffect" not in persistent_host or "window.scrollTo({ top: 0, left: 0, behavior: \"auto\" })" not in persistent_host or "watchLocationKey" not in persistent_host or "useSearchParams" not in persistent_host:
