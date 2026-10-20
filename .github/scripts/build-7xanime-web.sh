@@ -41,7 +41,7 @@ if [[ -d "$HEALTH_ROUTE" ]]; then
   mv "$HEALTH_ROUTE" "$HEALTH_BACKUP"
 fi
 
-NEXT_STATIC_EXPORT=1 npm run build
+NEXT_PUBLIC_LOCAL_BACKEND=1 NEXT_STATIC_EXPORT=1 npm run build
 
 test -f out/index.html || {
   echo "::error::Next.js static export did not produce out/index.html."
