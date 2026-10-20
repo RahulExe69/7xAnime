@@ -624,7 +624,7 @@ def install_picture_in_picture_lifecycle(main_activity: Path) -> None:
 
 
 def install_background_playback_guard(main_activity: Path) -> None:
-    """Stop foreground-only media in background and restore embeds on foreground return."""
+    """Pause media on background without replacing embedded player documents."""
     text = main_activity.read_text(encoding="utf-8")
     text = add_import(text, "import android.os.Build;")
     text = add_import(text, "import android.webkit.WebView;")
@@ -646,7 +646,7 @@ def install_background_playback_guard(main_activity: Path) -> None:
             if (getBridge() != null && getBridge().getWebView() != null) {
                 String stopScript = "(function(){"
                     + "document.querySelectorAll('video,audio').forEach(function(media){try{media.pause();}catch(e){}});"
-                    + "document.querySelectorAll('[data-player-viewport=true] iframe').forEach(function(frame){try{if(frame.contentWindow){frame.contentWindow.postMessage({event:'pause'},'*');frame.contentWindow.postMessage({type:'pause'},'*');frame.contentWindow.postMessage({method:'pause'},'*');frame.contentWindow.postMessage(JSON.stringify({context:'player.js',version:'0.0.11',method:'pause'}),'*');}var savedSrc=frame.getAttribute('src')||frame.src;if(savedSrc&&savedSrc!=='about:blank'){frame.setAttribute('data-sevenx-background-src',savedSrc);frame.src='about:blank';}}catch(e){}});"
+                    + "document.querySelectorAll('[data-player-viewport=true] iframe').forEach(function(frame){try{if(frame.contentWindow){frame.contentWindow.postMessage({event:'pause'},'*');frame.contentWindow.postMessage({type:'pause'},'*');frame.contentWindow.postMessage({method:'pause'},'*');frame.contentWindow.postMessage(JSON.stringify({context:'player.js',version:'0.0.11',method:'pause'}),'*');}}catch(e){}});"
                     + "})();";
                 getBridge().getWebView().evaluateJavascript(stopScript, null);
             }
@@ -656,25 +656,6 @@ def install_background_playback_guard(main_activity: Path) -> None:
 """
         text = text[:close] + method + text[close:]
 
-    # A provider may ignore every cross-origin pause message. Save its URL and
-    # detach the iframe while the Activity is stopped; the active URL is restored
-    # onStart so foreground playback can reload and recover its saved timestamp.
-    if "data-sevenx-background-src" in text and "iframe[data-sevenx-background-src]" not in text:
-        close = text.rfind("}")
-        class_match = re.search(r"class\s+MainActivity\s+extends\s+BridgeActivity\s*\{", text)
-        if not class_match or close < class_match.end():
-            fail("Could not locate MainActivity for restoring backgrounded embeds.")
-        resume_method = """
-    @Override
-    public void onStart() {
-        super.onStart();
-        if (getBridge() != null && getBridge().getWebView() != null) {
-            WebView webView = getBridge().getWebView();
-            webView.evaluateJavascript("(function(){document.querySelectorAll('iframe[data-sevenx-background-src]').forEach(function(frame){var saved=frame.getAttribute('data-sevenx-background-src');frame.removeAttribute('data-sevenx-background-src');if(saved){frame.src=saved;}});})();", null);
-        }
-    }
-"""
-        text = text[:close] + resume_method + text[close:]
     main_activity.write_text(text, encoding="utf-8")
 
 

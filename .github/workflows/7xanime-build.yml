@@ -286,8 +286,10 @@ jobs:
               raise SystemExit("Player swipe progress must follow the current locked-direction distance")
           if 'const target = session.isFullscreen' not in viewport or '? session.inlineTarget' not in viewport or 'followVerticalDistance' not in viewport or 'session.miniTarget' not in viewport or 'const verticalTravel' not in viewport:
               raise SystemExit("Fullscreen exit and inline minimisation must preserve state-specific targets, finger tracking, and continuous mini-player sizing")
-          if 'Math.pow(1 - collapseProgress, 3)' not in viewport or 'collapseTarget?: RectSnapshot' not in viewport or 'targetCenterX - originCenterX' not in viewport or 'element.style.scale = String(Math.max(0.15, 1 - collapseProgress * 0.85))' not in viewport:
-              raise SystemExit("The watch page must move and progressively scale/fade toward the mini-player dock with the inline player gesture")
+          if 'Math.pow(1 - collapseProgress, 3)' not in viewport or 'collapseTarget?: RectSnapshot' not in viewport or 'collapseOrigin?: RectSnapshot' not in viewport or 'originalRect.left - collapseOrigin.left) * sharedScale' not in viewport or 'element.style.translate = `${translateX}px ${translateY}px`' not in viewport:
+              raise SystemExit("The watch page must share the player's affine scale and finger-tracked trajectory toward the mini-player dock")
+          if 'if (direction === "expand")' not in viewport or 'element.style.zIndex = "10003"' not in viewport or 'page surfaces behind the player' not in viewport:
+              raise SystemExit("Only fullscreen expansion may layer the watch-page surfaces above the video preview")
           if "ancillaryRectsRef.current.set(element" not in viewport or "element.style.scale = original.scale" not in viewport:
               raise SystemExit("The shared watch-page motion must restore its original geometry after a cancelled gesture")
           if 'mode: "pending" | "drag" | "expand"' in viewport or 'drag.mode === "expand"' in viewport or 'drag.swipeSession' in viewport:
@@ -332,8 +334,10 @@ jobs:
               raise SystemExit("Background playback stop / PiP lifecycle handling is missing")
           if "getLocalWatchProgress" not in watch_section or "requestEmbedResume" not in watch_section:
               raise SystemExit("Cross-server watch-progress resume handling is missing")
-          if "if (responseSinceResume) return;" not in watch_section or "for (const delay of [400, 1100])" not in watch_section:
-              raise SystemExit("Foreground recovery must not reconnect healthy embeds or send a late duplicate play command")
+          if "Keep the existing iframe document alive." not in watch_section or "for (const delay of [400, 1100])" not in watch_section or "requestExternalPlayerState(frame);" not in watch_section:
+              raise SystemExit("Foreground recovery must keep the iframe session alive and use state probes after WebView resumes")
+          if "const recoveryTimer = window.setTimeout" in watch_section or "Recreate the iframe only when it has stayed completely silent" in watch_section:
+              raise SystemExit("Foreground recovery must not remount an embed simply because its provider is silent")
           if "overscroll-auto" not in episode_list or "overscroll-contain" in episode_list:
               raise SystemExit("Episode-list boundary scrolling must chain naturally into the page")
           if "useLayoutEffect" not in persistent_host or "window.scrollTo({ top: 0, left: 0, behavior: \"auto\" })" not in persistent_host or "watchLocationKey" not in persistent_host or "useSearchParams" not in persistent_host:
@@ -458,12 +462,12 @@ jobs:
           if "Image.Resampling.LANCZOS" in launcher_script or "ic_launcher_foreground.png" in launcher_script:
               raise SystemExit("Launcher script must not resize or redraw the approved source icon")
           background_guard = Path(".github/scripts/configure-local-anime-backend.py").read_text(encoding="utf-8")
-          if "frame.src='about:blank'" not in background_guard or "data-sevenx-background-src" not in background_guard:
-              raise SystemExit("Background lifecycle must detach iframe playback that ignores pause messages and retain its source for restore")
-          if "iframe[data-sevenx-background-src]" not in background_guard or "void onStart()" not in background_guard:
-              raise SystemExit("Backgrounded iframe sources must be restored on Activity foreground")
+          if "frame.src='about:blank'" in background_guard or "data-sevenx-background-src" in background_guard or "public void onStart()" in background_guard:
+              raise SystemExit("Background lifecycle must not blank and reload provider iframes when returning to the app")
           if "frame.contentWindow.postMessage({event:'pause'}" not in background_guard:
-              raise SystemExit("Background lifecycle must request an orderly player pause before detaching the iframe")
+              raise SystemExit("Background lifecycle must request an orderly pause without replacing the iframe document")
+          if "Keep the existing iframe document alive." not in watch_section or "Recreate the iframe only when it has stayed completely silent" in watch_section:
+              raise SystemExit("Foreground recovery must preserve the current embed and must not remount it only because a provider is silent")
           print("Provider-agnostic filter-list engine, pause-safe background lifecycle, warning-card removal, approved 7xAnime branding, fullscreen and seeking gestures are wired.")
           PY
 
