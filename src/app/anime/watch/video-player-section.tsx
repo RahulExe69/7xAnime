@@ -298,56 +298,19 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
             requestExternalPlayerPause(frame);
           }
 
-          // Some providers ignore the first postMessage after WebView resume.
-          // Retry state/play-or-pause commands briefly while keeping the same
-          // iframe mounted; only rebuild it if it never responds at all.
-          // Two short retries are enough for slow WebView wake-up. Avoid a late
-          // ~2.2s play command against an embed that has already resumed; some
-          // providers treat repeated play commands as a fresh load.
+          // Keep the existing iframe document alive. On wake-up, query its state
+          // after WebView has resumed; do not replay generic play commands or
+          // remount a silent cross-origin embed, both of which can restart it.
           for (const delay of [400, 1100]) {
             const timer = window.setTimeout(() => {
               if (externalEmbedFrameRef.current !== frame ||
                   frame.src !== sourceAtResume ||
                   !appIsActiveRef.current ||
                   backgroundResumeStartedAtRef.current !== resumeStartedAt) return;
-              const responseSinceResume = Math.max(
-                lastEmbedSignalAtRef.current,
-                lastEmbedProgressAtRef.current,
-                lastEmbedStateReplyAtRef.current,
-              ) >= resumeStartedAt;
-
-              // Do not send duplicate play commands when the provider has
-              // already emitted progress, playback state, or a state-query reply.
-              if (backgroundResumeModeRef.current === "playing" && !responseSinceResume) {
-                requestExternalPlayerPlay(frame);
-              } else if (backgroundResumeModeRef.current === "paused") {
-                requestExternalPlayerPause(frame);
-              }
               requestExternalPlayerState(frame);
             }, delay);
             lifecycleResumeTimersRef.current.push(timer);
           }
-
-          const recoveryTimer = window.setTimeout(() => {
-            if (externalEmbedFrameRef.current !== frame ||
-                frame.src !== sourceAtResume ||
-                !appIsActiveRef.current ||
-                backgroundResumeStartedAtRef.current !== resumeStartedAt ||
-                backgroundResumeModeRef.current !== resumeMode) return;
-
-            const responseSinceResume = Math.max(
-              lastEmbedSignalAtRef.current,
-              lastEmbedProgressAtRef.current,
-              lastEmbedStateReplyAtRef.current,
-            ) >= resumeStartedAt;
-            if (responseSinceResume) return;
-
-            // Recreate the iframe only when it has stayed completely silent
-            // since foregrounding. A healthy embed must never be reloaded just
-            // because the fallback timer elapsed.
-            setPlayerRetryKey((previous) => previous + 1);
-          }, 4800);
-          lifecycleResumeTimersRef.current.push(recoveryTimer);
         }
 
         snapshot.directVideos.forEach((video) => {
