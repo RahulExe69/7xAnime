@@ -11,6 +11,23 @@ const getAnimeDetails = async (animeId: string): Promise<IAnimeDetails> => {
   const title = media.title?.english || media.title?.romaji || media.title?.native || "Untitled";
   const poster = media.coverImage?.extraLarge || media.coverImage?.large || "";
 
+  // Some AniList entries include a direct TMDB page. Never substitute the
+  // AniList or MAL ID for TMDB: Aethoflix's stream API requires TMDB IDs.
+  const tmdbLink = (media.externalLinks || []).find((link) => {
+    try {
+      const url = new URL(link.url);
+      return (
+        (url.hostname === "themoviedb.org" || url.hostname.endsWith(".themoviedb.org")) &&
+        /^\/(tv|movie)\/\d+(?:\/|$)/i.test(url.pathname)
+      );
+    } catch {
+      return false;
+    }
+  });
+  const tmdbMatch = tmdbLink?.url.match(/themoviedb\.org\/(tv|movie)\/(\d+)/i);
+  const tmdbMediaType = tmdbMatch?.[1]?.toLowerCase() as "tv" | "movie" | undefined;
+  const tmdbId = Number(tmdbMatch?.[2]) || undefined;
+
   const charactersVoiceActors = (media.characters?.edges || [])
     .filter((edge) => edge && edge.node && edge.node.id)
     .map((edge) => ({
@@ -86,6 +103,8 @@ const getAnimeDetails = async (animeId: string): Promise<IAnimeDetails> => {
         id: String(media.id),
         anilistId: media.id,
         malId: media.idMal || 0,
+        tmdbId,
+        tmdbMediaType,
         name: title,
         poster: poster,
         bannerImage: media.bannerImage || media.coverImage?.extraLarge || "",
