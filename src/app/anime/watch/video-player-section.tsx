@@ -146,29 +146,12 @@ const requestExternalPlayerPause = (frame: HTMLIFrameElement) => {
 // Resume commands are best-effort because cross-origin providers expose different
 // APIs. The iframe is deliberately kept mounted across app background/foreground.
 const requestExternalPlayerPlay = (frame: HTMLIFrameElement) => {
+  // A single provider-neutral resume signal is intentionally used here.
+  // Sending a burst of overlapping play protocols can make some embed hosts
+  // tear down and reconnect their stream instead of resuming the paused session.
   const target = frame.contentWindow;
   if (!target) return;
-  const objectCommands = [
-    { event: "play" },
-    { type: "play" },
-    { action: "play" },
-    { method: "play" },
-    { command: "play" },
-    { event: "command", func: "playVideo", args: [] },
-    { func: "playVideo", args: [] },
-  ];
-  for (const command of objectCommands) {
-    try { target.postMessage(command, "*"); } catch { /* provider ignored */ }
-  }
-  const protocolCommands = [
-    { context: "player.js", version: PLAYER_JS_VERSION, method: "play" },
-    { eventName: "postmessage:do:play" },
-    { method: "play", params: {} },
-  ];
-  for (const command of protocolCommands) {
-    try { target.postMessage(JSON.stringify(command), "*"); } catch { /* provider ignored */ }
-  }
-  try { target.postMessage("play", "*"); } catch { /* provider ignored */ }
+  try { target.postMessage({ event: "play" }, "*"); } catch { /* provider ignored */ }
 };
 
 // Query common state APIs so a silent pause is not mistaken for a stalled
