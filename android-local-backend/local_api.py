@@ -614,7 +614,7 @@ async def _fetch_aethoflix_json(path: str, params: dict | None = None) -> dict:
         raise ValueError("Unsupported Aethoflix endpoint")
     async with httpx.AsyncClient(
         timeout=httpx.Timeout(connect=6.0, read=48.0, write=10.0, pool=5.0),
-        follow_redirects=True,
+        follow_redirects=False,
         limits=httpx.Limits(max_connections=4, max_keepalive_connections=2),
     ) as client:
         response = await client.get(
