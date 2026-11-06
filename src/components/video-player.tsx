@@ -191,7 +191,9 @@ function VideoPlayer({
   const isHlsSource = sourceType === "m3u8" || sourceType === "hls";
   const uri = useMemo(() => {
     if (!firstSourceUrl) return null;
-    return getProxyUrl(firstSourceUrl, sourceReferer);
+    return firstSource?.bypassProxy
+      ? firstSourceUrl
+      : getProxyUrl(firstSourceUrl, sourceReferer);
   }, [firstSourceUrl, sourceReferer]);
 
   // Use a value signature instead of the episode object identity: React Query
