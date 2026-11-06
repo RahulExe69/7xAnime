@@ -468,7 +468,15 @@ jobs:
               raise SystemExit("Background lifecycle must request an orderly pause without replacing the iframe document")
           if "Keep the existing iframe document alive." not in watch_section or "Recreate the iframe only when it has stayed completely silent" in watch_section:
               raise SystemExit("Foreground recovery must preserve the current embed and must not remount it only because a provider is silent")
-          print("Provider-agnostic filter-list engine, pause-safe background lifecycle, warning-card removal, approved 7xAnime branding, fullscreen and seeking gestures are wired.")
+          play_helper = watch_section[watch_section.index("const requestExternalPlayerPlay ="):watch_section.index("// Query common state APIs")]
+          if play_helper.count('postMessage({ event: "play" }') != 1 or "playVideo" in play_helper or "PLAYER_JS_VERSION" in play_helper:
+              raise SystemExit("Foreground recovery must send one resume command, not a burst of conflicting provider play protocols")
+          viewport_source = Path("src/components/player-viewport.tsx").read_text(encoding="utf-8")
+          if 'direction === "collapse" && !isMiniPlayer && routeContent && collapseTarget && collapseOrigin' not in viewport_source:
+              raise SystemExit("Mini-player collapse must transform the whole watch page as one shared surface")
+          if 'routeContent.style.scale = String(sharedScale)' not in viewport_source or 'routeContent.style.translate = `${currentLeft - collapseOrigin.left}px ${currentTop - collapseOrigin.top}px`' not in viewport_source:
+              raise SystemExit("Watch-page and player motion must share the same scale and drag trajectory")
+          print("Provider-agnostic filter-list engine, session-preserving background lifecycle, shared watch-page/player collapse, warning-card removal, approved 7xAnime branding, fullscreen and seeking gestures are wired.")
           PY
 
       # Test the exact patched Python tree that Chaquopy packages in the APK,
