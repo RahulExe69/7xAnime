@@ -14,7 +14,7 @@ const AnimeEpisodes = dynamic(() => import("@/components/anime-episodes"), {
 });
 import { useGetEpisodeData } from "@/query/get-episode-data";
 import { useQuery } from "react-query";
-import { getHindiDubStreams } from "@/lib/hindi-dub";
+import { getAethoflixHindiStreams, getHindiDubStreams } from "@/lib/hindi-dub";
 import { ArrowLeft, Captions, Mic, AlertCircle, ChevronDown, ChevronUp, Sparkles } from "lucide-react";
 import Image from "next/image";
 import AnimeCard from "@/components/anime-card";
@@ -897,7 +897,6 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
   const {
     data: hindiDubData,
     isLoading: isLoadingHindi,
-
   } = useQuery({
     queryKey: ["HINDI_DUB_STREAMS", animeIdParam, currentEpNumber, animeTitleOptions],
     queryFn: () => getHindiDubStreams(animeTitleOptions, currentEpNumber),
@@ -905,7 +904,47 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
     retry: 0,
     staleTime: 1000 * 60 * 10,
   });
-  const hindiStreams = hindiDubData?.streams || [];
+
+  const aethoflixSeason = useMemo(() => {
+    const title = animeTitleOptions.join(" ");
+    const match = title.match(/\bseason\s*(\d+)\b|\bS(\d+)\b/i);
+    return Math.max(1, Number(match?.[1] || match?.[2]) || 1);
+  }, [animeTitleOptions]);
+  const { data: aethoflixHindiStreams = [] } = useQuery({
+    queryKey: [
+      "AETHOFLIX_HINDI_STREAMS",
+      animeIdParam,
+      anime?.anime?.info?.tmdbId,
+      anime?.anime?.info?.tmdbMediaType,
+      aethoflixSeason,
+      currentEpNumber,
+    ],
+    queryFn: () => getAethoflixHindiStreams({
+      tmdbId: anime?.anime?.info?.tmdbId,
+      tmdbMediaType: anime?.anime?.info?.tmdbMediaType,
+      season: aethoflixSeason,
+      episode: currentEpNumber,
+      titles: animeTitleOptions,
+    }),
+    enabled: isLocalBackendEnabled() &&
+      !!anime?.anime?.info?.tmdbId &&
+      !!currentEpNumber,
+    retry: 0,
+    staleTime: 1000 * 60 * 10,
+  });
+
+  // Keep the established community Hindi results first; Aethoflix is an
+  // independent optional source and cannot delay or replace the old catalogue.
+  const hindiStreams = useMemo(() => {
+    const combined = [...(hindiDubData?.streams || []), ...aethoflixHindiStreams];
+    const seen = new Set<string>();
+    return combined.filter((stream) => {
+      const key = String(stream.url || stream.embed || "").trim();
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [hindiDubData?.streams, aethoflixHindiStreams]);
 
   const { data: localProviderStatus, isLoading: isLoadingProviderStatus } = useQuery<LocalProviderStatus>({
     queryKey: ["local-provider-status"],
@@ -1214,8 +1253,9 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
     : useFallback || isFallbackActive
       ? fallbackServerNumber
       : selectedProviderIndex >= 0 ? selectedProviderIndex + 2 : 1;
-  const activeServerLabel =
-    !isFallbackActive && !isHindiMode && providerPlaybackOutcomes[currentProviderName] === "failed"
+  const activeServerLabel = isHindiMode
+    ? `Server ${selectedHindiServer + 1} — ${hindiStreams[selectedHindiServer]?.sourceLabel || "Hindi"}`
+    : !isFallbackActive && providerPlaybackOutcomes[currentProviderName] === "failed"
       ? `${getProviderDisplayName(currentProviderName)} unavailable`
       : activeServerNumber === 1
         ? "Server 1 — MegaPlay"
@@ -1735,9 +1775,24 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
       <div className="flex min-w-0 flex-wrap items-center gap-2 border-t border-white/[0.06] pt-3">
         <span className="mr-1 text-xs font-extrabold tracking-wide text-zinc-400">Server:</span>
         {isHindiMode ? (
-          hindiStreams.map((stream, index) => (
-            <Button key={stream.embed} size="sm" title={`Server ${index + 1} — Hindi dub — ${stream.host}`} aria-label={`Server ${index + 1} — Hindi dub — ${stream.host}`} onClick={() => setSelectedHindiServer(index)} className={`h-9 min-w-9 rounded-xl px-3 text-xs font-extrabold transition ${activeServerNumber === index + 1 ? "bg-[#ff3b72] text-white" : "border border-white/[0.08] bg-white/[0.035] text-zinc-300 hover:border-[#ff3b72]/30 hover:bg-[#ff3b72]/10"}`}>{index + 1}</Button>
-          ))
+          hindiStreams.map((stream, index) => {
+            const sourceName = stream.sourceLabel || stream.server || "Hindi";
+            return (
+              <Button
+                key={stream.url || stream.embed || `${sourceName}-${index}`}
+                size="sm"
+                title={`Server ${index + 1} — ${sourceName} — Hindi dub — ${stream.quality || stream.host}`}
+                aria-label={`Server ${index + 1} — ${sourceName} — Hindi dub — ${stream.host}`}
+                onClick={() => setSelectedHindiServer(index)}
+                className={`h-10 min-w-12 rounded-xl px-2.5 text-xs font-extrabold transition ${activeServerNumber === index + 1 ? "bg-[#ff3b72] text-white" : "border border-white/[0.08] bg-white/[0.035] text-zinc-300 hover:border-[#ff3b72]/30 hover:bg-[#ff3b72]/10"}`}
+              >
+                <span className="flex flex-col items-center gap-0.5 leading-none">
+                  <span>{index + 1}</span>
+                  <span className="text-[8px] font-semibold opacity-80">{sourceName}</span>
+                </span>
+              </Button>
+            );
+          })
         ) : (
           <>
             <Button size="sm" title="Server 1 — MegaPlay" aria-label="Server 1 — MegaPlay" onClick={() => selectFallbackServer()} className={`h-10 min-w-12 rounded-xl px-2.5 text-xs font-extrabold transition ${activeServerNumber === 1 && (useFallback || isFallbackActive) ? "bg-[#ff3b72] text-white" : "border border-white/[0.08] bg-white/[0.035] text-zinc-300 hover:border-[#ff3b72]/30 hover:bg-[#ff3b72]/10"}`}>
@@ -1991,14 +2046,64 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
     return (
       <div className="flex w-full flex-col gap-3">
         {playerHeader}
-        {selectedHindi ? (
+        {selectedHindi?.kind === "direct" && selectedHindi.url ? (
+          <PlayerViewport title={`${selectedHindi.sourceLabel || selectedHindi.server} Hindi video player`}>
+            <VideoPlayer
+              key={selectedHindi.url}
+              className="!h-full !min-h-0 !max-h-none !aspect-auto"
+              episodeInfo={{
+                headers: {
+                  Referer: selectedHindi.headers?.Referer || selectedHindi.headers?.referer || "",
+                },
+                subtitles: (selectedHindi.subtitles || []).map((subtitle) => ({
+                  lang: subtitle.lang,
+                  url: subtitle.url,
+                })),
+                intro: { start: 0, end: 0 },
+                outro: { start: 0, end: 0 },
+                sources: [{
+                  url: selectedHindi.url,
+                  type: selectedHindi.type || "hls",
+                  referer: selectedHindi.headers?.Referer || selectedHindi.headers?.referer || "",
+                  headers: selectedHindi.headers,
+                  server: "Aethoflix",
+                }],
+                anilistID: Number(animeIdParam) || 0,
+                malID: Number(anime?.anime?.info?.malId) || 0,
+              }}
+              serversData={{
+                episodeId: `aethoflix-${selectedHindi.seriesId}-${selectedHindi.season}-${selectedHindi.episode}`,
+                episodeNo: String(currentEpNumber),
+                sub: [],
+                dub: [],
+                raw: [],
+              }}
+              animeInfo={playerAnimeInfo}
+              subOrDub="dub"
+              autoSkip={autoSkip}
+              onError={() => {
+                const communityFallback = hindiStreams.findIndex((stream, index) =>
+                  index !== selectedHindiServer && stream.sourceId !== "aethoflix",
+                );
+                if (communityFallback >= 0) {
+                  setSelectedHindiServer(communityFallback);
+                } else {
+                  setIsHindiMode(false);
+                  selectFallbackServer();
+                }
+              }}
+              onPlaybackReady={() => setLastPlayerError(null)}
+              onEpisodeEnded={advanceToNextEpisode}
+            />
+          </PlayerViewport>
+        ) : selectedHindi?.embed ? (
           <PlayerViewport title="Hindi video player">
             <iframe
               ref={externalEmbedFrameRef}
               key={selectedHindi.embed}
               src={selectedHindi.embed}
               onLoad={requestEmbedResume}
-              title={`${hindiDubData?.matchedTitle || anime?.anime?.info?.name || "Anime"} episode ${currentEpNumber} Hindi dub via ${selectedHindi.host}`}
+              title={`${hindiDubData?.matchedTitle || selectedHindi.seriesTitle || anime?.anime?.info?.name || "Anime"} episode ${currentEpNumber} Hindi dub via ${selectedHindi.sourceLabel || selectedHindi.host}`}
               width="100%"
               height="100%"
               allow="autoplay; fullscreen; encrypted-media"
@@ -2008,8 +2113,7 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
               className="absolute inset-0 h-full w-full border-0"
             />
           </PlayerViewport>
-        ) : (
-          <Alert className="rounded-2xl border-white/[0.08] bg-[#101018] text-zinc-200">
+ext-zinc-200">
             <AlertCircle className="h-4 w-4 text-[#ff70bd]" />
             <AlertTitle className="font-bold">Hindi stream temporarily unavailable</AlertTitle>
             <AlertDescription className="mt-1 text-sm text-zinc-400">This episode has no verified playable Hindi embed right now.</AlertDescription>
