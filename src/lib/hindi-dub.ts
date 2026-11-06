@@ -6,12 +6,23 @@ const HINDI_REQUEST_TIMEOUT_MS = 9000;
 
 export type HindiDubStream = {
   server: string;
-  embed: string;
+  /** Present for legacy iframe providers. */
+  embed?: string;
+  /** Present for direct HLS/MP4 streams from Aethoflix. */
+  url?: string;
+  kind?: "embed" | "direct";
+  type?: "hls" | "mp4";
+  quality?: string;
+  headers?: Record<string, string>;
+  subtitles?: Array<{ lang: string; url: string }>;
   host: string;
   seriesTitle: string;
   seriesId: string;
   season: number;
   episode: number;
+  sourceId?: "community-hindi" | "aethoflix";
+  sourceLabel?: string;
+  languageEvidence?: "hindi-catalogue-contract" | "explicit-hindi-audio-metadata";
 };
 
 type SearchCandidate = {
@@ -164,6 +175,10 @@ export async function getHindiDubStreams(
             try { host = new URL(stream.embed).hostname.replace(/^www\./, ""); } catch {}
             return {
               ...stream,
+              kind: "embed" as const,
+              sourceId: "community-hindi" as const,
+              sourceLabel: "Hindi Catalogue",
+              languageEvidence: "hindi-catalogue-contract" as const,
               host,
               seriesTitle: candidate.title,
               seriesId: candidate.anime_id,
@@ -183,4 +198,135 @@ export async function getHindiDubStreams(
       ? "No Hindi dub embed was found for this episode."
       : "No close Hindi-catalogue title match was found.",
   );
+}
+
+
+type AethoflixStreamInput = {
+  tmdbId?: number;
+  tmdbMediaType?: "tv" | "movie";
+  season: number;
+  episode: number;
+  titles: string[];
+};
+
+const isHindiAudioLanguage = (value: unknown): boolean => {
+  const language = String(value ?? "").trim().toLocaleLowerCase();
+  return ["hi", "hin", "hindi", "हिंदी", "हिन्दी"].includes(language);
+};
+
+const isHttpsMediaUrl = (value: unknown): value is string => {
+  if (typeof value !== "string" || !value.trim()) return false;
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && !!url.hostname && !url.username && !url.password;
+  } catch {
+    return false;
+  }
+};
+
+const stringHeaders = (value: unknown): Record<string, string> | undefined => {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const headers: Record<string, string> = {};
+  for (const [key, headerValue] of Object.entries(value as Record<string, unknown>)) {
+    if (typeof headerValue === "string" && key.trim() && headerValue.trim()) {
+      headers[key] = headerValue;
+    }
+  }
+  return Object.keys(headers).length ? headers : undefined;
+};
+
+const parseAethoflixSubtitles = (value: unknown): Array<{ lang: string; url: string }> => {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((item) => item && typeof item === "object")
+    .map((item: any) => ({
+      lang: String(item.label || item.lang || item.language || "Subtitle"),
+      url: String(item.file || item.url || item.src || ""),
+    }))
+    .filter((item) => isHttpsMediaUrl(item.url))
+    .slice(0, 12);
+};
+
+/**
+ * Resolve Aethoflix only when AniList supplied an explicit TMDB external link.
+ * The provider is optional: every failure returns an empty list, leaving the
+ * community Hindi catalogue untouched and immediately usable.
+ */
+export async function getAethoflixHindiStreams(
+  input: AethoflixStreamInput,
+): Promise<HindiDubStream[]> {
+  const tmdbId = Number(input.tmdbId);
+  if (!isLocalBackendEnabled() || !Number.isSafeInteger(tmdbId) || tmdbId < 1) return [];
+
+  const episode = Math.max(1, Math.floor(Number(input.episode) || 1));
+  const season = Math.max(1, Math.floor(Number(input.season) || 1));
+  const isMovie = input.tmdbMediaType === "movie";
+  const route = isMovie ? "/aethoflix/stream-movie" : "/aethoflix/stream-tv";
+
+  try {
+    const response = await api.get<any>(route, {
+      params: isMovie
+        ? { tmdbId }
+        : { tmdbId, season, episode },
+      timeout: 55000,
+    });
+    const body = response.data;
+    if (body?.success !== true || !Array.isArray(body?.links)) return [];
+
+    const seen = new Set<string>();
+    const streams: HindiDubStream[] = [];
+    for (const rawLink of body.links) {
+      if (!rawLink || typeof rawLink !== "object") continue;
+      const language = rawLink.audioLanguage ??
+        rawLink.audio_language ??
+        rawLink.hlsAudioLanguage ??
+        rawLink.language ??
+        rawLink.lang;
+      // A generic "dub" value is deliberately insufficient evidence.
+      if (!isHindiAudioLanguage(language)) continue;
+
+      const url = rawLink.url;
+      if (!isHttpsMediaUrl(url) || rawLink.isDASH === true) continue;
+      const normalizedUrl = url.trim();
+      if (seen.has(normalizedUrl)) continue;
+
+      const parsedUrl = new URL(normalizedUrl);
+      const path = parsedUrl.pathname.toLocaleLowerCase();
+      const declaredType = String(rawLink.type || rawLink.format || "").toLocaleLowerCase();
+      const type = rawLink.isM3U8 === true || /\.(m3u8)(?:$|\/)/.test(path) ||
+        declaredType === "hls" || declaredType === "m3u8"
+        ? "hls"
+        : /\.mp4(?:$|\/)/.test(path) || declaredType === "mp4"
+          ? "mp4"
+          : null;
+      // ArtPlayer supports HLS and MP4 in this app; don't surface DASH or
+      // unknown formats as selectable streams.
+      if (!type) continue;
+
+      seen.add(normalizedUrl);
+      const headers = stringHeaders(rawLink.headers);
+      streams.push({
+        server: "Aethoflix",
+        kind: "direct",
+        sourceId: "aethoflix",
+        sourceLabel: "Aethoflix",
+        languageEvidence: "explicit-hindi-audio-metadata",
+        url: normalizedUrl,
+        type,
+        quality: String(rawLink.quality || "Auto"),
+        headers,
+        subtitles: parseAethoflixSubtitles(rawLink.subtitles),
+        host: parsedUrl.hostname.replace(/^www\./, ""),
+        seriesTitle: input.titles.find((title) => title.trim()) || "Anime",
+        seriesId: String(tmdbId),
+        season,
+        episode,
+      });
+      if (streams.length >= 6) break;
+    }
+    return streams;
+  } catch {
+    // Aethoflix is optional and must never break or delay the community source.
+    return [];
+  }
 }
