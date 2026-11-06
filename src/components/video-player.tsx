@@ -194,14 +194,14 @@ function VideoPlayer({
     return firstSource?.bypassProxy
       ? firstSourceUrl
       : getProxyUrl(firstSourceUrl, sourceReferer);
-  }, [firstSourceUrl, sourceReferer]);
+  }, [firstSourceUrl, sourceReferer, firstSource?.bypassProxy]);
 
   // Use a value signature instead of the episode object identity: React Query
   // can return an equivalent new object after lifecycle/network events. Rebuilding
   // ArtPlayer for identical stream data resets playback when the app resumes.
   const episodeInfoSignature = useMemo(
     () => JSON.stringify({
-      sources: episodeInfo?.sources?.map(({ url, type }) => ({ url, type })) ?? [],
+      sources: episodeInfo?.sources?.map(({ url, type, bypassProxy }) => ({ url, type, bypassProxy })) ?? [],
       subtitles: episodeInfo?.subtitles?.map(({ lang, url }) => ({ lang, url })) ?? [],
       intro: episodeInfo?.intro,
       outro: episodeInfo?.outro,
