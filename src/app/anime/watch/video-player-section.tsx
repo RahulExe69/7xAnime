@@ -2113,10 +2113,11 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
               className="absolute inset-0 h-full w-full border-0"
             />
           </PlayerViewport>
-ext-zinc-200">
+        ) : (
+          <Alert className="rounded-2xl border-white/[0.08] bg-[#101018] text-zinc-200">
             <AlertCircle className="h-4 w-4 text-[#ff70bd]" />
             <AlertTitle className="font-bold">Hindi stream temporarily unavailable</AlertTitle>
-            <AlertDescription className="mt-1 text-sm text-zinc-400">This episode has no verified playable Hindi embed right now.</AlertDescription>
+            <AlertDescription className="mt-1 text-sm text-zinc-400">This episode has no verified playable Hindi stream right now.</AlertDescription>
           </Alert>
         )}
         {playerControls}
