@@ -240,6 +240,40 @@ export function PlayerViewport({
     }
 
     const routeContent = document.querySelector<HTMLElement>("[data-persistent-route-content]");
+    if (direction === "collapse" && !isMiniPlayer && routeContent && collapseTarget && collapseOrigin) {
+      if (!routeContentStyleRef.current || routeContentStyleRef.current.element !== routeContent) {
+        routeContentStyleRef.current = {
+          element: routeContent,
+          opacity: routeContent.style.opacity,
+          pointerEvents: routeContent.style.pointerEvents,
+          transition: routeContent.style.transition,
+          translate: routeContent.style.translate,
+          transform: routeContent.style.transform,
+          transformOrigin: routeContent.style.transformOrigin,
+          willChange: routeContent.style.willChange,
+          position: routeContent.style.position,
+          zIndex: routeContent.style.zIndex,
+          scale: routeContent.style.scale,
+        };
+      }
+      // Treat the entire watch page as one surface. Its transform uses the
+      // exact same origin, scale, and drag distance as the player, avoiding
+      // independently drifting cards/labels during the mini-player transition.
+      const targetScale = collapseTarget.width / Math.max(1, collapseOrigin.width);
+      const sharedScale = 1 + (targetScale - 1) * collapseProgress;
+      const currentLeft = collapseOrigin.left +
+        (collapseTarget.left - collapseOrigin.left) * collapseProgress;
+      const maxVerticalTravel = Math.max(0, collapseTarget.top - collapseOrigin.top);
+      const verticalTravel = Math.min(Math.max(0, rawDistance), maxVerticalTravel);
+      const currentTop = collapseOrigin.top + verticalTravel;
+      routeContent.style.transition = "none";
+      routeContent.style.transformOrigin = "top left";
+      routeContent.style.translate = `${currentLeft - collapseOrigin.left}px ${currentTop - collapseOrigin.top}px`;
+      routeContent.style.scale = String(sharedScale);
+      routeContent.style.opacity = opacity;
+      routeContent.style.pointerEvents = blockInteractions ? "none" : routeContentStyleRef.current.pointerEvents;
+      routeContent.style.willChange = "opacity, translate, scale";
+    }
     if (direction === "expand" && isMiniPlayer && routeContent) {
       if (!routeContentStyleRef.current || routeContentStyleRef.current.element !== routeContent) {
         routeContentStyleRef.current = {
