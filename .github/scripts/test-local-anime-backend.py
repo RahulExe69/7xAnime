@@ -203,6 +203,123 @@ class LocalAnimeApiTests(unittest.TestCase):
             params={"s": "Solo Leveling", "page": 2},
         )
 
+    def test_aethoflix_status_exposes_only_the_enabled_provider(self) -> None:
+        fake_response = type(
+            "FakeResponse",
+            (),
+            {
+                "is_success": True,
+                "status_code": 200,
+                "content": b'{"success":true,"providers":[]}',
+                "json": staticmethod(lambda: {
+                    "success": True,
+                    "providers": [
+                        {"id": "other", "name": "Other", "enabled": True},
+                        {"id": "aethoflix", "name": "Karamara", "enabled": True},
+                    ],
+                }),
+            },
+        )()
+        fake_client = AsyncMock()
+        fake_client.__aenter__.return_value = fake_client
+        fake_client.__aexit__.return_value = None
+        fake_client.get = AsyncMock(return_value=fake_response)
+
+        with patch.object(local_api.httpx, "AsyncClient", return_value=fake_client):
+            response = self.client.get("/aethoflix/providers", headers=self.auth)
+
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.json()["provider"]["name"], "Aethoflix")
+        self.assertEqual(response.json()["provider"]["id"], "aethoflix")
+        fake_client.get.assert_awaited_once_with(
+            "https://scraper.flix.quest/api/v2/providers",
+            params={},
+        )
+
+    def test_aethoflix_stream_uses_fixed_provider_and_tmdb_episode_mapping(self) -> None:
+        provider_response = type(
+            "FakeResponse",
+            (),
+            {
+                "is_success": True,
+                "status_code": 200,
+                "content": b'{"success":true}',
+                "json": staticmethod(lambda: {
+                    "success": True,
+                    "providers": [{"id": "aethoflix", "enabled": True}],
+                }),
+            },
+        )()
+        stream_body = {
+            "success": True,
+            "links": [{
+                "url": "https://scraper.flix.quest/api/v2/proxy/example.m3u8",
+                "quality": "1080p",
+                "isM3U8": True,
+                "audioLanguage": "Hindi",
+            }],
+        }
+        stream_response = type(
+            "FakeResponse",
+            (),
+            {
+                "is_success": True,
+                "status_code": 200,
+                "content": b'{"success":true,"links":[]}',
+                "json": staticmethod(lambda: stream_body),
+            },
+        )()
+        fake_client = AsyncMock()
+        fake_client.__aenter__.return_value = fake_client
+        fake_client.__aexit__.return_value = None
+        fake_client.get = AsyncMock(side_effect=[provider_response, stream_response])
+
+        with patch.object(local_api.httpx, "AsyncClient", return_value=fake_client):
+            response = self.client.get(
+                "/aethoflix/stream-tv",
+                params={"tmdbId": 12345, "season": 2, "episode": 7},
+                headers=self.auth,
+            )
+
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.json()["provider"], "Aethoflix")
+        self.assertEqual(response.json()["links"][0]["audioLanguage"], "Hindi")
+        self.assertEqual(fake_client.get.await_count, 2)
+        fake_client.get.assert_any_await(
+            "https://scraper.flix.quest/api/v2/stream-tv",
+            params={"tmdbId": 12345, "season": 2, "episode": 7, "provider": "aethoflix"},
+        )
+
+    def test_aethoflix_stream_rejects_disabled_upstream_provider(self) -> None:
+        provider_response = type(
+            "FakeResponse",
+            (),
+            {
+                "is_success": True,
+                "status_code": 200,
+                "content": b'{"success":true}',
+                "json": staticmethod(lambda: {
+                    "success": True,
+                    "providers": [{"id": "aethoflix", "enabled": False}],
+                }),
+            },
+        )()
+        fake_client = AsyncMock()
+        fake_client.__aenter__.return_value = fake_client
+        fake_client.__aexit__.return_value = None
+        fake_client.get = AsyncMock(return_value=provider_response)
+
+        with patch.object(local_api.httpx, "AsyncClient", return_value=fake_client):
+            response = self.client.get(
+                "/aethoflix/stream-tv",
+                params={"tmdbId": 12345, "season": 1, "episode": 1},
+                headers=self.auth,
+            )
+
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(response.json()["providerStatus"], "provider_unavailable")
+        fake_client.get.assert_awaited_once()
+
     def test_hindi_stream_route_bounds_query_parameters(self) -> None:
         fake_response = type(
             "FakeResponse",
