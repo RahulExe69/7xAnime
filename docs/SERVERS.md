@@ -36,7 +36,7 @@ Do not add retired providers back to `src/lib/server-map.ts`, `ACTIVE_PROVIDER_O
 
 ## Hindi dub
 
-Hindi dub remains a separate feature using the community `ZeroTwo-Py/anime-api` catalogue through the fixed `/hindi/search` and `/hindi/stream` routes. Its third-party embeds are separate from the five standard playback choices; do not mix Hindi-mode server numbering with the standard server list. SupaPlay is not yet confirmed as a Hindi source.
+Hindi playback remains a separate mode and does not add servers to the five-choice standard list. The existing community `ZeroTwo-Py/anime-api` catalogue remains available through the fixed `/hindi/search` and `/hindi/stream` routes. Aethoflix is integrated as an optional direct-media Hindi source through the fixed local `/aethoflix/stream-tv` and `/aethoflix/stream-movie` bridge routes. It is shown only when a direct TMDB mapping is available and an individual returned link carries explicit Hindi audio metadata; generic `dub` labels are not enough. Aethoflix HLS/MP4 links use the existing player, while the community catalogue continues to use embeds. Hindi-mode server numbering is separate from the standard list. SupaPlay is not independently confirmed as a Hindi source.
 
 ## Testing checklist
 
