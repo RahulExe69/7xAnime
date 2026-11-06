@@ -600,6 +600,122 @@ async def hindi_catalogue_stream(id: str, season: int = 1, ep: int = 1):
     )
 
 
+# The upstream base is documented in the 7xPlay Scraper API v2 client README.
+# Keep it fixed: the Android bridge must never become an arbitrary URL proxy.
+AETHOFLIX_API_BASE = "https://scraper.flix.quest"
+AETHOFLIX_PROVIDER_ID = "aethoflix"
+AETHOFLIX_MAX_RESPONSE_BYTES = 2 * 1024 * 1024
+
+
+async def _fetch_aethoflix_json(path: str, params: dict | None = None) -> dict:
+    """Fetch one fixed Scraper API v2 endpoint with a bounded response budget."""
+    allowed_paths = {"/providers", "/stream-tv"}
+    if path not in allowed_paths:
+        raise ValueError("Unsupported Aethoflix endpoint")
+    async with httpx.AsyncClient(
+        timeout=httpx.Timeout(connect=6.0, read=48.0, write=10.0, pool=5.0),
+        follow_redirects=True,
+        limits=httpx.Limits(max_connections=4, max_keepalive_connections=2),
+    ) as client:
+        response = await client.get(
+            f"{AETHOFLIX_API_BASE}/api/v2{path}",
+            params=params or {},
+        )
+    if not response.is_success:
+        raise RuntimeError(f"Scraper API returned HTTP {response.status_code}")
+    if len(response.content) > AETHOFLIX_MAX_RESPONSE_BYTES:
+        raise RuntimeError("Scraper API response exceeded the size limit")
+    try:
+        body = response.json()
+    except ValueError as error:
+        raise RuntimeError("Scraper API returned invalid JSON") from error
+    if not isinstance(body, dict):
+        raise RuntimeError("Scraper API returned an invalid response")
+    return body
+
+
+def _aethoflix_provider_from(body: dict) -> dict | None:
+    providers = body.get("providers")
+    if not isinstance(providers, list):
+        return None
+    for provider in providers:
+        if not isinstance(provider, dict):
+            continue
+        provider_id = str(provider.get("id") or "").strip().lower()
+        if provider_id == AETHOFLIX_PROVIDER_ID and provider.get("enabled") is True:
+            return provider
+    return None
+
+
+@app.get("/aethoflix/providers")
+async def aethoflix_provider_status():
+    """Expose only the enabled Aethoflix source, not the upstream provider catalogue."""
+    try:
+        body = await _fetch_aethoflix_json("/providers")
+        provider = _aethoflix_provider_from(body)
+        if provider is None:
+            return JSONResponse(
+                {"success": False, "available": False, "detail": "Aethoflix is not currently enabled upstream"},
+                status_code=503,
+            )
+        # Avoid returning unrelated provider records or upstream branding aliases.
+        return {
+            "success": True,
+            "available": True,
+            "provider": {
+                "id": AETHOFLIX_PROVIDER_ID,
+                "name": "Aethoflix",
+                "enabled": True,
+            },
+        }
+    except Exception:
+        return JSONResponse(
+            {"success": False, "available": False, "detail": "Aethoflix is temporarily unavailable"},
+            status_code=502,
+        )
+
+
+@app.get("/aethoflix/stream-tv")
+async def aethoflix_tv_stream(tmdbId: int, season: int = 1, episode: int = 1):
+    """Resolve a single mapped TV episode from the explicitly enabled Aethoflix provider."""
+    tmdb_id = max(1, int(tmdbId))
+    season_number = max(1, int(season))
+    episode_number = max(1, int(episode))
+    try:
+        providers = await _fetch_aethoflix_json("/providers")
+        if _aethoflix_provider_from(providers) is None:
+            return JSONResponse(
+                {"success": False, "providerStatus": "provider_unavailable", "links": []},
+                status_code=503,
+            )
+        body = await _fetch_aethoflix_json(
+            "/stream-tv",
+            {
+                "tmdbId": tmdb_id,
+                "season": season_number,
+                "episode": episode_number,
+                "provider": AETHOFLIX_PROVIDER_ID,
+            },
+        )
+        # The provider-specific adapter consumes links and language metadata only.
+        links = body.get("links")
+        if not isinstance(links, list):
+            body["links"] = []
+        body["provider"] = "Aethoflix"
+        body["requestedProvider"] = AETHOFLIX_PROVIDER_ID
+        return body
+    except Exception:
+        return JSONResponse(
+            {
+                "success": False,
+                "providerStatus": "error",
+                "providerError": "Aethoflix could not resolve this episode",
+                "links": [],
+            },
+            status_code=502,
+        )
+
+
 def _validated_remote_url(value: str) -> str:
     value = (value or "").strip()
     if value.startswith("//"):
