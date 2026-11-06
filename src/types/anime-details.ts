@@ -23,6 +23,9 @@ export interface Info {
   id: string;
   anilistId: number;
   malId: number;
+  /** Explicit TMDB identity only when supplied by an AniList external link. */
+  tmdbId?: number;
+  tmdbMediaType?: "tv" | "movie";
   name: string;
   poster: string;
   bannerImage?: string;
