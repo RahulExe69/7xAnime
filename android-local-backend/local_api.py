@@ -609,7 +609,7 @@ AETHOFLIX_MAX_RESPONSE_BYTES = 2 * 1024 * 1024
 
 async def _fetch_aethoflix_json(path: str, params: dict | None = None) -> dict:
     """Fetch one fixed Scraper API v2 endpoint with a bounded response budget."""
-    allowed_paths = {"/providers", "/stream-tv"}
+    allowed_paths = {"/providers", "/stream-tv", "/stream-movie"}
     if path not in allowed_paths:
         raise ValueError("Unsupported Aethoflix endpoint")
     async with httpx.AsyncClient(
@@ -675,12 +675,7 @@ async def aethoflix_provider_status():
         )
 
 
-@app.get("/aethoflix/stream-tv")
-async def aethoflix_tv_stream(tmdbId: int, season: int = 1, episode: int = 1):
-    """Resolve a single mapped TV episode from the explicitly enabled Aethoflix provider."""
-    tmdb_id = max(1, int(tmdbId))
-    season_number = max(1, int(season))
-    episode_number = max(1, int(episode))
+async def _aethoflix_stream(path: str, params: dict):
     try:
         providers = await _fetch_aethoflix_json("/providers")
         if _aethoflix_provider_from(providers) is None:
@@ -689,18 +684,12 @@ async def aethoflix_tv_stream(tmdbId: int, season: int = 1, episode: int = 1):
                 status_code=503,
             )
         body = await _fetch_aethoflix_json(
-            "/stream-tv",
-            {
-                "tmdbId": tmdb_id,
-                "season": season_number,
-                "episode": episode_number,
-                "provider": AETHOFLIX_PROVIDER_ID,
-            },
+            path,
+            {**params, "provider": AETHOFLIX_PROVIDER_ID},
         )
-        # The provider-specific adapter consumes links and language metadata only.
-        links = body.get("links")
-        if not isinstance(links, list):
+        if not isinstance(body.get("links"), list):
             body["links"] = []
+        # The UI label remains canonical even if the upstream alias says Karamara.
         body["provider"] = "Aethoflix"
         body["requestedProvider"] = AETHOFLIX_PROVIDER_ID
         return body
@@ -709,11 +698,33 @@ async def aethoflix_tv_stream(tmdbId: int, season: int = 1, episode: int = 1):
             {
                 "success": False,
                 "providerStatus": "error",
-                "providerError": "Aethoflix could not resolve this episode",
+                "providerError": "Aethoflix could not resolve this stream",
                 "links": [],
             },
             status_code=502,
         )
+
+
+@app.get("/aethoflix/stream-tv")
+async def aethoflix_tv_stream(tmdbId: int, season: int = 1, episode: int = 1):
+    """Resolve a mapped TV episode; TMDB IDs are never inferred from AniList IDs."""
+    return await _aethoflix_stream(
+        "/stream-tv",
+        {
+            "tmdbId": max(1, int(tmdbId)),
+            "season": max(1, int(season)),
+            "episode": max(1, int(episode)),
+        },
+    )
+
+
+@app.get("/aethoflix/stream-movie")
+async def aethoflix_movie_stream(tmdbId: int):
+    """Resolve a movie through the same fixed Aethoflix provider integration."""
+    return await _aethoflix_stream(
+        "/stream-movie",
+        {"tmdbId": max(1, int(tmdbId))},
+    )
 
 
 def _validated_remote_url(value: str) -> str:
