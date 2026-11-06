@@ -290,6 +290,49 @@ class LocalAnimeApiTests(unittest.TestCase):
             params={"tmdbId": 12345, "season": 2, "episode": 7, "provider": "aethoflix"},
         )
 
+    def test_aethoflix_movie_route_uses_the_fixed_movie_endpoint(self) -> None:
+        provider_response = type(
+            "FakeResponse",
+            (),
+            {
+                "is_success": True,
+                "status_code": 200,
+                "content": b'{"success":true}',
+                "json": staticmethod(lambda: {
+                    "success": True,
+                    "providers": [{"id": "aethoflix", "enabled": True}],
+                }),
+            },
+        )()
+        movie_response = type(
+            "FakeResponse",
+            (),
+            {
+                "is_success": True,
+                "status_code": 200,
+                "content": b'{"success":true,"links":[]}',
+                "json": staticmethod(lambda: {"success": True, "links": []}),
+            },
+        )()
+        fake_client = AsyncMock()
+        fake_client.__aenter__.return_value = fake_client
+        fake_client.__aexit__.return_value = None
+        fake_client.get = AsyncMock(side_effect=[provider_response, movie_response])
+
+        with patch.object(local_api.httpx, "AsyncClient", return_value=fake_client):
+            response = self.client.get(
+                "/aethoflix/stream-movie",
+                params={"tmdbId": 24680},
+                headers=self.auth,
+            )
+
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.json()["provider"], "Aethoflix")
+        fake_client.get.assert_any_await(
+            "https://scraper.flix.quest/api/v2/stream-movie",
+            params={"tmdbId": 24680, "provider": "aethoflix"},
+        )
+
     def test_aethoflix_stream_rejects_disabled_upstream_provider(self) -> None:
         provider_response = type(
             "FakeResponse",
