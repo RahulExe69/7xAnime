@@ -2027,7 +2027,7 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
     </div>
   );
 
-  if (isHindiMode && isLoadingHindi) {
+  if (isHindiMode && isLoadingHindi && !hindiStreams.length) {
     return (
       <div className="space-y-3">
         {playerHeader}
