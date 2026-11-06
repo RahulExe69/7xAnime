@@ -2067,6 +2067,7 @@ const VideoPlayerSection = ({ isWatchRoute }: { isWatchRoute: boolean }) => {
                   referer: selectedHindi.headers?.Referer || selectedHindi.headers?.referer || "",
                   headers: selectedHindi.headers,
                   server: "Aethoflix",
+                  bypassProxy: true,
                 }],
                 anilistID: Number(animeIdParam) || 0,
                 malID: Number(anime?.anime?.info?.malId) || 0,
