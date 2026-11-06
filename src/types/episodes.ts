@@ -67,6 +67,8 @@ export interface Outro {
 export interface Source {
   url: string;
   type: string;
+  /** Skip the 7xAnime proxy when the upstream API already returns a proxied media URL. */
+  bypassProxy?: boolean;
   referer?: string;
   headers?: Record<string, string>;
   server?: string;
